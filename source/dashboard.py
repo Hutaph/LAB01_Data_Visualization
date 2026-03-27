@@ -85,20 +85,42 @@ def main() -> None:
     st.markdown(
         """
         <style>
+        /* --- Layout polish (lightweight, no extra deps) --- */
+        .block-container { padding-top: 1.2rem; padding-bottom: 2.25rem; }
+        section[data-testid="stSidebar"] > div { padding-top: 1.0rem; }
         div[data-testid="stMetricValue"] { font-size: 1.85rem; }
-        .block-container { padding-top: 1.2rem; }
+        div[data-testid="stMetricLabel"] { opacity: 0.8; }
+        /* reduce top whitespace before tabs */
+        div[data-testid="stTabs"] { margin-top: 0.35rem; }
+        /* make plots/tables feel like cards */
+        div[data-testid="stPlotlyChart"], div[data-testid="stDataFrame"] {
+          border: 1px solid rgba(120,120,120,0.20);
+          border-radius: 14px;
+          padding: 12px 12px 6px 12px;
+          background: rgba(250,250,250,0.35);
+        }
+        /* nicer caption */
+        .stCaption { opacity: 0.85; }
+        div[data-testid="stMetricValue"] { font-size: 1.85rem; }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
-    st.title("Amazon US · Laptop & phụ kiện")
-    st.caption(
-        "Bộ lọc theo giá, đánh giá và ngành hàng. Biểu đồ tương tác và xuất danh sách đã lọc."
-    )
+    # ==============================
+    # Header (đẹp mắt + gọn)
+    # ==============================
+    left, right = st.columns([3.2, 1.1], vertical_alignment="bottom")
+    with left:
+        st.title("Amazon US · Laptop & phụ kiện")
+        st.caption(
+            "Bộ lọc theo giá, đánh giá và ngành hàng. Dùng dữ liệu crawl để demo dashboard."
+        )
+    with right:
+        st.caption("Phiên bản: `demo`")
 
     with st.sidebar:
-        st.header("Bộ lọc")
+        st.header("Bộ lọc dữ liệu")
         csv_path = st.text_input("Tệp dữ liệu CSV", value=str(DEFAULT_CSV))
         try:
             df = load_products(csv_path)
@@ -129,7 +151,7 @@ def main() -> None:
         only_bestseller = st.toggle("Chỉ Best Seller", value=False)
 
         st.divider()
-        st.caption("Giao diện: menu ⋮ ở góc phải → Settings → Theme.")
+        st.caption("Gợi ý: menu ⋮ (góc phải) → Settings → Theme.")
 
     q = st.text_input("Tìm theo tên sản phẩm", placeholder="Ví dụ: MacBook, HP, sleeve")
 
@@ -171,379 +193,37 @@ def main() -> None:
             f"{avg_disc:.0f}%" if len(f) and pd.notna(avg_disc) else "—",
         )
 
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-        [
-            "Tổng quan",
-            "Danh sách",
-            "Ưu tiên",
-            "Khuyến mãi",
-            "Thương hiệu",
-            "Prime & nhãn",
-        ]
+    # ==============================
+    # Tabs (TEAM TODO)
+    # ==============================
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["Tab 1", "Tab 2", "Tab 3", "Tab 4", "Tab 5"]
     )
 
     with tab1:
-        if len(f) < 2:
-            st.warning("Không đủ dữ liệu. Hãy nới bộ lọc ở cột bên trái.")
-        else:
-            col_a, col_b = st.columns(2)
-            with col_a:
-                fig_hist = px.histogram(
-                    f.dropna(subset=["price_usd"]),
-                    x="price_usd",
-                    nbins=40,
-                    color_discrete_sequence=["#6366f1"],
-                    title="Phân bố giá bán, USD",
-                )
-                fig_hist.update_layout(
-                    bargap=0.05,
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                )
-                st.plotly_chart(fig_hist, use_container_width=True)
-
-            with col_b:
-                sub = f.dropna(subset=["price_usd", "rating", "reviews"])
-                if len(sub):
-                    fig_sc = px.scatter(
-                        sub,
-                        x="price_usd",
-                        y="rating",
-                        size="reviews",
-                        color="category",
-                        hover_data=["title"],
-                        title="Giá bán và số sao · kích thước điểm theo số đánh giá",
-                        opacity=0.65,
-                    )
-                    fig_sc.update_layout(
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        legend_title_text="Ngành hàng",
-                    )
-                    st.plotly_chart(fig_sc, use_container_width=True)
-                else:
-                    st.info("Không đủ bản ghi có đủ giá và điểm sao để hiển thị biểu đồ.")
-
-            top_cat = (
-                f.groupby("category", dropna=False)
-                .size()
-                .reset_index(name="n")
-                .sort_values("n", ascending=False)
-                .head(15)
-            )
-            fig_bar = px.bar(
-                top_cat,
-                x="n",
-                y="category",
-                orientation="h",
-                color_discrete_sequence=["#14b8a6"],
-                title="15 ngành hàng phổ biến nhất",
-            )
-            fig_bar.update_layout(
-                yaxis={"categoryorder": "total ascending"},
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-            )
-            st.plotly_chart(fig_bar, use_container_width=True)
+        # TEAM: Dán code Tab 1 tại đây
+        # - Ví dụ: biểu đồ tổng quan, KPI cards, phân bố giá
+        st.info("Tab 1 đang để trống.")
 
     with tab2:
-        show_cols = [
-            "title",
-            "price_usd",
-            "list_price_usd",
-            "discount_pct",
-            "rating",
-            "reviews",
-            "category",
-            "search_is_prime",
-            "search_is_best_seller",
-            "link",
-        ]
-        disp = f[show_cols].copy()
-        disp = disp.rename(
-            columns={
-                "title": "Tên sản phẩm",
-                "price_usd": "Giá bán",
-                "list_price_usd": "Giá niêm yết",
-                "discount_pct": "Chiết khấu",
-                "rating": "Số sao",
-                "reviews": "Số đánh giá",
-                "category": "Ngành hàng",
-                "search_is_prime": "Prime",
-                "search_is_best_seller": "Best Seller",
-                "link": "Liên kết",
-            }
-        )
-        st.dataframe(
-            disp,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "Liên kết": st.column_config.LinkColumn("Liên kết"),
-                "Giá bán": st.column_config.NumberColumn(format="$%.2f"),
-                "Giá niêm yết": st.column_config.NumberColumn(format="$%.2f"),
-                "Chiết khấu": st.column_config.NumberColumn(format="%.0f%%"),
-            },
-        )
-        csv_bytes = f[show_cols].to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "Tải CSV",
-            data=csv_bytes,
-            file_name="amazon_filtered.csv",
-            mime="text/csv",
-        )
+        # TEAM: Dán code Tab 2 tại đây
+        # - Ví dụ: bảng dữ liệu + export, drill-down theo SKU
+        st.info("Tab 2 đang để trống.")
 
     with tab3:
-        st.subheader("Gợi ý theo điểm ưu tiên")
-        st.caption(
-            "Xếp hạng nội bộ từ số sao, số đánh giá và giá bán. Chỉ dùng để so sánh trong cùng tập dữ liệu đã lọc."
-        )
-        work = f.dropna(subset=["price_usd", "rating"]).copy()
-        work = work[work["price_usd"] > 0]
-        if len(work):
-            work["_score"] = (
-                work["rating"] * np.log1p(work["reviews"].fillna(0)) / np.sqrt(work["price_usd"])
-            )
-            top = work.nlargest(12, "_score")[
-                ["title", "price_usd", "rating", "reviews", "link", "image_url"]
-            ]
-            for _, row in top.iterrows():
-                ic, tx = st.columns([1, 5])
-                with ic:
-                    if pd.notna(row.get("image_url")) and str(row["image_url"]).startswith("http"):
-                        st.image(str(row["image_url"]), width=72)
-                    else:
-                        st.write("—")
-                with tx:
-                    st.markdown(f"**{row['title'][:120]}…**" if len(str(row["title"])) > 120 else f"**{row['title']}**")
-                    st.markdown(
-                        f"${row['price_usd']:.2f} · {row['rating']:.1f} sao · {int(row['reviews'] or 0):,} đánh giá"
-                    )
-                    st.link_button("Xem trên Amazon", str(row["link"]))
-        else:
-            st.info("Không có bản ghi đủ giá bán và số sao.")
+        # TEAM: Dán code Tab 3 tại đây
+        # - Ví dụ: ranking / gợi ý sản phẩm / scoring
+        st.info("Tab 3 đang để trống.")
 
     with tab4:
-        st.subheader("Chiết khấu so với giá niêm yết")
-        st.caption(
-            "Hiển thị SKU có đủ giá niêm yết và giá bán, với mức chiết khấu từ ngưỡng bạn chọn."
-        )
-        min_disc = st.slider("Chiết khấu tối thiểu", 5, 80, 15, 5, key="deal_min_disc")
-        deals = f[
-            f["discount_pct"].notna()
-            & (f["discount_pct"] >= min_disc)
-            & (f["list_price_usd"].notna())
-        ].copy()
-        deals = deals.sort_values("discount_pct", ascending=False)
-        st.metric("SKU đạt ngưỡng", f"{len(deals):,}")
-        if len(deals):
-            top_d = deals.head(20)[
-                [
-                    "title",
-                    "price_usd",
-                    "list_price_usd",
-                    "discount_pct",
-                    "savings_usd",
-                    "rating",
-                    "reviews",
-                    "link",
-                ]
-            ]
-            st.dataframe(
-                top_d.rename(
-                    columns={
-                        "price_usd": "Giá",
-                        "list_price_usd": "Niêm yết",
-                        "discount_pct": "Giảm %",
-                        "savings_usd": "Tiết kiệm $",
-                        "rating": "Rating",
-                        "reviews": "Reviews",
-                        "link": "Link",
-                    }
-                ),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Link": st.column_config.LinkColumn("Link"),
-                    "Giá": st.column_config.NumberColumn(format="$%.2f"),
-                    "Niêm yết": st.column_config.NumberColumn(format="$%.2f"),
-                    "Giảm %": st.column_config.NumberColumn(format="%.0f%%"),
-                    "Tiết kiệm $": st.column_config.NumberColumn(format="$%.2f"),
-                },
-            )
-            fig_deal = px.bar(
-                deals.head(25).iloc[::-1],
-                x="discount_pct",
-                y="title",
-                orientation="h",
-                color="savings_usd",
-                color_continuous_scale="Turbo",
-                title="Top 25 deal (theo % giảm) — màu = tiết kiệm $",
-                hover_data=["price_usd", "list_price_usd", "rating"],
-            )
-            fig_deal.update_layout(
-                yaxis={"title": None, "tickmode": "linear"},
-                height=max(420, min(900, 24 * len(deals.head(25)))),
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-            )
-            fig_deal.update_yaxes(tickfont={"size": 9})
-            st.plotly_chart(fig_deal, use_container_width=True)
-        else:
-            st.info("Không có deal nào — hạ ngưỡng % hoặc nới bộ lọc sidebar.")
+        # TEAM: Dán code Tab 4 tại đây
+        # - Ví dụ: phân tích khuyến mãi / chiết khấu / price ladder
+        st.info("Tab 4 đang để trống.")
 
     with tab5:
-        st.subheader("Thương hiệu (suy ra từ brand_info / chữ đầu tiêu đề)")
-        top_n = st.slider("Số thương hiệu hiển thị", 5, 40, 15, 1, key="brand_top_n")
-        bdf = (
-            f.groupby("brand", dropna=False)
-            .agg(
-                n=("asin", "count"),
-                avg_price=("price_usd", "mean"),
-                avg_rating=("rating", "mean"),
-            )
-            .reset_index()
-            .query("n >= 1")
-            .sort_values("n", ascending=False)
-            .head(top_n)
-        )
-        if len(bdf):
-            c_b1, c_b2 = st.columns(2)
-            with c_b1:
-                fig_bn = px.bar(
-                    bdf.sort_values("n"),
-                    x="n",
-                    y="brand",
-                    orientation="h",
-                    color_discrete_sequence=["#8b5cf6"],
-                    title="Số sản phẩm theo brand",
-                )
-                fig_bn.update_layout(
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                    yaxis={"categoryorder": "total ascending"},
-                )
-                st.plotly_chart(fig_bn, use_container_width=True)
-            with c_b2:
-                bpr = bdf.dropna(subset=["avg_price"])
-                if len(bpr):
-                    fig_bp = px.bar(
-                        bpr.sort_values("avg_price"),
-                        x="avg_price",
-                        y="brand",
-                        orientation="h",
-                        color="avg_rating",
-                        color_continuous_scale="RdYlGn",
-                        range_color=[3, 5],
-                        title="Giá TB (USD) — màu = rating TB",
-                    )
-                    fig_bp.update_layout(
-                        plot_bgcolor="rgba(0,0,0,0)",
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        yaxis={"categoryorder": "total ascending"},
-                    )
-                    st.plotly_chart(fig_bp, use_container_width=True)
-            st.dataframe(
-                bdf.rename(
-                    columns={
-                        "brand": "Brand",
-                        "n": "Số SP",
-                        "avg_price": "Giá TB",
-                        "avg_rating": "Rating TB",
-                    }
-                ),
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Giá TB": st.column_config.NumberColumn(format="$%.2f"),
-                    "Rating TB": st.column_config.NumberColumn(format="%.2f"),
-                },
-            )
-        else:
-            st.info("Không có dữ liệu brand sau lọc.")
-
-    with tab6:
-        st.subheader("So sánh Prime & huy hiệu Amazon")
-        st.caption("Dựa trên cờ crawl: Prime, Best seller, Amazon's Choice.")
-        if len(f) == 0:
-            st.warning("Không có dòng sau lọc.")
-        else:
-            seg = f.assign(
-                prime_label=f["search_is_prime"].map({True: "Prime", False: "Không Prime"})
-            )
-            col_p1, col_p2 = st.columns(2)
-            with col_p1:
-                fig_box = px.box(
-                    seg.dropna(subset=["price_usd"]),
-                    x="prime_label",
-                    y="price_usd",
-                    color="prime_label",
-                    points="outliers",
-                    title="Phân bố giá: Prime vs không Prime",
-                )
-                fig_box.update_layout(
-                    showlegend=False,
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                )
-                st.plotly_chart(fig_box, use_container_width=True)
-            with col_p2:
-                pm = (
-                    seg.groupby("prime_label", dropna=False)
-                    .agg(avg_rating=("rating", "mean"), n=("asin", "count"))
-                    .reset_index()
-                )
-                fig_pr = px.bar(
-                    pm,
-                    x="prime_label",
-                    y="avg_rating",
-                    color="prime_label",
-                    text="n",
-                    title="Rating trung bình theo nhóm Prime",
-                )
-                fig_pr.update_traces(texttemplate="n=%{text}", textposition="outside")
-                fig_pr.update_layout(
-                    showlegend=False,
-                    yaxis_range=[0, 5.15],
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    paper_bgcolor="rgba(0,0,0,0)",
-                )
-                st.plotly_chart(fig_pr, use_container_width=True)
-
-            badge_rows = [
-                ("Best seller", int(f["search_is_best_seller"].sum())),
-                ("Amazon's Choice", int(f["search_is_amazon_choice"].sum())),
-                ("Prime eligible", int(f["search_is_prime"].sum())),
-            ]
-            badf = pd.DataFrame(badge_rows, columns=["Huy hiệu", "Số sản phẩm"])
-            fig_bg = px.bar(
-                badf,
-                x="Huy hiệu",
-                y="Số sản phẩm",
-                color="Huy hiệu",
-                title="Số lượng sản phẩm có từng huy hiệu (trong tập đã lọc)",
-            )
-            fig_bg.update_layout(
-                showlegend=False,
-                plot_bgcolor="rgba(0,0,0,0)",
-                paper_bgcolor="rgba(0,0,0,0)",
-            )
-            st.plotly_chart(fig_bg, use_container_width=True)
-
-            cross = (
-                f.groupby(
-                    [
-                        f["search_is_prime"].map({True: "Prime", False: "Không Prime"}),
-                        f["search_is_best_seller"].map({True: "BS", False: "—"}),
-                    ],
-                    dropna=False,
-                )
-                .size()
-                .reset_index(name="n")
-            )
-            cross.columns = ["Prime", "Best seller", "n"]
-            st.markdown("**Giao Prime × Best seller** (nhanh thấy tỷ lệ chồng lấn)")
-            st.dataframe(cross, use_container_width=True, hide_index=True)
+        # TEAM: Dán code Tab 5 tại đây
+        # - Ví dụ: brand / Prime / badge analysis
+        st.info("Tab 5 đang để trống.")
 
 
 if __name__ == "__main__":
