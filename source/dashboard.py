@@ -15,23 +15,32 @@ import streamlit as st
 
 # Đường dẫn dữ liệu (cùng repo)
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_CSV = ROOT / "data" / "amazon_crawl" / "amazon_products_US_20260321_231510.csv"
+DEFAULT_CSV = ROOT / "data" / "amazon_crawl" / "amazon_products_US_20260324_231228.csv"
 
-USECOLS = [
+REQUIRED_COLS = [
+    # Search schema (README)
     "asin",
     "title",
-    "current_price",
-    "search_price",
+    "price",
     "original_price",
-    "search_original_price",
-    "search_rating",
-    "search_reviews",
-    "main_category_name",
-    "search_is_prime",
-    "search_is_best_seller",
-    "search_is_amazon_choice",
+    "rating",
+    "reviews",
+    "currency",
+    "is_best_seller",
+    "is_amazon_choice",
+    "is_prime",
+    "sales_volume",
+    "delivery_info",
+    "number_of_offers",
+    "lowest_offer_price",
+    "has_variations",
+    "is_climate_friendly",
     "link",
     "image_url",
+    # Added feature in pipeline
+    "crawl_category",
+    # Details schema (optional; may be missing for non-enriched rows)
+    "current_price",
     "brand_info",
 ]
 
@@ -53,16 +62,35 @@ def load_products(csv_path: str) -> pd.DataFrame:
     path = Path(csv_path)
     if not path.exists():
         raise FileNotFoundError(str(path))
-    df = pd.read_csv(path, usecols=USECOLS, low_memory=False)
-    price = df["search_price"].combine_first(df["current_price"])
-    orig = df["search_original_price"].combine_first(df["original_price"])
-    df["price_usd"] = pd.to_numeric(price, errors="coerce")
-    df["list_price_usd"] = pd.to_numeric(orig, errors="coerce")
-    df["rating"] = pd.to_numeric(df["search_rating"], errors="coerce")
-    df["reviews"] = pd.to_numeric(df["search_reviews"], errors="coerce")
-    df["category"] = df["main_category_name"].fillna("Không xác định")
-    for c in ("search_is_prime", "search_is_best_seller", "search_is_amazon_choice"):
+    # CSV mới (pipeline) giữ tên field theo README + thêm `crawl_category`.
+    # Không dùng usecols cố định để tránh crash khi enrich thiếu field.
+    df = pd.read_csv(path, low_memory=False)
+
+    # Ensure required cols exist (for robust UI even when some fields are missing)
+    for c in REQUIRED_COLS:
+        if c not in df.columns:
+            df[c] = pd.NA
+
+    # Normalize numeric fields
+    df["price"] = pd.to_numeric(df["price"], errors="coerce")
+    df["current_price"] = pd.to_numeric(df["current_price"], errors="coerce")
+    df["original_price"] = pd.to_numeric(df["original_price"], errors="coerce")
+    df["rating"] = pd.to_numeric(df["rating"], errors="coerce")
+    df["reviews"] = pd.to_numeric(df["reviews"], errors="coerce")
+    df["number_of_offers"] = pd.to_numeric(df["number_of_offers"], errors="coerce")
+    df["lowest_offer_price"] = pd.to_numeric(df["lowest_offer_price"], errors="coerce")
+
+    # Prefer enriched price when available
+    df["price_usd"] = df["current_price"].combine_first(df["price"])
+    df["list_price_usd"] = df["original_price"]
+
+    # Category for dashboard: use pipeline feature `crawl_category`
+    df["category"] = df["crawl_category"].fillna("unknown")
+
+    # Normalize boolean flags (search schema)
+    for c in ("is_prime", "is_best_seller", "is_amazon_choice", "has_variations", "is_climate_friendly"):
         df[c] = df[c].fillna(False).astype(bool)
+
     df["discount_pct"] = (
         (df["list_price_usd"] - df["price_usd"]) / df["list_price_usd"] * 100
     ).where(df["list_price_usd"] > 0)
@@ -112,7 +140,7 @@ def main() -> None:
     # ==============================
     left, right = st.columns([3.2, 1.1], vertical_alignment="bottom")
     with left:
-        st.title("Amazon US · Laptop & phụ kiện")
+        st.title("Amazon US")
         st.caption(
             "Bộ lọc theo giá, đánh giá và ngành hàng. Dùng dữ liệu crawl để demo dashboard."
         )
@@ -162,9 +190,9 @@ def main() -> None:
     if sel_cats:
         f = f[f["category"].isin(sel_cats)]
     if only_prime:
-        f = f[f["search_is_prime"]]
+        f = f[f["is_prime"]]
     if only_bestseller:
-        f = f[f["search_is_best_seller"]]
+        f = f[f["is_best_seller"]]
     if q.strip():
         f = f[f["title"].astype(str).str.contains(q.strip(), case=False, na=False)]
 
@@ -184,7 +212,7 @@ def main() -> None:
     with c4:
         st.metric(
             "Đủ điều kiện Prime",
-            f"{int(f['search_is_prime'].sum()):,}" if len(f) else "—",
+            f"{int(f['is_prime'].sum()):,}" if len(f) else "—",
         )
     with c5:
         avg_disc = f["discount_pct"].mean()
