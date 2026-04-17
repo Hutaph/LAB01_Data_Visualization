@@ -126,9 +126,10 @@ def render(df_raw):
         }}
 
         .filter-bar {{
+            position: sticky; top: 0; z-index: 1000;
             display: flex; align-items: center; gap: 24px; margin-bottom: 24px;
             background: var(--card-bg); padding: 16px 20px; border-radius: var(--border-radius);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-wrap: wrap;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); flex-wrap: wrap; margin-top: 5px;
         }}
         .f-item {{ display: flex; flex-direction: column; gap: 6px; }}
         .f-label {{ font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }}
@@ -191,8 +192,13 @@ def render(df_raw):
     </div>
 
     <!-- S.M.A.R.T STRATEGY DIGEST -->
-    <div class="insight-card">
-        <div class="insight-title">TỔNG HỢP KIẾN NGHỊ ĐỊNH HƯỚNG THEO S.M.A.R.T</div>
+    <div class="insight-card" style="margin-top: 10px;">
+        <div class="insight-title">📍 MỤC TIÊU CỦA TAB NÀY</div>
+        <div class="insight-text" style="margin-bottom: 12px; color: var(--dark);">
+            Sử dụng khuôn khổ S.M.A.R.T để đánh giá tính khả thi khi áp dụng <strong>Chính sách giao hàng Prime</strong> và sự ảnh hưởng của <strong>Biến động cước phí</strong> đến sức mua. Từ đó truy xuất chính xác ngưỡng giá cước kháng cự và các phân khúc danh mục tối ưu để bơm tiền trợ giá vận chuyển.
+        </div>
+        
+        <div class="insight-title" style="font-size: 13px; color: #78716C;">CHI TIẾT TRIỂN KHAI S.M.A.R.T</div>
         <div class="insight-text" id="dynamic_insight"></div>
     </div>
 
@@ -642,4 +648,4 @@ def render(df_raw):
 </html>
     """
     
-    components.html(html_code, height=2000, scrolling=True)
+    components.html(html_code, height=2300, scrolling=False)
