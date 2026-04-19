@@ -149,16 +149,43 @@ def render(df_raw):
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{ background: var(--bg); font-family: var(--font-family); color: var(--text-primary); padding: 14px 18px; line-height: 1.5; }}
 
-        .section-header {{
-            font-size: 14px; font-weight: 800; color: var(--dark); text-transform: uppercase;
-            padding: 10px 0 8px 0; border-bottom: 2px solid #FDBA74; margin: 28px 0 14px 0;
-            display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
+        /* ── Section Wrapper & Sticky Header ── */
+        .section-wrapper {{ position: relative; margin-top: 24px; }}
+        .section-sticky {{
+            position: relative; z-index: 100;
+            background: var(--bg); padding: 8px 0 6px 0;
+            border-bottom: 2px solid #FDBA74;
+            margin-bottom: 14px;
+            transition: box-shadow 0.15s ease;
+            will-change: transform;
         }}
-        .section-header .num {{
+        .section-sticky.is-stuck {{
+            box-shadow: 0 3px 10px rgba(154, 52, 18, 0.15);
+        }}
+        .section-title-row {{
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+        }}
+        .section-title {{
+            display: flex; align-items: center; gap: 7px;
+            font-size: 12px; font-weight: 800; color: var(--dark); text-transform: uppercase; letter-spacing: 0.3px;
+            white-space: nowrap; flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+        }}
+        .section-title .num {{
             display: inline-flex; align-items: center; justify-content: center;
-            width: 26px; height: 26px; border-radius: 50%; background: var(--primary);
-            color: white; font-size: 13px; font-weight: 700; flex-shrink: 0;
+            width: 24px; height: 24px; border-radius: 50%; background: var(--primary);
+            color: white; font-size: 12px; font-weight: 700; flex-shrink: 0;
         }}
+        .header-filters {{
+            display: flex; align-items: center; gap: 10px; flex-shrink: 0;
+        }}
+        .hf-item {{ display: flex; align-items: center; gap: 4px; }}
+        .hf-label {{ font-size: 9.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; white-space: nowrap; }}
+        select {{
+            padding: 5px 8px; border: 1px solid #D6D3D1; border-radius: 5px;
+            font-family: inherit; font-size: 11px; color: var(--text-primary);
+            outline: none; cursor: pointer; background: white;
+        }}
+        select:focus {{ border-color: var(--primary); box-shadow: 0 0 0 2px rgba(249,115,22,0.15); }}
 
         /* ── Objective & Concept Cards ── */
         .obj-card {{
@@ -200,21 +227,6 @@ def render(df_raw):
         .concept-tag.green {{ background: #D1FAE5; color: #065F46; }}
         .concept-tag.amber {{ background: #FEF3C7; color: #92400E; }}
         .concept-tag.red {{ background: #FEE2E2; color: #991B1B; }}
-
-        /* ── Section Filter Bar (per-section) ── */
-        .section-filter {{
-            display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
-            background: #F5F5F4; padding: 10px 16px; border-radius: 8px;
-            margin-bottom: 14px; border: 1px solid #E7E5E4;
-        }}
-        .f-item {{ display: flex; align-items: center; gap: 6px; }}
-        .f-label {{ font-size: 10.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; white-space: nowrap; }}
-        select {{
-            padding: 6px 10px; border: 1px solid #D6D3D1; border-radius: 6px;
-            font-family: inherit; font-size: 11.5px; color: var(--text-primary);
-            outline: none; cursor: pointer; background: white;
-        }}
-        select:focus {{ border-color: var(--primary); box-shadow: 0 0 0 2px rgba(249,115,22,0.15); }}
 
         /* ── KPI Cards ── */
         .kpi-row {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 14px; }}
@@ -295,7 +307,23 @@ def render(df_raw):
     <!-- ═══════════════════════════════════════════════════════════
          SECTION 1: CHIẾN LƯỢC ĐỊNH GIÁ VẬN CHUYỂN
          ═══════════════════════════════════════════════════════════ -->
-    <div class="section-header"><span class="num">1</span> CHIẾN LƯỢC ĐỊNH GIÁ TỐI ƯU QUA CẤU TRÚC PHÍ VẬN CHUYỂN</div>
+    <div class="section-wrapper">
+    <div class="section-sticky">
+        <div class="section-title-row">
+            <div class="section-title"><span class="num">1</span> CHIẾN LƯỢC ĐỊNH GIÁ PHÍ VẬN CHUYỂN</div>
+            <div class="header-filters">
+                <div class="hf-item"><span class="hf-label">Chỉ Số:</span>
+                    <select id="selMetric1" onchange="applySection1()">
+                        <option value="sales">Số Lượng Bán Ra</option>
+                        <option value="revenue">Doanh Thu ($)</option>
+                    </select>
+                </div>
+                <div class="hf-item"><span class="hf-label">Danh Mục:</span>
+                    <select id="selCat1" onchange="applySection1()"><option value="ALL">Tất Cả Danh Mục</option></select>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="obj-card">
         <div class="obj-title">🎯 Mục tiêu phân tích</div>
@@ -327,18 +355,6 @@ def render(df_raw):
                 </div>
             </div>
         </details>
-    </div>
-
-    <div class="section-filter">
-        <div class="f-item"><span class="f-label">Chỉ Số:</span>
-            <select id="selMetric1" onchange="applySection1()">
-                <option value="sales">Số Lượng Bán Ra</option>
-                <option value="revenue">Doanh Thu ($)</option>
-            </select>
-        </div>
-        <div class="f-item"><span class="f-label">Danh Mục:</span>
-            <select id="selCat1" onchange="applySection1()"><option value="ALL">Tất Cả Danh Mục</option></select>
-        </div>
     </div>
 
     <div class="kpi-row">
@@ -388,11 +404,28 @@ def render(df_raw):
             <div class="insight-text" id="ins1">Đang phân tích...</div>
         </div>
     </div>
+    </div><!-- /section-wrapper 1 -->
 
     <!-- ═══════════════════════════════════════════════════════════
          SECTION 2: VAI TRÒ CỦA PRIME
          ═══════════════════════════════════════════════════════════ -->
-    <div class="section-header"><span class="num">2</span> VAI TRÒ CỦA PRIME TRONG ĐỊNH HÌNH SẢN PHẨM NỔI BẬT</div>
+    <div class="section-wrapper">
+    <div class="section-sticky">
+        <div class="section-title-row">
+            <div class="section-title"><span class="num">2</span> VAI TRÒ PRIME VỚI SẢN PHẨM NỔI BẬT</div>
+            <div class="header-filters">
+                <div class="hf-item"><span class="hf-label">Chỉ Số:</span>
+                    <select id="selMetric2" onchange="applySection2()">
+                        <option value="sales">Số Lượng Bán Ra</option>
+                        <option value="revenue">Doanh Thu ($)</option>
+                    </select>
+                </div>
+                <div class="hf-item"><span class="hf-label">Danh Mục:</span>
+                    <select id="selCat2" onchange="applySection2()"><option value="ALL">Tất Cả Danh Mục</option></select>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="obj-card">
         <div class="obj-title">🎯 Mục tiêu phân tích</div>
@@ -432,18 +465,6 @@ def render(df_raw):
                 </div>
             </div>
         </details>
-    </div>
-
-    <div class="section-filter">
-        <div class="f-item"><span class="f-label">Chỉ Số:</span>
-            <select id="selMetric2" onchange="applySection2()">
-                <option value="sales">Số Lượng Bán Ra</option>
-                <option value="revenue">Doanh Thu ($)</option>
-            </select>
-        </div>
-        <div class="f-item"><span class="f-label">Danh Mục:</span>
-            <select id="selCat2" onchange="applySection2()"><option value="ALL">Tất Cả Danh Mục</option></select>
-        </div>
     </div>
 
     <div class="kpi-row">
@@ -503,11 +524,28 @@ def render(df_raw):
             <div class="insight-text" id="ins2">Đang phân tích...</div>
         </div>
     </div>
+    </div><!-- /section-wrapper 2 -->
 
     <!-- ═══════════════════════════════════════════════════════════
          SECTION 3: TỐC ĐỘ GIAO HÀNG
          ═══════════════════════════════════════════════════════════ -->
-    <div class="section-header"><span class="num">3</span> TÁC ĐỘNG TỐC ĐỘ GIAO HÀNG ĐẾN ĐỊNH VỊ THƯƠNG HIỆU</div>
+    <div class="section-wrapper">
+    <div class="section-sticky">
+        <div class="section-title-row">
+            <div class="section-title"><span class="num">3</span> TÁC ĐỘNG TỐC ĐỘ GIAO HÀNG</div>
+            <div class="header-filters">
+                <div class="hf-item"><span class="hf-label">Chỉ Số:</span>
+                    <select id="selMetric3" onchange="applySection3()">
+                        <option value="sales">Số Lượng Bán Ra</option>
+                        <option value="revenue">Doanh Thu ($)</option>
+                    </select>
+                </div>
+                <div class="hf-item"><span class="hf-label">Danh Mục:</span>
+                    <select id="selCat3" onchange="applySection3()"><option value="ALL">Tất Cả Danh Mục</option></select>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="obj-card">
         <div class="obj-title">🎯 Mục tiêu phân tích</div>
@@ -550,18 +588,6 @@ def render(df_raw):
                 </div>
             </div>
         </details>
-    </div>
-
-    <div class="section-filter">
-        <div class="f-item"><span class="f-label">Chỉ Số:</span>
-            <select id="selMetric3" onchange="applySection3()">
-                <option value="sales">Số Lượng Bán Ra</option>
-                <option value="revenue">Doanh Thu ($)</option>
-            </select>
-        </div>
-        <div class="f-item"><span class="f-label">Danh Mục:</span>
-            <select id="selCat3" onchange="applySection3()"><option value="ALL">Tất Cả Danh Mục</option></select>
-        </div>
     </div>
 
     <div class="kpi-row">
@@ -621,6 +647,7 @@ def render(df_raw):
             <div class="insight-text" id="ins3">Đang phân tích...</div>
         </div>
     </div>
+    </div><!-- /section-wrapper 3 -->
 
 <!-- ═══════════════════════════════════════════════════════════
      JAVASCRIPT
@@ -659,6 +686,75 @@ def render(df_raw):
         }});
         initCharts();
         applySection1(); applySection2(); applySection3();
+        initStickyHeaders();
+    }}
+
+    // ── JS-driven Sticky Headers (GPU-composited, no layout thrash) ──
+    function initStickyHeaders() {{
+        const wraps = [...document.querySelectorAll('.section-wrapper')];
+        const sticks = wraps.map(w => w.querySelector('.section-sticky'));
+        if (!wraps.length) return;
+
+        let myIframe = null;
+        try {{
+            const iframes = window.parent.document.querySelectorAll('iframe');
+            for (let f of iframes) {{
+                try {{ if (f.contentWindow === window) {{ myIframe = f; break; }} }} catch(e) {{}}
+            }}
+        }} catch(e) {{ return; }}
+        if (!myIframe) return;
+
+        // Cache layout measurements (avoid reading DOM every frame)
+        let L = [];
+        function cacheLayout() {{
+            L = wraps.map((w, i) => ({{
+                wTop: w.offsetTop,
+                wH: w.offsetHeight,
+                sH: sticks[i].offsetHeight
+            }}));
+        }}
+        cacheLayout();
+        window.addEventListener('resize', cacheLayout);
+
+        let ticking = false;
+        let prevStates = wraps.map(() => 0); // 0=normal, 1=stuck, 2=bottom
+
+        function update() {{
+            const scrollY = Math.max(0, -myIframe.getBoundingClientRect().top);
+
+            for (let i = 0; i < wraps.length; i++) {{
+                const s = sticks[i];
+                const {{ wTop, wH, sH }} = L[i];
+                let newState = 0, dy = 0;
+
+                if (scrollY >= wTop && scrollY < wTop + wH - sH) {{
+                    newState = 1;
+                    dy = scrollY - wTop;
+                }} else if (scrollY >= wTop + wH - sH && scrollY < wTop + wH) {{
+                    newState = 2;
+                    dy = wH - sH;
+                }}
+
+                // GPU-composited transform (no reflow)
+                s.style.transform = dy > 0 ? 'translateY(' + dy + 'px)' : '';
+
+                // Only toggle class when state actually changes
+                if (newState !== prevStates[i]) {{
+                    s.classList.toggle('is-stuck', newState > 0);
+                    prevStates[i] = newState;
+                }}
+            }}
+            ticking = false;
+        }}
+
+        function onScroll() {{
+            if (!ticking) {{ requestAnimationFrame(update); ticking = true; }}
+        }}
+
+        try {{ window.parent.addEventListener('scroll', onScroll, true); }} catch(e) {{}}
+        window.addEventListener('scroll', onScroll);
+        setTimeout(cacheLayout, 500); // recache after charts render
+        update();
     }}
 
     // ══════════════════════════════════════
