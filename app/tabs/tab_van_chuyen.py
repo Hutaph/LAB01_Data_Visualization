@@ -4,92 +4,119 @@ import streamlit as st
 import streamlit.components.v1 as components
 import re
 
+
 def render(df_raw):
     df = df_raw.copy()
-    
-    # Preprocess shipping-related features
+
+    # ══════════════════════════════════════════════════════════════
+    # 1. PREPROCESSING
+    # ══════════════════════════════════════════════════════════════
+
+    # --- is_prime ---
     if "is_prime" not in df.columns:
         df["is_prime"] = False
     else:
         df["is_prime"] = df["is_prime"].fillna(False).astype(bool)
 
+    # --- delivery_fee ---
     if "delivery_fee" not in df.columns:
         df["delivery_fee"] = 0.0
     else:
         df["delivery_fee"] = pd.to_numeric(df["delivery_fee"], errors="coerce").fillna(0.0)
 
+    # --- sales_volume_num ---
     if "sales_volume_num" in df.columns:
-        df["sales_volume_num"] = pd.to_numeric(df["sales_volume_num"], errors="coerce").fillna(0)
+        df["sales_volume_num"] = pd.to_numeric(df["sales_volume_num"], errors="coerce").fillna(0).astype(int)
     else:
         df["sales_volume_num"] = 0
 
+    # --- price ---
     if "price" in df.columns:
         df["current_price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0.0)
     else:
         df["current_price"] = 0.0
 
+    # --- rating ---
+    if "rating" in df.columns:
+        df["rating_val"] = pd.to_numeric(df["rating"], errors="coerce").fillna(0.0)
+    else:
+        df["rating_val"] = 0.0
+
+    # --- is_amazon_choice (proxy for distinguished products) ---
+    if "is_amazon_choice" not in df.columns:
+        df["is_amazon_choice"] = False
+    else:
+        df["is_amazon_choice"] = df["is_amazon_choice"].fillna(False).astype(bool)
+
+    # --- crawl_category ---
     if "crawl_category" not in df.columns:
         df["crawl_category"] = "Không rõ"
-    
+
     def group_category(cat):
         c = str(cat).lower()
         if c.startswith("electronics"): return "Hàng Điện Tử"
-        if c.startswith("fashion"): return "Thời Trang Và Phụ Kiện"
-        if c.startswith("home"): return "Đồ Gia Dụng Và Nội Thất"
-        if c.startswith("beauty"): return "Sản Phẩm Làm Đẹp"
-        if c.startswith("health"): return "Sức Khỏe Và Y Tế"
-        if c.startswith("sports"): return "Thể Thao Và Dã Ngoại"
-        if c.startswith("office"): return "Thiết Bị Văn Phòng"
-        if c.startswith("baby"): return "Đồ Dùng Trẻ Em"
-        if c.startswith("pet"): return "Vật Nuôi Và Thú Cưng"
-        if c.startswith("tools"): return "Công Cụ Cải Tạo Nhà Cửa"
-        if c.startswith("toys"): return "Đồ Chơi Điện Tử"
-        if c.startswith("automotive"): return "Linh Kiện Phương Tiện"
-        return "Danh Mục Khác"
-        
+        if c.startswith("fashion"): return "Thời Trang"
+        if c.startswith("home"): return "Gia Dụng & Nội Thất"
+        if c.startswith("beauty"): return "Làm Đẹp"
+        if c.startswith("health"): return "Sức Khỏe"
+        if c.startswith("sports"): return "Thể Thao"
+        if c.startswith("office"): return "Văn Phòng"
+        if c.startswith("baby"): return "Trẻ Em"
+        if c.startswith("pet"): return "Thú Cưng"
+        if c.startswith("tools"): return "Cải Tạo Nhà"
+        if c.startswith("toys"): return "Đồ Chơi"
+        if c.startswith("automotive"): return "Phương Tiện"
+        return "Khác"
+
     df["crawl_category"] = df["crawl_category"].fillna("Không rõ").apply(group_category)
 
-    def parse_delivery_day(info):
-        info_str = str(info)
-        match = re.search(r'\b(Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b', info_str)
-        if match:
-            day_map = {'Mon': 'Thứ Hai', 'Tue': 'Thứ Ba', 'Wed': 'Thứ Tư', 'Thu': 'Thứ Năm', 'Fri': 'Thứ Sáu', 'Sat': 'Thứ Bảy', 'Sun': 'Chủ Nhật'}
-            return day_map[match.group(1)]
-        return "Không có dữ liệu"
-
-    def parse_delivery_month(info):
-        info_str = str(info)
-        match = re.search(r'\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b', info_str)
-        if match:
-            month_map = {'Jan':'Tháng 1','Feb':'Tháng 2','Mar':'Tháng 3','Apr':'Tháng 4','May':'Tháng 5','Jun':'Tháng 6','Jul':'Tháng 7','Aug':'Tháng 8','Sep':'Tháng 9','Oct':'Tháng 10','Nov':'Tháng 11','Dec':'Tháng 12'}
-            return month_map[match.group(1)]
-        return "Không có dữ liệu"
-        
-    if "delivery_info_clean" in df.columns:
-        df["delivery_day"] = df["delivery_info_clean"].fillna("").apply(parse_delivery_day)
-        df["delivery_month"] = df["delivery_info_clean"].fillna("").apply(parse_delivery_month)
-    else:
-        df["delivery_day"] = "Không có dữ liệu"
-        df["delivery_month"] = "Không có dữ liệu"
-
-    # Limit numeric types and drop invalid records
+    # --- Computed Features ---
     df["current_price"] = df["current_price"].clip(lower=0)
     df["delivery_fee"] = df["delivery_fee"].clip(lower=0)
-    
-    # Thêm Doanh thu
-    df["revenue"] = df["sales_volume_num"] * df["current_price"]
+    df["fee_ratio"] = (df["delivery_fee"] / df["current_price"].clip(lower=0.01)).clip(upper=5.0).round(4)
+    df["revenue"] = (df["sales_volume_num"] * df["current_price"]).round(0)
+
+    # --- Estimate delivery days from delivery_date_text ---
+    def parse_est_days(text):
+        if pd.isna(text):
+            return None
+        s = str(text)
+        # Format: "Mon, Apr 13"
+        m = re.search(r'\w+,\s*Apr\s+(\d+)', s)
+        if m:
+            return max(1, int(m.group(1)) - 6)
+        # Format: "Apr 8 - 28"
+        m2 = re.search(r'Apr\s+(\d+)\s*-\s*(\d+)', s)
+        if m2:
+            return max(1, round((int(m2.group(1)) + int(m2.group(2))) / 2.0 - 6))
+        return None
+
+    if "delivery_date_text" in df.columns:
+        df["est_delivery_days"] = df["delivery_date_text"].apply(parse_est_days)
+    else:
+        df["est_delivery_days"] = None
+
+    # --- Top seller proxy (top 20% sales) ---
+    top20_threshold = df["sales_volume_num"].quantile(0.8)
+    df["is_top_seller"] = df["sales_volume_num"] >= top20_threshold
+
+    # ══════════════════════════════════════════════════════════════
+    # 2. EXPORT TO JSON
+    # ══════════════════════════════════════════════════════════════
 
     select_cols = [
-        "is_prime", "delivery_fee", "sales_volume_num", "current_price", "revenue", "crawl_category", "delivery_day", "delivery_month"
+        "is_prime", "delivery_fee", "sales_volume_num", "current_price",
+        "revenue", "crawl_category", "rating_val", "is_amazon_choice",
+        "fee_ratio", "est_delivery_days", "is_top_seller"
     ]
     export_df = df[select_cols].copy()
+    data_json_str = export_df.to_json(orient="records", force_ascii=False)
 
-    # Filter out entries with invalid day/month for strictness in analysis if helpful, but keeping all for pie charts
-    data_json = export_df.to_dict(orient="records")
-    data_json_str = json.dumps(data_json, ensure_ascii=False)
+    # ══════════════════════════════════════════════════════════════
+    # 3. HTML TEMPLATE
+    # ══════════════════════════════════════════════════════════════
 
-    html_code = f"""
-<!DOCTYPE html>
+    html_code = f"""<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
@@ -98,546 +125,1034 @@ def render(df_raw):
     <style>
         :root {{
             --primary: #F97316;
+            --primary-light: #FDBA74;
             --secondary: #3B82F6;
             --dark: #9A3412;
             --bg: #FEF3E2;
             --card-bg: #FFFFFF;
             --text-primary: #1C1917;
             --text-secondary: #78716C;
-            --border-radius: 8px;
+            --border-radius: 10px;
             --font-family: 'Inter', sans-serif;
             --success: #10B981;
             --danger: #EF4444;
             --warning: #F59E0B;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+            --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
         }}
-        
+
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{
             background-color: var(--bg);
             font-family: var(--font-family);
             color: var(--text-primary);
-            padding: 20px;
+            padding: 16px 20px;
+            line-height: 1.5;
         }}
 
-        .section-header {{
-            font-size: 16px; font-weight: 700; color: var(--dark); text-transform: uppercase;
-            padding-bottom: 8px; border-bottom: 2px solid #FED7AA; margin: 32px 0 20px 0;
-            display: flex; align-items: center; gap: 8px; letter-spacing: 0.5px;
-        }}
-
+        /* ── Filter Bar ── */
         .filter-bar {{
             position: sticky; top: 0; z-index: 1000;
-            display: flex; align-items: center; gap: 24px; margin-bottom: 24px;
-            background: var(--card-bg); padding: 16px 20px; border-radius: var(--border-radius);
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); flex-wrap: wrap; margin-top: 5px;
+            display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+            background: var(--card-bg); padding: 14px 20px; border-radius: var(--border-radius);
+            box-shadow: var(--shadow-md); margin-bottom: 20px;
         }}
-        .f-item {{ display: flex; flex-direction: column; gap: 6px; }}
-        .f-label {{ font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }}
+        .f-item {{ display: flex; flex-direction: column; gap: 5px; }}
+        .f-label {{ font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }}
         select {{
-            padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px; width: 220px;
-            font-family: inherit; font-size: 13px; color: var(--text-primary); outline: none; cursor: pointer;
+            padding: 7px 12px; border: 1px solid #D6D3D1; border-radius: 6px;
+            font-family: inherit; font-size: 12px; color: var(--text-primary);
+            outline: none; cursor: pointer; min-width: 200px; background: #FAFAF9;
         }}
-        select:focus {{ border-color: var(--primary); }}
+        select:focus {{ border-color: var(--primary); box-shadow: 0 0 0 2px rgba(249,115,22,0.15); }}
 
-        .insight-card {{
-            background: #FFFAF5; border: 1px solid #FED7AA; border-radius: var(--border-radius);
-            padding: 24px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 10px;
+        /* ── Section Headers ── */
+        .section-header {{
+            font-size: 14px; font-weight: 800; color: var(--dark); text-transform: uppercase;
+            padding: 10px 0 8px 0; border-bottom: 2px solid #FDBA74;
+            margin: 28px 0 16px 0; display: flex; align-items: center; gap: 8px;
+            letter-spacing: 0.5px;
         }}
-        .insight-title {{ font-size: 15px; font-weight: 700; color: var(--dark); text-transform: uppercase; display: flex; align-items: center; gap: 6px; letter-spacing: 0.5px; }}
-        .insight-text {{ font-size: 14px; line-height: 1.6; color: var(--text-primary); font-weight: 400; }}
-        .insight-text strong {{ color: var(--dark); font-weight: 600; }}
+        .section-header .num {{
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; border-radius: 50%; background: var(--primary);
+            color: white; font-size: 13px; font-weight: 700; flex-shrink: 0;
+        }}
 
-        .kpi-row {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }}
+        /* ── Objective Card ── */
+        .obj-card {{
+            background: linear-gradient(135deg, #FFFAF5 0%, #FFF7ED 100%);
+            border: 1px solid #FED7AA; border-radius: var(--border-radius);
+            padding: 18px 22px; margin-bottom: 16px;
+        }}
+        .obj-title {{
+            font-size: 13px; font-weight: 700; color: var(--dark); text-transform: uppercase;
+            margin-bottom: 6px; display: flex; align-items: center; gap: 6px;
+        }}
+        .obj-text {{
+            font-size: 13px; line-height: 1.65; color: #44403C; font-weight: 400;
+        }}
+        .obj-text strong {{ color: var(--dark); font-weight: 600; }}
+
+        /* ── KPI Cards ── */
+        .kpi-row {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 18px; }}
         .kpi-card {{
-            background: var(--card-bg); border-radius: var(--border-radius); padding: 16px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-left: 4px solid var(--primary);
-            display: flex; flex-direction: column; gap: 4px; position: relative;
+            background: var(--card-bg); border-radius: var(--border-radius); padding: 14px 16px;
+            box-shadow: var(--shadow-sm); border-left: 4px solid var(--primary);
+            display: flex; flex-direction: column; gap: 2px; transition: transform 0.15s ease;
         }}
-        .kpi-title {{ font-size: 11px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; }}
-        .kpi-value {{ font-size: 20px; font-weight: 600; color: var(--text-primary); letter-spacing: -0.5px; }}
-
+        .kpi-card:hover {{ transform: translateY(-2px); box-shadow: var(--shadow-md); }}
+        .kpi-title {{ font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.3px; }}
+        .kpi-value {{ font-size: 22px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.5px; }}
+        .kpi-sub {{ font-size: 10px; color: var(--text-secondary); font-weight: 500; }}
         .kpi-card.c-green {{ border-left-color: var(--success); }}
         .kpi-card.c-blue {{ border-left-color: var(--secondary); }}
         .kpi-card.c-red {{ border-left-color: var(--danger); }}
+        .kpi-card.c-amber {{ border-left-color: var(--warning); }}
 
-        .chart-row {{ display: flex; gap: 20px; margin-bottom: 24px; align-items: stretch; }}
+        /* ── Chart Cards ── */
+        .chart-row {{ display: flex; gap: 16px; margin-bottom: 18px; align-items: stretch; }}
         .chart-card {{
-            background: var(--card-bg); border-radius: var(--border-radius); padding: 20px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; flex: 1; min-width: 0;
+            background: var(--card-bg); border-radius: var(--border-radius); padding: 18px;
+            box-shadow: var(--shadow-sm); display: flex; flex-direction: column; flex: 1; min-width: 0;
         }}
-        .chart-header {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }}
-        .chart-title {{ font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; }}
-        .chart-subtitle {{ font-size: 12px; font-weight: 400; color: var(--text-secondary); line-height: 1.4; }}
-        .chart-wrapper {{ position: relative; width: 100%; flex-grow: 1; min-height: 280px; display: flex; justify-content: center; align-items: center; }}
-        
-        .select-light {{ padding: 6px 10px; width: auto; font-weight: 500; border-radius: 6px; box-shadow: none; font-size: 12px; }}
+        .chart-header {{ margin-bottom: 12px; }}
+        .chart-title {{ font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 3px; }}
+        .chart-subtitle {{ font-size: 11px; font-weight: 400; color: var(--text-secondary); line-height: 1.4; }}
+        .chart-wrapper {{ position: relative; width: 100%; flex-grow: 1; min-height: 280px; }}
+
+        /* ── Insight Box ── */
+        .insight-box {{
+            background: linear-gradient(135deg, #F0FDF4 0%, #ECFDF5 100%);
+            border: 1px solid #A7F3D0; border-left: 4px solid var(--success);
+            border-radius: var(--border-radius); padding: 16px 20px; margin-bottom: 8px;
+            display: flex; gap: 12px; align-items: flex-start;
+        }}
+        .insight-box.warn {{
+            background: linear-gradient(135deg, #FFFBEB 0%, #FEF3C7 100%);
+            border-color: #FDE68A; border-left-color: var(--warning);
+        }}
+        .insight-icon {{ font-size: 20px; flex-shrink: 0; margin-top: 1px; }}
+        .insight-content {{ flex: 1; }}
+        .insight-label {{ font-size: 11px; font-weight: 700; color: var(--success); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }}
+        .insight-box.warn .insight-label {{ color: #B45309; }}
+        .insight-text {{ font-size: 12.5px; line-height: 1.7; color: #374151; }}
+        .insight-text strong {{ color: var(--dark); }}
+
+        /* ── Heatmap Table ── */
+        .hm-table {{
+            width: 100%; border-collapse: collapse; font-size: 12px;
+        }}
+        .hm-table th {{
+            background: #F5F5F4; padding: 10px 8px; text-align: center;
+            font-weight: 700; color: var(--text-secondary); font-size: 11px;
+            text-transform: uppercase; border: 1px solid #E7E5E4;
+        }}
+        .hm-table td {{
+            padding: 12px 10px; text-align: center; border: 1px solid #E7E5E4;
+            vertical-align: middle; transition: background 0.2s;
+        }}
+        .hm-table td:hover {{ filter: brightness(0.95); }}
+        .hm-rating {{ font-weight: 700; font-size: 14px; color: var(--text-primary); }}
+        .hm-sales {{ font-size: 11px; color: var(--text-secondary); margin-top: 2px; }}
+        .hm-count {{ font-size: 10px; color: #A8A29E; margin-top: 1px; }}
+        .hm-row-label {{
+            text-align: left !important; font-weight: 600; color: var(--text-primary);
+            background: #FAFAF9 !important; white-space: nowrap;
+        }}
     </style>
 </head>
 <body>
 
+    <!-- ═══ FILTER BAR ═══ -->
     <div class="filter-bar">
         <div class="f-item">
-            <span class="f-label">Chỉ số Hiệu Suất Cần Tối Ưu</span>
+            <span class="f-label">Chỉ Số Hiệu Suất</span>
             <select id="selMetric" onchange="applyFilters()">
-                <option value="revenue">Tối Ưu Phân Bổ Theo Doanh Thu Bán Hàng ($)</option>
-                <option value="sales">Tối Ưu Phân Bổ Theo Số Lượng Hàng Bán</option>
+                <option value="revenue">Doanh Thu ($)</option>
+                <option value="sales">Số Lượng Bán Ra</option>
             </select>
         </div>
         <div class="f-item">
-            <span class="f-label">Phân Tích Theo Danh Mục Sản Phẩm</span>
+            <span class="f-label">Danh Mục Sản Phẩm</span>
             <select id="selCategory" onchange="applyFilters()">
-                <option value="ALL">Khảo Sát Toàn Bộ Danh Mục Sản Phẩm Hệ Thống</option>
+                <option value="ALL">Tất Cả Danh Mục</option>
             </select>
         </div>
     </div>
 
-    <!-- S.M.A.R.T STRATEGY DIGEST -->
-    <div class="insight-card" style="margin-top: 10px;">
-        <div class="insight-title">📍 MỤC TIÊU CỦA TAB NÀY</div>
-        <div class="insight-text" style="margin-bottom: 12px; color: var(--dark);">
-            Sử dụng khuôn khổ S.M.A.R.T để đánh giá tính khả thi khi áp dụng <strong>Chính sách giao hàng Prime</strong> và sự ảnh hưởng của <strong>Biến động cước phí</strong> đến sức mua. Từ đó truy xuất chính xác ngưỡng giá cước kháng cự và các phân khúc danh mục tối ưu để bơm tiền trợ giá vận chuyển.
+    <!-- ═══ OVERVIEW CARD ═══ -->
+    <div class="obj-card">
+        <div class="obj-title">📍 TỔNG QUAN MỤC TIÊU PHÂN TÍCH TAB VẬN CHUYỂN</div>
+        <div class="obj-text">
+            Tab này phân tích <strong>3 khía cạnh chiến lược</strong> của hoạt động vận chuyển trên Amazon:
+            <strong>(1)</strong> Mối tương quan giữa tỷ lệ phí ship/giá sản phẩm với doanh số để đề xuất chiến lược định giá tối ưu;
+            <strong>(2)</strong> Vai trò của nhãn Prime trong việc định hình đặc điểm sản phẩm nổi bật;
+            <strong>(3)</strong> Tác động của tốc độ giao hàng đến rating và doanh số, từ đó đề xuất chiến lược logistics.
         </div>
-        
-        <div class="insight-title" style="font-size: 13px; color: #78716C;">CHI TIẾT TRIỂN KHAI S.M.A.R.T</div>
-        <div class="insight-text" id="dynamic_insight"></div>
     </div>
 
-    <div class="section-header">1. TỔNG QUAN PHÂN BỔ DỊCH VỤ VẬN CHUYỂN</div>
-    
+    <!-- ═══════════════════════════════════════════════════════════
+         SECTION 1: CHIẾN LƯỢC ĐỊNH GIÁ VẬN CHUYỂN
+         ═══════════════════════════════════════════════════════════ -->
+    <div class="section-header"><span class="num">1</span> CHIẾN LƯỢC ĐỊNH GIÁ TỐI ƯU QUA CẤU TRÚC PHÍ VẬN CHUYỂN</div>
+
+    <div class="obj-card">
+        <div class="obj-title">🎯 Mục tiêu phân tích</div>
+        <div class="obj-text">
+            Đánh giá mối tương quan giữa <strong>tỷ lệ phí vận chuyển trên giá trị sản phẩm (Shipping Fee / Price)</strong>
+            với <strong>khối lượng bán ra (Sales Volume)</strong>. Xác định ngưỡng phí ship tối đa mà khách hàng chấp nhận
+            và đề xuất chiến lược: <em>gộp phí ship vào giá bán (freeship)</em> hay <em>tách rời phí ship</em>.
+        </div>
+    </div>
+
     <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-title">Tỷ Lệ Phí Ship / Giá TB</div>
+            <div class="kpi-value" id="kpi1_fee_ratio">0%</div>
+            <div class="kpi-sub" id="kpi1_fee_ratio_sub"></div>
+        </div>
         <div class="kpi-card c-green">
-            <div class="kpi-title">Tỷ Lệ Chấp Nhận Dịch Vụ Prime</div>
-            <div class="kpi-value" id="kpi_prime_pct">0%</div>
+            <div class="kpi-title">Doanh Số TB — Nhóm Free Ship</div>
+            <div class="kpi-value" id="kpi1_free_sales">0</div>
+            <div class="kpi-sub" id="kpi1_free_sales_sub"></div>
         </div>
         <div class="kpi-card c-red">
-            <div class="kpi-title">Chi Phí Vận Chuyển Bình Quân Các Đơn Hàng Tự Giao</div>
-            <div class="kpi-value" id="kpi_avg_fee">$0.00</div>
+            <div class="kpi-title">Doanh Số TB — Nhóm Tốn Phí Ship</div>
+            <div class="kpi-value" id="kpi1_paid_sales">0</div>
+            <div class="kpi-sub" id="kpi1_paid_sales_sub"></div>
         </div>
         <div class="kpi-card c-blue">
-            <div class="kpi-title">Hiệu Suất Bình Quân Trên Một Sản Phẩm Thuộc Prime</div>
-            <div class="kpi-value" id="kpi_metric_prime">0</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Hiệu Suất Bình Quân Trên Một Sản Phẩm Tự Giao Hàng</div>
-            <div class="kpi-value" id="kpi_metric_non">0</div>
+            <div class="kpi-title">Revenue Share — Free Ship</div>
+            <div class="kpi-value" id="kpi1_rev_share">0%</div>
+            <div class="kpi-sub">Tỷ trọng doanh thu nhóm miễn phí ship</div>
         </div>
     </div>
 
     <div class="chart-row">
-        <div class="chart-card">
+        <div class="chart-card" style="flex: 1.4;">
             <div class="chart-header">
-                <div>
-                    <div class="chart-title">Phân Bổ Tỷ Trọng Sản Phẩm Dựa Theo Tính Chất Vận Chuyển</div>
-                    <div class="chart-subtitle">So sánh số lượng mã sản phẩm cung cấp thông qua dịch vụ Prime và phương thức tự giao hàng độc lập.</div>
-                </div>
+                <div class="chart-title">Biến Động Doanh Số Trung Bình Theo Mức Tỷ Lệ Phí Ship / Giá Sản Phẩm</div>
+                <div class="chart-subtitle">Bars = doanh số TB mỗi bin · Line = số lượng sản phẩm trong bin · Xác định ngưỡng kháng cự rõ ràng</div>
             </div>
-            <div class="chart-wrapper"><canvas id="cPrimeDist"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <div class="chart-header">
-                <div>
-                    <div class="chart-title">Phân Bổ Định Lượng Dòng Tiền Theo Tỷ Trọng Chi Phí Vận Chuyển</div>
-                    <div class="chart-subtitle">Xác định tổng thể các mức phí vận chuyển chủ yếu chi phối đến tổng dòng tiền hệ thống.</div>
-                </div>
-            </div>
-            <div class="chart-wrapper"><canvas id="cDonutShip"></canvas></div>
-        </div>
-        <div class="chart-card">
-            <div class="chart-header">
-                <div>
-                    <div class="chart-title">Thống Kê Khối Lượng Doanh Nghiệp Phát Sinh Theo Khoảng Thời Gian Giao Nhận Dự Kiến</div>
-                    <div class="chart-subtitle">Phân tích chu kỳ thời điểm người tiêu dùng lập lịch hoàn thành nhận hàng trong tương lai.</div>
-                </div>
-                <select id="selTimeView" class="select-light" onchange="applyFilters()">
-                    <option value="day">Theo Các Ngày Cụ Thể Trong Tuần</option>
-                    <option value="month">Theo Các Tháng Trong Năm</option>
-                </select>
-            </div>
-            <div class="chart-wrapper"><canvas id="cDeliveryDays"></canvas></div>
-        </div>
-    </div>
-
-    <div class="section-header">2. YẾU TỐ ẢNH HƯỞNG: PHÂN TÍCH QUAN HỆ GIỮA CHI PHÍ VẬN CHUYỂN VÀ SỰ THAY ĐỔI CỦA SỨC MUA THỰC THẾ</div>
-    <div class="chart-row">
-        <div class="chart-card" style="flex: 1.5;">
-            <div class="chart-header">
-                <div>
-                    <div class="chart-title">Đối Chiếu Mức Độ Biến Động Trung Bình Của Hiệu Suất So Với Thang Phí Vận Chuyển Xác Lập</div>
-                    <div class="chart-subtitle">Đo lường mức sụt giảm chỉ số doanh nghiệp khi chi phí vận chuyển tăng tiến so với giá trị món hàng hoặc mức giá trị tuyệt đối.</div>
-                </div>
-                <select id="selLineMode" class="select-light" onchange="applyFilters()">
-                    <option value="percent">Định dạng số liệu: Thay Đổi Tỷ Lệ Chi Phí Dự Kiến / Đơn Giá (%)</option>
-                    <option value="cash">Định dạng số liệu: Thay Đổi Mức Phí Giao Hàng Tuyệt Đối ($)</option>
-                </select>
-            </div>
-            <div class="chart-wrapper" style="min-height: 340px;"><canvas id="cFeeRatioRatio"></canvas></div>
+            <div class="chart-wrapper"><canvas id="cFeeBins"></canvas></div>
         </div>
         <div class="chart-card" style="flex: 1;">
             <div class="chart-header">
-                <div>
-                    <div class="chart-title">Chỉ Số Hiệu Suất Phân Bổ Qua Các Phân Khúc Đơn Giá Chấp Nhận Chi Trả</div>
-                    <div class="chart-subtitle">So sánh mức tác động của phương thức tự giao hàng (Tốn Phí) và Prime (Miễn Phí) ở nhóm sản phẩm phân khúc đơn giá khác nhau.</div>
-                </div>
+                <div class="chart-title">Phân Bổ Doanh Thu Theo Chiến Lược Phí Vận Chuyển</div>
+                <div class="chart-subtitle">So sánh tỷ trọng doanh thu giữa nhóm Free Ship và các mức phí ship khác nhau</div>
             </div>
-            <div class="chart-wrapper"><canvas id="cPriceSegment"></canvas></div>
+            <div class="chart-wrapper"><canvas id="cRevShare"></canvas></div>
         </div>
     </div>
 
-    <div class="section-header">3. MỞ RỘNG HIỆU SUẤT TRÊN PHẠM VI TOÀN CỤC DANH MỤC</div>
-    <div class="chart-row" style="flex-direction: column;">
+    <div class="insight-box" id="insightBox1">
+        <div class="insight-icon">💡</div>
+        <div class="insight-content">
+            <div class="insight-label">KẾT LUẬN & ĐỀ XUẤT CHIẾN LƯỢC ĐỊNH GIÁ</div>
+            <div class="insight-text" id="insight1_text">Đang phân tích...</div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECTION 2: VAI TRÒ CỦA PRIME
+         ═══════════════════════════════════════════════════════════ -->
+    <div class="section-header"><span class="num">2</span> VAI TRÒ CỦA PRIME TRONG ĐỊNH HÌNH SẢN PHẨM NỔI BẬT</div>
+
+    <div class="obj-card">
+        <div class="obj-title">🎯 Mục tiêu phân tích</div>
+        <div class="obj-text">
+            Phân tích xác suất lọt vào nhóm <strong>sản phẩm nổi bật (Amazon's Choice, Top 20% doanh số)</strong>
+            và chênh lệch hiệu suất giữa nhóm <strong>Prime</strong> vs <strong>Non-Prime</strong>.
+            Xác nhận liệu Prime có phải là <em>"tấm vé bắt buộc"</em> để một sản phẩm định vị top đầu.
+            <br/><em style="color: var(--text-secondary); font-size: 11px;">⚠ Lưu ý: is_best_seller = True cho 100% sản phẩm trong dataset. Sử dụng is_amazon_choice + Top 20% Sales làm proxy.</em>
+        </div>
+    </div>
+
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-title">Tỷ Lệ Prime Tổng Thể</div>
+            <div class="kpi-value" id="kpi2_prime_rate">0%</div>
+            <div class="kpi-sub" id="kpi2_prime_rate_sub"></div>
+        </div>
+        <div class="kpi-card c-green">
+            <div class="kpi-title">Prime Rate — Amazon's Choice</div>
+            <div class="kpi-value" id="kpi2_ac_prime">0%</div>
+            <div class="kpi-sub">Tỷ lệ Prime trong nhóm được đề xuất</div>
+        </div>
+        <div class="kpi-card c-amber">
+            <div class="kpi-title">Chênh Lệch Doanh Số TB</div>
+            <div class="kpi-value" id="kpi2_sales_diff">0</div>
+            <div class="kpi-sub" id="kpi2_sales_diff_sub"></div>
+        </div>
+        <div class="kpi-card c-blue">
+            <div class="kpi-title">Chênh Lệch Rating TB</div>
+            <div class="kpi-value" id="kpi2_rating_diff">0</div>
+            <div class="kpi-sub" id="kpi2_rating_diff_sub"></div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card" style="flex: 1;">
+            <div class="chart-header">
+                <div class="chart-title">So Sánh Tỷ Lệ Prime Giữa Các Nhóm Sản Phẩm</div>
+                <div class="chart-subtitle">Tỷ lệ % sản phẩm có nhãn Prime trong từng tier · Đánh giá Prime như "tấm vé" cạnh tranh</div>
+            </div>
+            <div class="chart-wrapper"><canvas id="cPrimeRate"></canvas></div>
+        </div>
+        <div class="chart-card" style="flex: 1;">
+            <div class="chart-header">
+                <div class="chart-title">Hồ Sơ Đa Chiều: Prime vs Non-Prime</div>
+                <div class="chart-subtitle">So sánh chuẩn hóa trên 5 trục: Rating, Doanh số, Giá, Amazon Choice %, Free Ship %</div>
+            </div>
+            <div class="chart-wrapper"><canvas id="cRadar"></canvas></div>
+        </div>
+    </div>
+
+    <div class="chart-row">
         <div class="chart-card">
             <div class="chart-header">
-                <div>
-                    <div class="chart-title">Đánh Giá Tính Cấp Thiết Khi Áp Dụng Dịch Vụ Prime Cục Bộ Phân Loại Qua Các Nhóm Ngành Hàng Tổng Quát</div>
-                    <div class="chart-subtitle">Đo lường sức ảnh hưởng vận chuyển để tiến hành xây dựng chính sách hỗ trợ chi phí cho riêng từng danh mục sản phẩm cụ thể.</div>
-                </div>
+                <div class="chart-title">Hiệu Suất Prime vs Non-Prime Theo Từng Danh Mục Ngành Hàng</div>
+                <div class="chart-subtitle">Đo lường chênh lệch doanh số trung bình theo từng category · Xác định ngành hàng mà Prime tạo lợi thế rõ rệt</div>
             </div>
-            <div class="chart-wrapper" style="min-height: 500px;"><canvas id="cCategoryBreakdown"></canvas></div>
+            <div class="chart-wrapper" style="min-height: 380px;"><canvas id="cPrimeCat"></canvas></div>
         </div>
     </div>
 
+    <div class="insight-box warn" id="insightBox2">
+        <div class="insight-icon">⚠️</div>
+        <div class="insight-content">
+            <div class="insight-label">KẾT LUẬN: PRIME CÓ PHẢI "TẤM VÉ BẮT BUỘC"?</div>
+            <div class="insight-text" id="insight2_text">Đang phân tích...</div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         SECTION 3: TỐC ĐỘ GIAO HÀNG
+         ═══════════════════════════════════════════════════════════ -->
+    <div class="section-header"><span class="num">3</span> TÁC ĐỘNG TỐC ĐỘ GIAO HÀNG ĐẾN ĐỊNH VỊ THƯƠNG HIỆU</div>
+
+    <div class="obj-card">
+        <div class="obj-title">🎯 Mục tiêu phân tích</div>
+        <div class="obj-text">
+            Đo lường mức độ ảnh hưởng của <strong>thời gian chờ giao hàng</strong> (ước tính bằng số ngày)
+            đến <strong>điểm đánh giá (rating)</strong> và <strong>khối lượng bán ra (sales volume)</strong>.
+            Đề xuất chiến lược định vị sản phẩm thông qua <strong>chất lượng dịch vụ logistics</strong>.
+        </div>
+    </div>
+
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <div class="kpi-title">Thời Gian Giao Hàng TB</div>
+            <div class="kpi-value" id="kpi3_avg_days">0 ngày</div>
+            <div class="kpi-sub" id="kpi3_avg_days_sub"></div>
+        </div>
+        <div class="kpi-card c-green">
+            <div class="kpi-title">% Giao Dưới 7 Ngày</div>
+            <div class="kpi-value" id="kpi3_fast_pct">0%</div>
+            <div class="kpi-sub">Tỷ lệ sản phẩm giao nhanh</div>
+        </div>
+        <div class="kpi-card c-red">
+            <div class="kpi-title">Chênh Lệch Rating (Nhanh vs Chậm)</div>
+            <div class="kpi-value" id="kpi3_rating_gap">0</div>
+            <div class="kpi-sub" id="kpi3_rating_gap_sub"></div>
+        </div>
+        <div class="kpi-card c-blue">
+            <div class="kpi-title">Hệ Số Tương Quan (Ngày Giao × Rating)</div>
+            <div class="kpi-value" id="kpi3_corr">0</div>
+            <div class="kpi-sub">Tương quan Pearson</div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card" style="flex: 1;">
+            <div class="chart-header">
+                <div class="chart-title">Tác Động Thời Gian Giao Hàng Đến Doanh Số & Rating</div>
+                <div class="chart-subtitle">Bars = doanh số TB · Line = rating TB · Trục kép cho 2 chỉ số khác đơn vị</div>
+            </div>
+            <div class="chart-wrapper"><canvas id="cDeliveryImpact"></canvas></div>
+        </div>
+        <div class="chart-card" style="flex: 1;">
+            <div class="chart-header">
+                <div class="chart-title">Ma Trận: Tốc Độ Giao × Phân Khúc Giá → Rating & Doanh Số</div>
+                <div class="chart-subtitle">Màu nền = mức rating trung bình · ⭐ = rating · Số liệu = doanh số TB</div>
+            </div>
+            <div class="chart-wrapper" style="overflow-x: auto; display: block;"><div id="heatmapContainer"></div></div>
+        </div>
+    </div>
+
+    <div class="chart-row">
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title">Hiệu Suất Giao Hàng Theo Danh Mục: So Sánh Nhóm Giao Nhanh vs Chậm</div>
+                <div class="chart-subtitle">Grouped bar: doanh số TB của sản phẩm giao nhanh (≤7 ngày) so với giao chậm (>7 ngày) trong mỗi ngành hàng</div>
+            </div>
+            <div class="chart-wrapper" style="min-height: 380px;"><canvas id="cCatDelivery"></canvas></div>
+        </div>
+    </div>
+
+    <div class="insight-box" id="insightBox3">
+        <div class="insight-icon">🚚</div>
+        <div class="insight-content">
+            <div class="insight-label">KẾT LUẬN & ĐỀ XUẤT CHIẾN LƯỢC LOGISTICS</div>
+            <div class="insight-text" id="insight3_text">Đang phân tích...</div>
+        </div>
+    </div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     JAVASCRIPT
+     ═══════════════════════════════════════════════════════════ -->
 <script>
     const RAW_DATA = {data_json_str};
-    let globalInstances = {{}};
+    let GI = {{}};  // Global chart Instances
 
-    // Mẫu màu quy định nghiêm ngặt cho báo cáo
     const BRAND = {{
-        prime: '#F97316',
-        nonPrime: '#9CA3AF',
-        piePrime: '#F97316',
-        pieNon: '#E5E7EB',
-        palette: ['#10B981', '#3B82F6', '#F59E0B', '#F97316', '#EF4444']
+        prime: '#F97316', nonPrime: '#9CA3AF',
+        palette: ['#10B981','#3B82F6','#F59E0B','#F97316','#EF4444','#8B5CF6'],
+        green: '#10B981', red: '#EF4444', blue: '#3B82F6', amber: '#F59E0B'
     }};
 
-    const fmtN = (n) => new Intl.NumberFormat('en-US').format(Math.round(n));
-    const fmtR = (n) => Number(n).toFixed(2);
-    const fmtC = (n) => "$" + new Intl.NumberFormat('en-US').format(Math.round(n));
+    const fmtN  = n => new Intl.NumberFormat('en-US').format(Math.round(n));
+    const fmtR  = n => Number(n).toFixed(2);
+    const fmtPct = n => Number(n).toFixed(1) + '%';
+    const fmtC  = n => "$" + fmtN(n);
 
+    // ── SETUP ──
     function setup() {{
         let cats = new Set();
-        RAW_DATA.forEach(d => {{
-            if (d.crawl_category && d.crawl_category !== 'Không rõ') cats.add(d.crawl_category);
-        }});
-        
+        RAW_DATA.forEach(d => {{ if (d.crawl_category && d.crawl_category !== 'Khác') cats.add(d.crawl_category); }});
         let sel = document.getElementById('selCategory');
         Array.from(cats).sort().forEach(c => {{
-            let opt = document.createElement('option');
-            opt.value = c; opt.innerText = c;
-            sel.appendChild(opt);
+            let o = document.createElement('option');
+            o.value = c; o.innerText = c;
+            sel.appendChild(o);
         }});
-        
         initCharts();
         applyFilters();
     }}
 
+    // ── APPLY FILTERS ──
     function applyFilters() {{
         let cat = document.getElementById('selCategory').value;
         let metric = document.getElementById('selMetric').value;
-
-        let lbls = document.getElementsByClassName("lbl_metric");
-        let metricStr = (metric === 'revenue') ? 'Doanh Thu' : 'Số Lượng Hàng Bán Ra';
-        for(let l of lbls) l.innerText = metricStr;
-
-        let filtered = RAW_DATA.filter(d => {{
-            if (cat !== 'ALL' && d.crawl_category !== cat) return false;
-            return true;
-        }});
-
-        updateKPIsandInsight(filtered, metric);
-        updateCharts(filtered, metric);
+        let filtered = RAW_DATA.filter(d => cat === 'ALL' || d.crawl_category === cat);
+        updateSection1(filtered, metric);
+        updateSection2(filtered, metric);
+        updateSection3(filtered, metric);
     }}
 
-    function updateKPIsandInsight(data, metric) {{
-        let tProd = data.length;
-        if (tProd === 0) return;
+    // ══════════════════════════════════════════════
+    // SECTION 1: Chiến Lược Định Giá
+    // ══════════════════════════════════════════════
+    function updateSection1(data, metric) {{
+        let vP = metric === 'revenue' ? 'revenue' : 'sales_volume_num';
+        let prefix = metric === 'revenue' ? '$' : '';
 
-        let primeProds = data.filter(d => d.is_prime);
-        let nonPrimeProds = data.filter(d => !d.is_prime);
+        // Free = fee==0 or prime, Paid = fee > 0 & not prime
+        let freeGroup = data.filter(d => d.is_prime || d.delivery_fee === 0);
+        let paidGroup = data.filter(d => !d.is_prime && d.delivery_fee > 0);
 
-        let primePct = (primeProds.length / tProd) * 100;
-        document.getElementById('kpi_prime_pct').innerText = fmtR(primePct) + '%';
+        let avgFeeRatio = data.length > 0 ? (data.reduce((a,d) => a + (d.fee_ratio||0), 0) / data.length * 100) : 0;
+        let freeAvg = freeGroup.length > 0 ? freeGroup.reduce((a,d) => a + (d[vP]||0), 0) / freeGroup.length : 0;
+        let paidAvg = paidGroup.length > 0 ? paidGroup.reduce((a,d) => a + (d[vP]||0), 0) / paidGroup.length : 0;
 
-        let feeProds = data.filter(d => d.delivery_fee > 0 && !d.is_prime);
-        let avgFee = feeProds.length > 0 ? feeProds.reduce((a,b)=>a+b.delivery_fee, 0)/feeProds.length : 0;
-        document.getElementById('kpi_avg_fee').innerText = '$' + fmtR(avgFee);
+        let freeRev = freeGroup.reduce((a,d) => a + (d.revenue||0), 0);
+        let totalRev = data.reduce((a,d) => a + (d.revenue||0), 0);
+        let freeRevPct = totalRev > 0 ? (freeRev / totalRev * 100) : 0;
 
-        let valProp = (metric === 'revenue') ? 'revenue' : 'sales_volume_num';
-        let prefix = (metric === 'revenue') ? "$" : "";
+        let multiplier = paidAvg > 0 ? (freeAvg / paidAvg) : 0;
 
-        let pValAvg = primeProds.length > 0 ? primeProds.reduce((a,b)=>a+(b[valProp]||0), 0)/primeProds.length : 0;
-        let nValAvg = nonPrimeProds.length > 0 ? nonPrimeProds.reduce((a,b)=>a+(b[valProp]||0), 0)/nonPrimeProds.length : 0;
-        
-        document.getElementById('kpi_metric_prime').innerText = prefix + fmtN(pValAvg);
-        document.getElementById('kpi_metric_non').innerText = prefix + fmtN(nValAvg);
+        document.getElementById('kpi1_fee_ratio').innerText = fmtPct(avgFeeRatio);
+        document.getElementById('kpi1_fee_ratio_sub').innerText = avgFeeRatio > 30 ? '⚠ Trên ngưỡng khuyến nghị 30%' : '✓ Dưới ngưỡng khuyến nghị 30%';
+        document.getElementById('kpi1_free_sales').innerText = prefix + fmtN(freeAvg);
+        document.getElementById('kpi1_free_sales_sub').innerText = freeGroup.length + ' sản phẩm';
+        document.getElementById('kpi1_paid_sales').innerText = prefix + fmtN(paidAvg);
+        document.getElementById('kpi1_paid_sales_sub').innerText = paidGroup.length + ' sản phẩm';
+        document.getElementById('kpi1_rev_share').innerText = fmtPct(freeRevPct);
 
-        let mName = (metric === 'revenue') ? 'doanh thu' : 'số lượng bán hàng';
-        
-        let S = "<strong>Mục tiêu Cụ thể (Specific):</strong> Yêu cầu nghiên cứu định lượng mức độ sụt giảm " + mName + " bình quân thông qua biến số chi phí vận chuyển. Thiết lập cơ sở đưa ra kế hoạch tái cấu trúc giá cước vận chuyển riêng rẽ cho từng hạng mục phân khúc giá bán và từng danh mục ngành hàng cụ thể.<br/>";
-        let M = "<strong>Đo lường (Measurable):</strong> Xác nhận các ngưỡng định lượng đánh dấu suy giảm hiệu suất phân phối đáng kể. Hệ thống theo dõi đặc tính chênh lệch khi chi phí cước dịch vụ vượt tỷ lệ 30% mức giá niêm yết của mặt hàng hoặc tỷ giá chi phí tuyệt đối vượt mức 50 Đô La.<br/>";
-        let A = "<strong>Tính khả thi (Achievable):</strong> Quyết định phân luồng chính sách cước dựa vào tính chất sản phẩm. Cụ thể: Ứng dụng nguồn tài chính xúc tiến ưu đãi miễn phí giao hàng cho mặt hàng thiết yếu, bình dân và ấn định cấu trúc tính phí cố định đối với mặt hàng cao cấp thuộc nhóm khách hàng đặc quyền (Vượt kiểm định hiệu suất với " + prefix + fmtN(nValAvg) + " thu giá trị cao dù không nằm trong hệ thống ưu đãi).<br/>";
-        let R = "<strong>Tính thực tiễn bài toán (Relevant):</strong> Đánh thẳng vào nhân tố Logistics. Đây là điểm cắt giảm hiệu lực chính trong khâu chốt giao dịch Thương mại Điện tử. Xác suất ước tính khi tinh giảm chính sách này đủ để củng cố biên độ phát triển danh thu vượt lên biên độ kỳ vọng 15%.<br/>";
-        let T = "<strong>Khung thời gian áp dụng (Time-bound):</strong> Tổng hợp dữ liệu tập trung khung thời gian giao hàng nhằm chuẩn hóa các mốc biểu đồ lập lịch phân phối. Phương pháp này chỉ rõ ưu tiên ngân sách truyền thông tập trung vào các đoạn quy mô tháng/ngày thực nhận lớn nhất theo chuẩn quý báo cáo tiếp theo.<br/>";
-
-        document.getElementById('dynamic_insight').innerHTML = S + M + A + R + T;
-    }}
-
-    function updateCharts(data, metric) {{
-        let valProp = (metric === 'revenue') ? 'revenue' : 'sales_volume_num';
-        
-        // 0. Prime Pie
-        let primeProds = data.filter(d => d.is_prime);
-        let nonPrimeProds = data.filter(d => !d.is_prime);
-        globalInstances.cPrimeDist.data.datasets[0].data = [primeProds.length, nonPrimeProds.length];
-        let totalCount = primeProds.length + nonPrimeProds.length;
-        globalInstances.cPrimeDist.options.plugins.tooltip.callbacks.label = function(ctx) {{
-            let percent = totalCount > 0 ? ((ctx.raw / totalCount)*100).toFixed(1) : 0;
-            return " " + fmtN(ctx.raw) + " Danh Mục (" + percent + "%)";
-        }};
-        globalInstances.cPrimeDist.update();
-
-        // 1. Fee Distribution Pie
-        let tPrimeVal=0, tLowVal=0, tMidVal=0, tHighVal=0;
+        // ── Chart: Fee Bins ──
+        let bins = [
+            {{ label: 'Free (0%)', min:0, max:0.001, sumV:0, cnt:0 }},
+            {{ label: '0-15%', min:0.001, max:0.15, sumV:0, cnt:0 }},
+            {{ label: '15-30%', min:0.15, max:0.30, sumV:0, cnt:0 }},
+            {{ label: '30-50%', min:0.30, max:0.50, sumV:0, cnt:0 }},
+            {{ label: '50-100%', min:0.50, max:1.00, sumV:0, cnt:0 }},
+            {{ label: '>100%', min:1.00, max:999, sumV:0, cnt:0 }}
+        ];
         data.forEach(d => {{
-            let v = d[valProp] || 0;
-            if (d.is_prime || d.delivery_fee === 0) {{ tPrimeVal += v; }} 
-            else if (d.delivery_fee <= 12) {{ tLowVal += v; }} 
-            else if (d.delivery_fee <= 25) {{ tMidVal += v; }} 
-            else {{ tHighVal += v; }}
-        }});
-        let sumPie = tPrimeVal + tLowVal + tMidVal + tHighVal;
-        globalInstances.cDonutShip.data.datasets[0].data = [tPrimeVal, tLowVal, tMidVal, tHighVal];
-        globalInstances.cDonutShip.options.plugins.tooltip.callbacks.label = function(ctx) {{
-            let percent = sumPie > 0 ? ((ctx.raw / sumPie)*100).toFixed(1) : 0;
-            return " " + (metric === 'revenue' ? "$" : "") + fmtN(ctx.raw) + " (" + percent + "%)";
-        }};
-        globalInstances.cDonutShip.update();
-
-        // 2. Days / Time-Bound
-        let timeView = document.getElementById('selTimeView').value;
-        let timeLabels = [];
-        let timeProp = "";
-        
-        if (timeView === 'day') {{
-            timeLabels = ["Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy", "Chủ Nhật"];
-            timeProp = "delivery_day";
-        }} else {{
-            timeLabels = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
-            timeProp = "delivery_month";
-        }}
-
-        let timeStats = {{}};
-        timeLabels.forEach(t => timeStats[t] = {{ sumP:0, cntP:0, sumN:0, cntN:0 }});
-        
-        data.forEach(d => {{
-            let t = d[timeProp];
-            if (timeStats[t]) {{
-                let v = d[valProp] || 0;
-                if (d.is_prime) {{ timeStats[t].sumP += v; timeStats[t].cntP++; }}
-                else {{ timeStats[t].sumN += v; timeStats[t].cntN++; }}
+            let r = d.is_prime ? 0 : (d.fee_ratio || 0);
+            for (let b of bins) {{
+                if (r >= b.min && r < b.max) {{ b.sumV += (d[vP]||0); b.cnt++; break; }}
+                if (b.max === 999 && r >= b.min) {{ b.sumV += (d[vP]||0); b.cnt++; break; }}
             }}
         }});
-        
-        globalInstances.cDeliveryDays.data.labels = timeLabels;
-        globalInstances.cDeliveryDays.data.datasets[0].data = timeLabels.map(t => timeStats[t].cntP>0 ? timeStats[t].sumP/timeStats[t].cntP : 0);
-        globalInstances.cDeliveryDays.data.datasets[1].data = timeLabels.map(t => timeStats[t].cntN>0 ? timeStats[t].sumN/timeStats[t].cntN : 0);
-        globalInstances.cDeliveryDays.update();
 
-        // 3. Line Chart - Fee Ratio Breakdown
-        let lineMode = document.getElementById('selLineMode').value;
-        let bins = [];
-        if (lineMode === 'percent') {{
-            bins = [
-                {{ label: "0%", min: 0, max: 0, sumV: 0, count: 0 }},
-                {{ label: "Dưới 15%", min: 0.001, max: 0.15, sumV: 0, count: 0 }},
-                {{ label: "Từ 15% đến 30%", min: 0.1501, max: 0.30, sumV: 0, count: 0 }},
-                {{ label: "Từ 30% đến 60%", min: 0.3001, max: 0.60, sumV: 0, count: 0 }},
-                {{ label: "Trên 60%", min: 0.6001, max: 9999, sumV: 0, count: 0 }}
-            ];
-            data.forEach(d => {{
-                let fee = d.is_prime ? 0 : (d.delivery_fee || 0);
-                let price = d.current_price || 0;
-                let ratio = (price > 0) ? (fee / price) : ((fee>0)?999:0);
-                for(let b of bins) {{
-                    if (ratio >= b.min && ratio <= b.max) {{ b.sumV += (d[valProp] || 0); b.count++; break; }}
-                }}
-            }});
-        }} else {{
-            bins = [
-                {{ label: "Miễn Phí ($0)", min: 0, max: 0, sumV: 0, count: 0 }},
-                {{ label: "Dưới Khoảng $12", min: 0.001, max: 12, sumV: 0, count: 0 }},
-                {{ label: "Mức Từ $12 Đến $25", min: 12.001, max: 25, sumV: 0, count: 0 }},
-                {{ label: "Mức Từ $25 Đến $50", min: 25.001, max: 50, sumV: 0, count: 0 }},
-                {{ label: "Cao Lớn Hơn $50", min: 50.001, max: 9999, sumV: 0, count: 0 }}
-            ];
-            data.forEach(d => {{
-                let fee = d.is_prime ? 0 : (d.delivery_fee || 0);
-                for(let b of bins) {{
-                    if (fee >= b.min && fee <= b.max) {{ b.sumV += (d[valProp] || 0); b.count++; break; }}
-                }}
-            }});
-        }}
-        globalInstances.cFeeRatioRatio.data.labels = bins.map(b => b.label);
-        globalInstances.cFeeRatioRatio.data.datasets[0].data = bins.map(b => b.count > 0 ? (b.sumV / b.count) : 0);
-        globalInstances.cFeeRatioRatio.update();
+        GI.cFeeBins.data.labels = bins.map(b => b.label);
+        GI.cFeeBins.data.datasets[0].data = bins.map(b => b.cnt > 0 ? b.sumV / b.cnt : 0);
+        GI.cFeeBins.data.datasets[1].data = bins.map(b => b.cnt);
+        GI.cFeeBins.update();
 
-        // 4. Price Bracket Bar Chart
-        let segs = [
-            {{ name: "Mức Giá Thấp Dưới $25", sumP:0, cntP:0, sumN:0, cntN:0 }},
-            {{ name: "Mức Giá Chuẩn Từ $25 Đến $50", sumP:0, cntP:0, sumN:0, cntN:0 }},
-            {{ name: "Mức Giá Từ Tệp Cao $50 Đến $100", sumP:0, cntP:0, sumN:0, cntN:0 }},
-            {{ name: "Tệp Rất Cao Lớn Hơn $100", sumP:0, cntP:0, sumN:0, cntN:0 }}
+        // ── Chart: Revenue Share Pie ──
+        let revBins = [
+            {{ label: 'Free Ship / Prime', sum: 0 }},
+            {{ label: 'Phí Thấp (< $12)', sum: 0 }},
+            {{ label: 'Phí TB ($12-25)', sum: 0 }},
+            {{ label: 'Phí Cao ($25-50)', sum: 0 }},
+            {{ label: 'Phí Rất Cao (> $50)', sum: 0 }}
         ];
-
         data.forEach(d => {{
-            let v = d[valProp] || 0;
-            let p = d.current_price || 0;
-            let tg = null;
-            if (p < 25) tg = segs[0];
-            else if (p < 50) tg = segs[1];
-            else if (p <= 100) tg = segs[2];
-            else tg = segs[3];
-
-            if (d.is_prime) {{ tg.sumP += v; tg.cntP++; }}
-            else {{ tg.sumN += v; tg.cntN++; }}
+            let rv = d[vP] || 0;
+            if (d.is_prime || d.delivery_fee === 0) {{ revBins[0].sum += rv; }}
+            else if (d.delivery_fee <= 12) {{ revBins[1].sum += rv; }}
+            else if (d.delivery_fee <= 25) {{ revBins[2].sum += rv; }}
+            else if (d.delivery_fee <= 50) {{ revBins[3].sum += rv; }}
+            else {{ revBins[4].sum += rv; }}
         }});
 
-        globalInstances.cPriceSegment.data.labels = segs.map(s => s.name);
-        globalInstances.cPriceSegment.data.datasets[0].data = segs.map(s => s.cntP > 0 ? (s.sumP/s.cntP) : 0);
-        globalInstances.cPriceSegment.data.datasets[1].data = segs.map(s => s.cntN > 0 ? (s.sumN/s.cntN) : 0);
-        globalInstances.cPriceSegment.update();
+        GI.cRevShare.data.labels = revBins.map(b => b.label);
+        GI.cRevShare.data.datasets[0].data = revBins.map(b => b.sum);
+        GI.cRevShare.update();
 
-        // 5. Category Breakdown (Horizontal Bar)
-        let catStats = {{}};
-        data.forEach(d => {{
-            let cat = d.crawl_category || 'Danh Mục Khác';
-            if (cat === 'Không rõ' || cat === 'N/A') return;
-            if (!catStats[cat]) catStats[cat] = {{ sumP:0, cntP:0, sumN:0, cntN:0 }};
-            let v = d[valProp] || 0;
-            if (d.is_prime) {{ catStats[cat].sumP += v; catStats[cat].cntP++; }}
-            else {{ catStats[cat].sumN += v; catStats[cat].cntN++; }}
-        }});
-
-        let catLabels = Object.keys(catStats).sort();
-        globalInstances.cCategoryBreakdown.data.labels = catLabels;
-        globalInstances.cCategoryBreakdown.data.datasets[0].data = catLabels.map(c => catStats[c].cntP > 0 ? (catStats[c].sumP/catStats[c].cntP) : 0);
-        globalInstances.cCategoryBreakdown.data.datasets[1].data = catLabels.map(c => catStats[c].cntN > 0 ? (catStats[c].sumN/catStats[c].cntN) : 0);
-        globalInstances.cCategoryBreakdown.update();
+        // ── Insight 1 ──
+        let mName = metric === 'revenue' ? 'doanh thu' : 'doanh số';
+        let insight1 = '<strong>Phát hiện chính:</strong> Sản phẩm miễn phí vận chuyển đạt ' + mName + ' trung bình <strong>' + prefix + fmtN(freeAvg) + '</strong>';
+        if (multiplier > 1) {{
+            insight1 += ', cao gấp <strong>' + fmtR(multiplier) + ' lần</strong> so với nhóm tốn phí ship (' + prefix + fmtN(paidAvg) + ').';
+        }} else {{
+            insight1 += ' so với ' + prefix + fmtN(paidAvg) + ' của nhóm tốn phí ship.';
+        }}
+        insight1 += '<br/><strong>Ngưỡng kháng cự:</strong> Tỷ lệ phí ship/giá trung bình đạt <strong>' + fmtPct(avgFeeRatio) + '</strong>';
+        insight1 += avgFeeRatio > 30 ? ' — đang ở mức cao, cần chiến lược giảm gánh nặng phí ship.' : ' — vẫn trong ngưỡng chấp nhận.';
+        insight1 += '<br/><strong>Đề xuất:</strong> Với nhóm sản phẩm giá thấp (< $25), nên <strong>gộp phí ship vào giá bán</strong> để tạo hiệu ứng Free Ship, vì nhóm Free Ship chiếm <strong>' + fmtPct(freeRevPct) + '</strong> tổng ' + mName + '. Với sản phẩm cao cấp (> $100), có thể <strong>tách rời phí ship</strong> vì khách hàng ít nhạy cảm hơn với phí vận chuyển ở phân khúc này.';
+        document.getElementById('insight1_text').innerHTML = insight1;
     }}
 
+    // ══════════════════════════════════════════════
+    // SECTION 2: Vai Trò Của Prime
+    // ══════════════════════════════════════════════
+    function updateSection2(data, metric) {{
+        let vP = metric === 'revenue' ? 'revenue' : 'sales_volume_num';
+
+        let primeD = data.filter(d => d.is_prime);
+        let nonPrimeD = data.filter(d => !d.is_prime);
+        let acD = data.filter(d => d.is_amazon_choice);
+        let topD = data.filter(d => d.is_top_seller);
+        let botD = data.filter(d => !d.is_top_seller);
+
+        let primeRate = data.length > 0 ? (primeD.length / data.length * 100) : 0;
+        let acPrimeRate = acD.length > 0 ? (acD.filter(d => d.is_prime).length / acD.length * 100) : 0;
+
+        let primeAvgSales = primeD.length > 0 ? primeD.reduce((a,d) => a + (d[vP]||0), 0) / primeD.length : 0;
+        let nonPrimeAvgSales = nonPrimeD.length > 0 ? nonPrimeD.reduce((a,d) => a + (d[vP]||0), 0) / nonPrimeD.length : 0;
+        let salesDiff = primeAvgSales - nonPrimeAvgSales;
+
+        let primeAvgRating = primeD.length > 0 ? primeD.reduce((a,d) => a + (d.rating_val||0), 0) / primeD.length : 0;
+        let nonPrimeAvgRating = nonPrimeD.length > 0 ? nonPrimeD.reduce((a,d) => a + (d.rating_val||0), 0) / nonPrimeD.length : 0;
+        let ratingDiff = primeAvgRating - nonPrimeAvgRating;
+
+        let prefix = metric === 'revenue' ? '$' : '';
+
+        document.getElementById('kpi2_prime_rate').innerText = fmtPct(primeRate);
+        document.getElementById('kpi2_prime_rate_sub').innerText = primeD.length + ' / ' + data.length + ' sản phẩm';
+        document.getElementById('kpi2_ac_prime').innerText = fmtPct(acPrimeRate);
+        document.getElementById('kpi2_sales_diff').innerText = (salesDiff >= 0 ? '+' : '') + prefix + fmtN(salesDiff);
+        document.getElementById('kpi2_sales_diff_sub').innerText = salesDiff >= 0 ? 'Prime cao hơn Non-Prime' : 'Prime thấp hơn Non-Prime';
+        document.getElementById('kpi2_rating_diff').innerText = (ratingDiff >= 0 ? '+' : '') + fmtR(ratingDiff);
+        document.getElementById('kpi2_rating_diff_sub').innerText = 'Prime: ' + fmtR(primeAvgRating) + ' vs Non-Prime: ' + fmtR(nonPrimeAvgRating);
+
+        // ── Chart: Prime Rate Comparison ──
+        let topPrimeRate = topD.length > 0 ? (topD.filter(d => d.is_prime).length / topD.length * 100) : 0;
+        let botPrimeRate = botD.length > 0 ? (botD.filter(d => d.is_prime).length / botD.length * 100) : 0;
+
+        GI.cPrimeRate.data.datasets[0].data = [primeRate, acPrimeRate, topPrimeRate, botPrimeRate];
+        GI.cPrimeRate.update();
+
+        // ── Chart: Radar Profile ──
+        let maxSales = Math.max(primeAvgSales, nonPrimeAvgSales, 1);
+        let maxPrice = Math.max(
+            primeD.length > 0 ? primeD.reduce((a,d) => a + (d.current_price||0), 0) / primeD.length : 0,
+            nonPrimeD.length > 0 ? nonPrimeD.reduce((a,d) => a + (d.current_price||0), 0) / nonPrimeD.length : 0,
+            1
+        );
+        let pAvgPrice = primeD.length > 0 ? primeD.reduce((a,d)=>a+(d.current_price||0),0)/primeD.length : 0;
+        let nAvgPrice = nonPrimeD.length > 0 ? nonPrimeD.reduce((a,d)=>a+(d.current_price||0),0)/nonPrimeD.length : 0;
+        let pACpct = primeD.length > 0 ? (primeD.filter(d=>d.is_amazon_choice).length/primeD.length*100) : 0;
+        let nACpct = nonPrimeD.length > 0 ? (nonPrimeD.filter(d=>d.is_amazon_choice).length/nonPrimeD.length*100) : 0;
+        let pFreePct = primeD.length > 0 ? (primeD.filter(d=>d.delivery_fee===0).length/primeD.length*100) : 0;
+        let nFreePct = nonPrimeD.length > 0 ? (nonPrimeD.filter(d=>d.delivery_fee===0).length/nonPrimeD.length*100) : 0;
+
+        GI.cRadar.data.datasets[0].data = [
+            primeAvgRating / 5 * 100,
+            primeAvgSales / maxSales * 100,
+            pAvgPrice / maxPrice * 100,
+            pACpct,
+            pFreePct
+        ];
+        GI.cRadar.data.datasets[1].data = [
+            nonPrimeAvgRating / 5 * 100,
+            nonPrimeAvgSales / maxSales * 100,
+            nAvgPrice / maxPrice * 100,
+            nACpct,
+            nFreePct
+        ];
+        GI.cRadar.update();
+
+        // ── Chart: Prime vs Non-Prime by Category ──
+        let catStats = {{}};
+        data.forEach(d => {{
+            let c = d.crawl_category || 'Khác';
+            if (c === 'Khác') return;
+            if (!catStats[c]) catStats[c] = {{ pSum:0, pCnt:0, nSum:0, nCnt:0 }};
+            if (d.is_prime) {{ catStats[c].pSum += (d[vP]||0); catStats[c].pCnt++; }}
+            else {{ catStats[c].nSum += (d[vP]||0); catStats[c].nCnt++; }}
+        }});
+        let catLabels = Object.keys(catStats).sort();
+        GI.cPrimeCat.data.labels = catLabels;
+        GI.cPrimeCat.data.datasets[0].data = catLabels.map(c => catStats[c].pCnt > 0 ? catStats[c].pSum / catStats[c].pCnt : 0);
+        GI.cPrimeCat.data.datasets[1].data = catLabels.map(c => catStats[c].nCnt > 0 ? catStats[c].nSum / catStats[c].nCnt : 0);
+        GI.cPrimeCat.update();
+
+        // ── Insight 2 ──
+        let mName = metric === 'revenue' ? 'doanh thu' : 'doanh số';
+        let insight2 = '<strong>Phát hiện về Prime:</strong> Prime chỉ chiếm <strong>' + fmtPct(primeRate) + '</strong> tổng sản phẩm (' + primeD.length + '/' + data.length + ')';
+        insight2 += ', nhưng trong nhóm Amazon\\'s Choice, tỷ lệ Prime tăng lên <strong>' + fmtPct(acPrimeRate) + '</strong> — gấp <strong>' + fmtR(primeRate > 0 ? acPrimeRate / primeRate : 0) + ' lần</strong>.';
+        insight2 += '<br/><strong>Chênh lệch hiệu suất:</strong> ' + mName + ' trung bình Prime = <strong>' + prefix + fmtN(primeAvgSales) + '</strong> vs Non-Prime = <strong>' + prefix + fmtN(nonPrimeAvgSales) + '</strong>';
+        if (salesDiff < 0) {{
+            insight2 += '. Prime <strong>không đảm bảo doanh số cao hơn</strong> — điều này cho thấy nhãn Prime không phải yếu tố quyết định doanh số, mà là yếu tố gia tăng <em>uy tín và khả năng hiển thị</em>.';
+        }} else {{
+            insight2 += '. Prime mang lại lợi thế rõ rệt về doanh số.';
+        }}
+        insight2 += '<br/><strong>Kết luận:</strong> Prime là <strong>"tấm vé ưu tiên"</strong> — tăng khả năng được Amazon đề xuất (gấp ' + fmtR(primeRate > 0 ? acPrimeRate / primeRate : 0) + 'x) — nhưng <strong>không phải "tấm vé bắt buộc"</strong> để doanh số cao. Yếu tố quyết định vẫn là chất lượng sản phẩm, giá cả và đánh giá.';
+        document.getElementById('insight2_text').innerHTML = insight2;
+    }}
+
+    // ══════════════════════════════════════════════
+    // SECTION 3: Tốc Độ Giao Hàng
+    // ══════════════════════════════════════════════
+    function updateSection3(data, metric) {{
+        let vP = metric === 'revenue' ? 'revenue' : 'sales_volume_num';
+        let prefix = metric === 'revenue' ? '$' : '';
+
+        let withDays = data.filter(d => d.est_delivery_days != null && d.est_delivery_days > 0);
+
+        let avgDays = withDays.length > 0 ? withDays.reduce((a,d) => a + d.est_delivery_days, 0) / withDays.length : 0;
+        let fastGroup = withDays.filter(d => d.est_delivery_days <= 7);
+        let slowGroup = withDays.filter(d => d.est_delivery_days > 7);
+        let fastPct = withDays.length > 0 ? (fastGroup.length / withDays.length * 100) : 0;
+
+        let fastAvgRating = fastGroup.length > 0 ? fastGroup.reduce((a,d) => a + (d.rating_val||0), 0) / fastGroup.length : 0;
+        let slowAvgRating = slowGroup.length > 0 ? slowGroup.reduce((a,d) => a + (d.rating_val||0), 0) / slowGroup.length : 0;
+        let ratingGap = fastAvgRating - slowAvgRating;
+
+        // Pearson correlation: delivery_days vs rating
+        let corr = pearsonCorr(withDays.map(d => d.est_delivery_days), withDays.map(d => d.rating_val || 0));
+
+        document.getElementById('kpi3_avg_days').innerText = fmtR(avgDays) + ' ngày';
+        document.getElementById('kpi3_avg_days_sub').innerText = withDays.length + '/' + data.length + ' SP có dữ liệu giao hàng';
+        document.getElementById('kpi3_fast_pct').innerText = fmtPct(fastPct);
+        document.getElementById('kpi3_rating_gap').innerText = (ratingGap >= 0 ? '+' : '') + fmtR(ratingGap);
+        document.getElementById('kpi3_rating_gap_sub').innerText = 'Nhanh: ' + fmtR(fastAvgRating) + ' vs Chậm: ' + fmtR(slowAvgRating);
+        document.getElementById('kpi3_corr').innerText = fmtR(corr);
+
+        // ── Chart: Delivery Impact (Dual Axis) ──
+        let dayBins = [
+            {{ label: '1-3 ngày', min:1, max:3 }},
+            {{ label: '4-5 ngày', min:4, max:5 }},
+            {{ label: '6-7 ngày', min:6, max:7 }},
+            {{ label: '8-10 ngày', min:8, max:10 }},
+            {{ label: '11-14 ngày', min:11, max:14 }},
+            {{ label: '15+ ngày', min:15, max:999 }}
+        ];
+        let dbStats = dayBins.map(b => ({{ sumV:0, sumR:0, cnt:0 }}));
+        withDays.forEach(d => {{
+            for (let i = 0; i < dayBins.length; i++) {{
+                if (d.est_delivery_days >= dayBins[i].min && d.est_delivery_days <= dayBins[i].max) {{
+                    dbStats[i].sumV += (d[vP]||0);
+                    dbStats[i].sumR += (d.rating_val||0);
+                    dbStats[i].cnt++;
+                    break;
+                }}
+            }}
+        }});
+
+        GI.cDeliveryImpact.data.labels = dayBins.map(b => b.label);
+        GI.cDeliveryImpact.data.datasets[0].data = dbStats.map(s => s.cnt > 0 ? s.sumV / s.cnt : 0);
+        GI.cDeliveryImpact.data.datasets[1].data = dbStats.map(s => s.cnt > 0 ? s.sumR / s.cnt : 0);
+        GI.cDeliveryImpact.update();
+
+        // ── Heatmap Table ──
+        let hmDays = ['1-3 ngày', '4-7 ngày', '8-14 ngày', '15+ ngày'];
+        let hmDayRanges = [[1,3],[4,7],[8,14],[15,999]];
+        let hmPrices = ['< $25', '$25-50', '$50-100', '> $100'];
+        let hmPriceRanges = [[0,25],[25,50],[50,100],[100,999999]];
+
+        let hmMatrix = {{}};
+        hmDays.forEach((d,di) => {{
+            hmMatrix[d] = {{}};
+            hmPrices.forEach((p,pi) => {{
+                hmMatrix[d][p] = {{ sumR:0, sumV:0, cnt:0 }};
+            }});
+        }});
+
+        withDays.forEach(d => {{
+            let dIdx = -1;
+            for (let i = 0; i < hmDayRanges.length; i++) {{
+                if (d.est_delivery_days >= hmDayRanges[i][0] && d.est_delivery_days <= hmDayRanges[i][1]) {{ dIdx = i; break; }}
+            }}
+            let pIdx = -1;
+            let pr = d.current_price || 0;
+            for (let i = 0; i < hmPriceRanges.length; i++) {{
+                if (pr >= hmPriceRanges[i][0] && pr < hmPriceRanges[i][1]) {{ pIdx = i; break; }}
+            }}
+            if (dIdx >= 0 && pIdx >= 0) {{
+                hmMatrix[hmDays[dIdx]][hmPrices[pIdx]].sumR += (d.rating_val||0);
+                hmMatrix[hmDays[dIdx]][hmPrices[pIdx]].sumV += (d[vP]||0);
+                hmMatrix[hmDays[dIdx]][hmPrices[pIdx]].cnt++;
+            }}
+        }});
+
+        let hmHTML = '<table class="hm-table"><tr><th style="min-width:90px;">Tốc Độ Giao</th>';
+        hmPrices.forEach(p => {{ hmHTML += '<th>' + p + '</th>'; }});
+        hmHTML += '</tr>';
+
+        hmDays.forEach(d => {{
+            hmHTML += '<tr><td class="hm-row-label">' + d + '</td>';
+            hmPrices.forEach(p => {{
+                let cell = hmMatrix[d][p];
+                let avgR = cell.cnt > 0 ? cell.sumR / cell.cnt : 0;
+                let avgV = cell.cnt > 0 ? cell.sumV / cell.cnt : 0;
+                let bg = getRatingBg(avgR);
+                hmHTML += '<td style="background:' + bg + ';">';
+                if (cell.cnt > 0) {{
+                    hmHTML += '<div class="hm-rating">⭐ ' + fmtR(avgR) + '</div>';
+                    hmHTML += '<div class="hm-sales">' + prefix + fmtN(avgV) + '</div>';
+                    hmHTML += '<div class="hm-count">n=' + cell.cnt + '</div>';
+                }} else {{
+                    hmHTML += '<div class="hm-count" style="color:#D6D3D1;">—</div>';
+                }}
+                hmHTML += '</td>';
+            }});
+            hmHTML += '</tr>';
+        }});
+        hmHTML += '</table>';
+        document.getElementById('heatmapContainer').innerHTML = hmHTML;
+
+        // ── Chart: Category Delivery Performance ──
+        let catDel = {{}};
+        withDays.forEach(d => {{
+            let c = d.crawl_category || 'Khác';
+            if (c === 'Khác') return;
+            if (!catDel[c]) catDel[c] = {{ fSum:0, fCnt:0, sSum:0, sCnt:0 }};
+            if (d.est_delivery_days <= 7) {{ catDel[c].fSum += (d[vP]||0); catDel[c].fCnt++; }}
+            else {{ catDel[c].sSum += (d[vP]||0); catDel[c].sCnt++; }}
+        }});
+        let cdLabels = Object.keys(catDel).sort();
+        GI.cCatDelivery.data.labels = cdLabels;
+        GI.cCatDelivery.data.datasets[0].data = cdLabels.map(c => catDel[c].fCnt > 0 ? catDel[c].fSum / catDel[c].fCnt : 0);
+        GI.cCatDelivery.data.datasets[1].data = cdLabels.map(c => catDel[c].sCnt > 0 ? catDel[c].sSum / catDel[c].sCnt : 0);
+        GI.cCatDelivery.update();
+
+        // ── Insight 3 ──
+        let mName = metric === 'revenue' ? 'doanh thu' : 'doanh số';
+        let fastAvgSales = fastGroup.length > 0 ? fastGroup.reduce((a,d) => a + (d[vP]||0), 0) / fastGroup.length : 0;
+        let slowAvgSales = slowGroup.length > 0 ? slowGroup.reduce((a,d) => a + (d[vP]||0), 0) / slowGroup.length : 0;
+
+        let insight3 = '<strong>Phát hiện chính:</strong> Thời gian giao hàng trung bình đạt <strong>' + fmtR(avgDays) + ' ngày</strong>. ';
+        insight3 += 'Nhóm giao nhanh (≤7 ngày) chiếm <strong>' + fmtPct(fastPct) + '</strong> và đạt rating TB <strong>' + fmtR(fastAvgRating) + '</strong>';
+        insight3 += ' vs nhóm giao chậm (>7 ngày) chỉ đạt <strong>' + fmtR(slowAvgRating) + '</strong>';
+        insight3 += ' (chênh lệch <strong>' + (ratingGap >= 0 ? '+' : '') + fmtR(ratingGap) + ' ⭐</strong>).';
+        insight3 += '<br/><strong>Tương quan:</strong> Hệ số Pearson giữa ngày giao và rating = <strong>' + fmtR(corr) + '</strong>';
+        if (corr < -0.03) {{
+            insight3 += ' (tương quan âm) — giao hàng chậm <strong>làm giảm đánh giá</strong> của khách hàng.';
+        }} else if (corr > 0.03) {{
+            insight3 += ' (tương quan dương nhẹ) — thời gian giao không ảnh hưởng tiêu cực rõ rệt.';
+        }} else {{
+            insight3 += ' (gần 0) — tương quan yếu, nhưng sự chênh lệch rating giữa nhóm nhanh/chậm vẫn có ý nghĩa thực tiễn.';
+        }}
+        insight3 += '<br/><strong>Đề xuất:</strong> Nhà bán hàng nên cam kết giao trong <strong>≤7 ngày</strong> — khoảng thời gian tối ưu cho cả rating và ' + mName + '. ';
+        insight3 += 'Đối với các category có chênh lệch lớn giữa giao nhanh/chậm, nên <strong>ưu tiên đầu tư logistics</strong> hoặc sử dụng <strong>FBA (Fulfilled by Amazon)</strong> để đảm bảo tốc độ giao hàng ổn định.';
+        document.getElementById('insight3_text').innerHTML = insight3;
+    }}
+
+    // ── UTILITIES ──
+    function pearsonCorr(x, y) {{
+        let n = x.length;
+        if (n < 2) return 0;
+        let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+        for (let i = 0; i < n; i++) {{
+            sumX += x[i]; sumY += y[i];
+            sumXY += x[i]*y[i]; sumX2 += x[i]*x[i]; sumY2 += y[i]*y[i];
+        }}
+        let denom = Math.sqrt((n*sumX2 - sumX*sumX) * (n*sumY2 - sumY*sumY));
+        return denom === 0 ? 0 : (n*sumXY - sumX*sumY) / denom;
+    }}
+
+    function getRatingBg(r) {{
+        if (r >= 4.5) return 'rgba(16, 185, 129, 0.18)';
+        if (r >= 4.3) return 'rgba(245, 158, 11, 0.14)';
+        if (r >= 4.0) return 'rgba(249, 115, 22, 0.14)';
+        if (r > 0) return 'rgba(239, 68, 68, 0.12)';
+        return 'transparent';
+    }}
+
+    // ══════════════════════════════════════════════
+    // INIT CHARTS
+    // ══════════════════════════════════════════════
     function initCharts() {{
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#78716C';
-        Chart.defaults.font.size = 12;
+        Chart.defaults.font.size = 11;
 
-        let tooltipFormatter = function(ctx) {{
-            let met = document.getElementById('selMetric').value;
-            return (met === 'revenue' ? "$" : "") + fmtN(ctx.raw);
+        let metricAxisFmt = function(val) {{
+            let m = document.getElementById('selMetric').value;
+            if (m === 'revenue') {{ return val >= 1000 ? '$' + (val/1000).toFixed(0) + 'K' : '$' + val; }}
+            return val >= 1000 ? (val/1000).toFixed(0) + 'K' : val;
         }};
-        let axisFormatter = function(val) {{
-            let met = document.getElementById('selMetric').value;
-            if(met==='revenue') {{
-                if(val >= 1000) return "$" + (val/1000).toFixed(1) + "K";
-                return "$" + val;
-            }} else {{
-                if(val >= 1000) return (val/1000).toFixed(1) + "K";
-                return val;
-            }}
+        let metricTooltipFmt = function(ctx) {{
+            let m = document.getElementById('selMetric').value;
+            return (m === 'revenue' ? '$' : '') + fmtN(ctx.raw);
         }};
 
-        // Chart 0: cPrimeDist
-        let ctxDist = document.getElementById('cPrimeDist').getContext('2d');
-        globalInstances.cPrimeDist = new Chart(ctxDist, {{
-            type: 'doughnut',
-            data: {{
-                labels: ['Cung Cấp Qua Phương Thức Sử Dụng Dịch Vụ Mở Rộng Của Tính Năng Prime FBA', 'Phát Hành Bằng Phương Thức Người Bán Chủ Trị Hệ Thống Tự Giao Nhận Trực Tiếp'],
-                datasets: [{{ data: [0, 0], backgroundColor: [BRAND.piePrime, BRAND.pieNon], borderWidth: 1 }}]
-            }},
-            options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }} }} // To prevent extremely long horizontal labels from clashing the UI
-        }});
-
-        // Chart 1: cDonutShip
-        let ctxDonut = document.getElementById('cDonutShip').getContext('2d');
-        globalInstances.cDonutShip = new Chart(ctxDonut, {{
-            type: 'pie',
-            data: {{
-                labels: ['Sản Phẩm Áp Dụng Biên Độ Giao Hàng Miễn Cước', 'Sản Phẩm Tự Quy Định Thu Cước Thấp Tại Dưới Ngưỡng Mức Cục Bộ Giới Hạn $12', 'Sản Phẩm Tính Cước Giữa Ngưỡng Ranh Giới Trung Mức Độ Trung Định Mức Thu Cước Nằm Trong Dải Giao Hàng Xấp Xỉ Giá $25', 'Hạng Mục Quản Trị Hệ Số Vận Chuyển Tính Cước Phí Phụ Thêm Đặc Biệt Tại Mức Mở Lớn Hơn Không Gian Hoạch Định Hoặc Cồng Kềnh Mức $50 Trở Về Sau'],
-                datasets: [{{ data: [0, 0, 0, 0], backgroundColor: BRAND.palette, borderWidth: 1 }}]
-            }},
-            options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }} }}
-        }});
-
-        // Chart 2: cDeliveryDays
-        let ctxDays = document.getElementById('cDeliveryDays').getContext('2d');
-        globalInstances.cDeliveryDays = new Chart(ctxDays, {{
+        // ── S1: Fee Bins (Combo bar + line) ──
+        GI.cFeeBins = new Chart(document.getElementById('cFeeBins'), {{
             type: 'bar',
             data: {{
                 labels: [],
                 datasets: [
-                    {{ label: 'Sản Phẩm Áp Dụng Dịch Vụ Prime', data: [], backgroundColor: BRAND.prime, borderRadius: 3, barPercentage: 0.8 }},
-                    {{ label: 'Sản Phẩm Chọn Dịch Vụ Phân Phối Tự Giao Hàng', data: [], backgroundColor: BRAND.nonPrime, borderRadius: 3, barPercentage: 0.8 }}
+                    {{
+                        label: 'Doanh Số / Doanh Thu TB',
+                        data: [],
+                        backgroundColor: ['rgba(16,185,129,0.75)', 'rgba(239,68,68,0.65)', 'rgba(249,115,22,0.65)', 'rgba(245,158,11,0.65)', 'rgba(59,130,246,0.65)', 'rgba(139,92,246,0.65)'],
+                        borderRadius: 5,
+                        barPercentage: 0.7,
+                        yAxisID: 'y',
+                        order: 2
+                    }},
+                    {{
+                        label: 'Số Lượng Sản Phẩm',
+                        data: [],
+                        type: 'line',
+                        borderColor: '#78716C',
+                        backgroundColor: 'rgba(120,113,108,0.1)',
+                        borderWidth: 2,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#78716C',
+                        fill: true,
+                        tension: 0.3,
+                        yAxisID: 'y1',
+                        order: 1
+                    }}
                 ]
             }},
             options: {{
                 responsive: true, maintainAspectRatio: false,
-                plugins: {{ legend: {{ position: 'bottom', labels: {{ usePointStyle: true, pointStyle: 'circle' }} }}, tooltip: {{ callbacks: {{ label: tooltipFormatter }} }} }},
-                scales: {{ x: {{ grid: {{ display: false }} }}, y: {{ grid: {{ borderDash: [4, 4] }}, ticks: {{ callback: axisFormatter }} }} }}
+                plugins: {{
+                    legend: {{ position: 'bottom', labels: {{ usePointStyle: true, pointStyle: 'circle', padding: 12 }} }},
+                    tooltip: {{ callbacks: {{ label: function(ctx) {{
+                        if (ctx.datasetIndex === 0) return ' ' + metricTooltipFmt(ctx);
+                        return ' ' + fmtN(ctx.raw) + ' sản phẩm';
+                    }} }} }}
+                }},
+                scales: {{
+                    x: {{ grid: {{ display: false }} }},
+                    y: {{ position: 'left', grid: {{ borderDash: [3,3] }}, ticks: {{ callback: metricAxisFmt }} }},
+                    y1: {{ position: 'right', grid: {{ drawOnChartArea: false }}, ticks: {{ callback: v => fmtN(v) }},
+                        title: {{ display: true, text: 'Số SP', font: {{ size: 10 }} }} }}
+                }}
             }}
         }});
-        
-        // Chart 3: cFeeRatioRatio
-        let ctxRatio = document.getElementById('cFeeRatioRatio').getContext('2d');
-        globalInstances.cFeeRatioRatio = new Chart(ctxRatio, {{
-            type: 'bar',
+
+        // ── S1: Revenue Share (Doughnut) ──
+        GI.cRevShare = new Chart(document.getElementById('cRevShare'), {{
+            type: 'doughnut',
             data: {{
                 labels: [],
+                datasets: [{{ data: [], backgroundColor: BRAND.palette.concat(['#D4D4D8']), borderWidth: 1, hoverOffset: 6 }}]
+            }},
+            options: {{
+                responsive: true, maintainAspectRatio: false,
+                cutout: '55%',
+                plugins: {{
+                    legend: {{ position: 'bottom', labels: {{ usePointStyle: true, pointStyle: 'circle', padding: 10, font: {{ size: 10 }} }} }},
+                    tooltip: {{ callbacks: {{ label: function(ctx) {{
+                        let total = ctx.dataset.data.reduce((a,b)=>a+b, 0);
+                        let pct = total > 0 ? (ctx.raw/total*100).toFixed(1) : 0;
+                        let m = document.getElementById('selMetric').value;
+                        return ' ' + (m==='revenue'?'$':'') + fmtN(ctx.raw) + ' (' + pct + '%)';
+                    }} }} }}
+                }}
+            }}
+        }});
+
+        // ── S2: Prime Rate Comparison ──
+        GI.cPrimeRate = new Chart(document.getElementById('cPrimeRate'), {{
+            type: 'bar',
+            data: {{
+                labels: ['Tổng Thể', 'Amazon\\'s Choice', 'Top 20% Sales', 'Bottom 80%'],
                 datasets: [{{
-                    label: 'Giá Trị Biến Động Trung Bình Được Định Lượng Doanh Nghiệp',
-                    data: [],
-                    backgroundColor: 'rgba(249, 115, 22, 0.85)',
-                    borderRadius: 4
+                    label: 'Tỷ Lệ Prime (%)',
+                    data: [0, 0, 0, 0],
+                    backgroundColor: [BRAND.nonPrime, BRAND.green, BRAND.prime, '#D4D4D8'],
+                    borderRadius: 5,
+                    barPercentage: 0.6
                 }}]
             }},
             options: {{
+                indexAxis: 'y',
                 responsive: true, maintainAspectRatio: false,
-                plugins: {{ legend: {{ display: false }}, tooltip: {{ callbacks: {{ label: tooltipFormatter }} }} }},
-                scales: {{ x: {{ grid: {{ display: false }} }}, y: {{ grid: {{ borderDash: [4, 4] }}, ticks: {{ callback: axisFormatter }} }} }}
+                plugins: {{
+                    legend: {{ display: false }},
+                    tooltip: {{ callbacks: {{ label: ctx => ' ' + fmtR(ctx.raw) + '%' }} }}
+                }},
+                scales: {{
+                    x: {{ grid: {{ borderDash: [3,3] }}, ticks: {{ callback: v => v + '%' }},
+                        title: {{ display: true, text: 'Tỷ lệ Prime (%)', font: {{ size: 10 }} }} }},
+                    y: {{ grid: {{ display: false }} }}
+                }}
             }}
         }});
 
-        // Chart 4: cPriceSegment
-        let ctxPrice = document.getElementById('cPriceSegment').getContext('2d');
-        globalInstances.cPriceSegment = new Chart(ctxPrice, {{
-            type: 'bar',
+        // ── S2: Radar Profile ──
+        GI.cRadar = new Chart(document.getElementById('cRadar'), {{
+            type: 'radar',
             data: {{
-                labels: [],
+                labels: ['Rating', 'Doanh Số', 'Giá TB', 'Amazon Choice %', 'Free Ship %'],
                 datasets: [
-                    {{ label: 'Có Ứng Dụng Tích Hợp Hệ Thống Thực Thi Prime FBA', data: [], backgroundColor: BRAND.prime, borderRadius: 4, barPercentage: 0.7 }},
-                    {{ label: 'Tiến Hành Triển Khai Xử Lý Khâu Thực Thi Nội Bộ Đơn Vị Phát Hành', data: [], backgroundColor: BRAND.nonPrime, borderRadius: 4, barPercentage: 0.7 }}
+                    {{
+                        label: 'Prime',
+                        data: [0,0,0,0,0],
+                        borderColor: BRAND.prime,
+                        backgroundColor: 'rgba(249,115,22,0.15)',
+                        pointBackgroundColor: BRAND.prime,
+                        pointRadius: 3,
+                        borderWidth: 2
+                    }},
+                    {{
+                        label: 'Non-Prime',
+                        data: [0,0,0,0,0],
+                        borderColor: BRAND.nonPrime,
+                        backgroundColor: 'rgba(156,163,175,0.12)',
+                        pointBackgroundColor: BRAND.nonPrime,
+                        pointRadius: 3,
+                        borderWidth: 2
+                    }}
                 ]
             }},
             options: {{
                 responsive: true, maintainAspectRatio: false,
-                plugins: {{ legend: {{ position: 'bottom', labels: {{ usePointStyle: true, pointStyle: 'circle' }} }}, tooltip: {{ callbacks: {{ label: tooltipFormatter }} }} }},
-                scales: {{ x: {{ grid: {{ display: false }} }}, y: {{ grid: {{ borderDash: [4, 4] }}, ticks: {{ callback: axisFormatter }} }} }}
+                plugins: {{
+                    legend: {{ position: 'bottom', labels: {{ usePointStyle: true, pointStyle: 'circle', padding: 12 }} }},
+                    tooltip: {{ callbacks: {{ label: ctx => ' ' + ctx.dataset.label + ': ' + fmtR(ctx.raw) }} }}
+                }},
+                scales: {{
+                    r: {{
+                        min: 0, max: 100,
+                        ticks: {{ stepSize: 25, display: false }},
+                        grid: {{ color: '#E7E5E4' }},
+                        angleLines: {{ color: '#E7E5E4' }},
+                        pointLabels: {{ font: {{ size: 10, weight: '600' }} }}
+                    }}
+                }}
             }}
         }});
 
-        // Chart 5: cCategoryBreakdown
-        let ctxCat = document.getElementById('cCategoryBreakdown').getContext('2d');
-        globalInstances.cCategoryBreakdown = new Chart(ctxCat, {{
+        // ── S2: Prime by Category ──
+        GI.cPrimeCat = new Chart(document.getElementById('cPrimeCat'), {{
             type: 'bar',
             data: {{
                 labels: [],
                 datasets: [
-                    {{ label: 'Tiểu Chuẩn Phạm Vi Quét Quản Lý Danh Mục Áp Dụng Prime', data: [], backgroundColor: BRAND.prime, borderRadius: 4, barPercentage: 0.8 }},
-                    {{ label: 'Thống Kê Số Liệu Khảo Sát Từng Đoạn Cắt Mặt Cắt Danh Mục Tự Quản Trị Hệ Logistic', data: [], backgroundColor: BRAND.nonPrime, borderRadius: 4, barPercentage: 0.8 }}
+                    {{ label: 'Prime', data: [], backgroundColor: BRAND.prime, borderRadius: 4, barPercentage: 0.7 }},
+                    {{ label: 'Non-Prime', data: [], backgroundColor: BRAND.nonPrime, borderRadius: 4, barPercentage: 0.7 }}
                 ]
             }},
             options: {{
                 indexAxis: 'y',
                 responsive: true, maintainAspectRatio: false,
-                plugins: {{ legend: {{ position: 'top', labels: {{ usePointStyle: true, pointStyle: 'circle' }} }}, tooltip: {{ callbacks: {{ label: tooltipFormatter }} }} }},
-                scales: {{ x: {{ grid: {{ borderDash: [4, 4] }}, ticks: {{ callback: axisFormatter }} }}, y: {{ grid: {{ display: false }} }} }}
+                plugins: {{
+                    legend: {{ position: 'top', labels: {{ usePointStyle: true, pointStyle: 'circle' }} }},
+                    tooltip: {{ callbacks: {{ label: metricTooltipFmt }} }}
+                }},
+                scales: {{
+                    x: {{ grid: {{ borderDash: [3,3] }}, ticks: {{ callback: metricAxisFmt }} }},
+                    y: {{ grid: {{ display: false }} }}
+                }}
+            }}
+        }});
+
+        // ── S3: Delivery Impact (Dual Axis) ──
+        GI.cDeliveryImpact = new Chart(document.getElementById('cDeliveryImpact'), {{
+            type: 'bar',
+            data: {{
+                labels: [],
+                datasets: [
+                    {{
+                        label: 'Doanh Số / Doanh Thu TB',
+                        data: [],
+                        backgroundColor: 'rgba(59,130,246,0.65)',
+                        borderRadius: 5,
+                        barPercentage: 0.6,
+                        yAxisID: 'y',
+                        order: 2
+                    }},
+                    {{
+                        label: 'Rating TB',
+                        data: [],
+                        type: 'line',
+                        borderColor: BRAND.primary || '#F97316',
+                        backgroundColor: 'rgba(249,115,22,0.1)',
+                        borderWidth: 2.5,
+                        pointRadius: 5,
+                        pointBackgroundColor: '#F97316',
+                        fill: false,
+                        tension: 0.3,
+                        yAxisID: 'y1',
+                        order: 1
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true, maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{ position: 'bottom', labels: {{ usePointStyle: true, pointStyle: 'circle', padding: 12 }} }},
+                    tooltip: {{ callbacks: {{ label: function(ctx) {{
+                        if (ctx.datasetIndex === 0) return ' ' + metricTooltipFmt(ctx);
+                        return ' Rating: ' + fmtR(ctx.raw) + ' ⭐';
+                    }} }} }}
+                }},
+                scales: {{
+                    x: {{ grid: {{ display: false }} }},
+                    y: {{ position: 'left', grid: {{ borderDash: [3,3] }}, ticks: {{ callback: metricAxisFmt }},
+                        title: {{ display: true, text: 'Doanh số / Doanh thu', font: {{ size: 10 }} }} }},
+                    y1: {{ position: 'right', grid: {{ drawOnChartArea: false }},
+                        min: 3.5, max: 5.0,
+                        ticks: {{ callback: v => v.toFixed(1) + ' ⭐' }},
+                        title: {{ display: true, text: 'Rating', font: {{ size: 10 }} }} }}
+                }}
+            }}
+        }});
+
+        // ── S3: Category Delivery ──
+        GI.cCatDelivery = new Chart(document.getElementById('cCatDelivery'), {{
+            type: 'bar',
+            data: {{
+                labels: [],
+                datasets: [
+                    {{ label: 'Giao Nhanh (≤7 ngày)', data: [], backgroundColor: BRAND.green, borderRadius: 4, barPercentage: 0.7 }},
+                    {{ label: 'Giao Chậm (>7 ngày)', data: [], backgroundColor: BRAND.red, borderRadius: 4, barPercentage: 0.7 }}
+                ]
+            }},
+            options: {{
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: {{
+                    legend: {{ position: 'top', labels: {{ usePointStyle: true, pointStyle: 'circle' }} }},
+                    tooltip: {{ callbacks: {{ label: metricTooltipFmt }} }}
+                }},
+                scales: {{
+                    x: {{ grid: {{ borderDash: [3,3] }}, ticks: {{ callback: metricAxisFmt }} }},
+                    y: {{ grid: {{ display: false }} }}
+                }}
             }}
         }});
     }}
@@ -647,5 +1162,5 @@ def render(df_raw):
 </body>
 </html>
     """
-    
-    components.html(html_code, height=2300, scrolling=False)
+
+    components.html(html_code, height=4200, scrolling=False)
