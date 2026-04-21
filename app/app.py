@@ -1,5 +1,18 @@
 import streamlit as st
+import json
+import joblib
 from pathlib import Path
+
+try:
+    p = Path(__file__).resolve().parent / "services" / "models" / "best_gradient_boosting_model.pkl"
+    m = joblib.load(p)
+    dump_path = Path(__file__).resolve().parent / "features_dump.json"
+    with open(dump_path, "w") as f:
+        json.dump(list(m.feature_names_in_) if hasattr(m, 'feature_names_in_') else list(m.feature_names_), f)
+except Exception as e:
+    dump_path = Path(__file__).resolve().parent / "features_dump.json"
+    with open(dump_path, "w") as f:
+        json.dump(str(e), f)
 
 from components.footer import render_footer
 from components.header import render_header
