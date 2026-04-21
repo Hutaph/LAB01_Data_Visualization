@@ -16,6 +16,7 @@ TAB_CONFIG = [
     {"label": "Vận chuyển",    "icon": "bi-truck-front-fill"},
     {"label": "Nhãn & Uy tín", "icon": "bi-patch-check-fill"},
     {"label": "Nổi bật",       "icon": "bi-bar-chart-fill", "icon_style": "font-size: 24px;"},
+    {"label": "Dự báo",        "icon": "bi-cpu-fill"},
 ]
 
 TAB_LABELS = [t["label"] for t in TAB_CONFIG]

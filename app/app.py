@@ -12,6 +12,7 @@ from tabs.tab_danh_muc import render as render_tab_danh_muc
 from tabs.tab_nhan_uy_tin import render as render_tab_nhan_uy_tin
 from tabs.tab_van_chuyen import render as render_tab_van_chuyen
 from tabs.tab_noi_bat import render as render_tab_noi_bat
+from tabs.tab_du_bao import render as render_tab_du_bao
 from utils.css import inject_css
 
 amazon_icon_path = Path(__file__).resolve().parent / "data" / "Amazon_icon.png"
@@ -58,6 +59,7 @@ TAB_RENDERERS = {
     "Vận chuyển": lambda state, df: render_tab_van_chuyen(df),
     "Nhãn & Uy tín": lambda state, df: render_tab_nhan_uy_tin(df),
     "Nổi bật": lambda state, df: render_tab_noi_bat(df),
+    "Dự báo": lambda state, df: render_tab_du_bao(df),
 }
 
 def route_tab(active_tab: str, state: dict, df):
