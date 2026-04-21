@@ -41,7 +41,7 @@ def _resolve_latest_csv() -> Path:
             "Không tìm thấy file CSV trong data/Processed hoặc data/processed."
         )
 
-    preferred = [p for p in csv_files if p.stem.lower() == "data_tmp"]
+    preferred = [p for p in csv_files if p.stem.lower() == "amazon_products_viz_drop"]
     if preferred:
         return preferred[-1]
 
