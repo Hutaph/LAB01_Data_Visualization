@@ -342,7 +342,7 @@ def render(df_raw):
 <script>
     const RAW = {data_json_str};
     let globalInstances = {{}};
-    const COLORS = {{ choice: '#F97316', non: '#D6D3D1', green: '#10B981', dark: '#9A3412', blue: '#3B82F6', amber: '#F59E0B' }};
+    const COLORS = {{ choice: '#F97316', non: '#3B82F6', green: '#10B981', dark: '#9A3412', blue: '#3B82F6', amber: '#F59E0B' }};
 
     const fmtN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
     const fmtR = n => Number(n).toFixed(2);
@@ -548,7 +548,7 @@ def render(df_raw):
                 labels: ['Rating TB', 'Doanh Số TB', 'Lượt Review TB', 'Giá Bán TB'],
                 datasets: [
                     {{ label: "Amazon's Choice", data: [0,0,0,0], backgroundColor: 'rgba(249, 115, 22, 0.2)', borderColor: COLORS.choice, borderWidth: 2, pointBackgroundColor: COLORS.choice, pointRadius:3 }},
-                    {{ label: "Chỉ Best Seller", data: [0,0,0,0], backgroundColor: 'rgba(214, 211, 209, 0.2)', borderColor: COLORS.non, borderWidth: 2, pointBackgroundColor: COLORS.non, pointRadius:3 }}
+                    {{ label: "Chỉ Best Seller", data: [0,0,0,0], backgroundColor: 'rgba(59, 130, 246, 0.2)', borderColor: COLORS.non, borderWidth: 2, pointBackgroundColor: COLORS.non, pointRadius:3 }}
                 ]
             }},
             options: {{
@@ -625,7 +625,7 @@ def render(df_raw):
             data: {{
                 datasets: [
                     {{ label: "Amazon's Choice", data: [], backgroundColor: 'rgba(249, 115, 22, 0.8)', borderColor: '#FFFFFF', borderWidth:1, pointRadius: 5 }},
-                    {{ label: "Chỉ Best Seller", data: [], backgroundColor: 'rgba(214, 211, 209, 0.4)', borderColor: 'transparent', pointRadius: 3 }}
+                    {{ label: "Chỉ Best Seller", data: [], backgroundColor: 'rgba(59, 130, 246, 0.4)', borderColor: 'transparent', pointRadius: 3 }}
                 ]
             }},
             options: {{
