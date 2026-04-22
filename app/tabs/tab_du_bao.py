@@ -1,3 +1,14 @@
+"""
+`tab_du_bao` - Streamlit tab for product performance forecasting
+-------------------------------------------------------------
+
+This module renders the prediction UI and delegates preprocessing
+and model inference to the `predictor` package. The tab accepts a
+single-row input from the user, ensures the processor exists (builds
+it from sample data when missing), transforms the input, and calls
+the selected trained model for prediction.
+"""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,7 +16,10 @@ import joblib
 from pathlib import Path
 import plotly.graph_objects as go
 import sys
-from services.models.feature_engineering import DiscountFeatureEngineer, OutlierClipper
+
+from predictor.feature_engineering import DiscountFeatureEngineer, OutlierClipper
+from predictor import MODELS_DIR, ensure_processor, transform_with_feature_names
+from predictor.loader import load_processed_data
 
 def render(df):
     # PATHS
@@ -133,12 +147,21 @@ def render(df):
             pass
 
         model = joblib.load(MODEL_PATH)
-        processor = joblib.load(PROCESSOR_PATH)
+        # try to load existing processor, otherwise attempt to build one using a sample processed dataframe
+        try:
+            processor = joblib.load(PROCESSOR_PATH)
+        except Exception:
+            try:
+                # load a sample dataframe to fit a new processor
+                sample_df, _ = load_processed_data()
+                processor = ensure_processor(PROCESSOR_PATH, sample_df=sample_df)
+            except Exception as _err:
+                raise
 
         feature_names = list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else []
 
         # Try to load a features dump (created at app startup) for display
-        features_dump_path = Path(__file__).resolve().parents[1] / "features_dump.json"
+        features_dump_path = "./services/models/features_dump.json"
         try:
             if features_dump_path.exists():
                 import json
