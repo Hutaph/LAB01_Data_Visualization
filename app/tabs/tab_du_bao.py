@@ -1,3 +1,14 @@
+"""
+`tab_du_bao` - Streamlit tab for product performance forecasting
+-------------------------------------------------------------
+
+This module renders the prediction UI and delegates preprocessing
+and model inference to the `predictor` package. The tab accepts a
+single-row input from the user, ensures the processor exists (builds
+it from sample data when missing), transforms the input, and calls
+the selected trained model for prediction.
+"""
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -5,14 +16,36 @@ import joblib
 from pathlib import Path
 import plotly.graph_objects as go
 import sys
-from services.models.feature_engineering import DiscountFeatureEngineer, OutlierClipper
+
+from predictor.feature_engineering import DiscountFeatureEngineer, OutlierClipper
+from predictor import MODELS_DIR, ensure_processor, transform_with_feature_names
+from predictor.loader import load_processed_data
 
 def render(df):
     # PATHS
-    MODEL_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "best_gradient_boosting_model.pkl"
-    PROCESSOR_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "sales_prediction_processor.joblib"
+    # `MODELS_DIR` is provided by the predictor package (points to app/services/models)
+    PROCESSOR_PATH = MODELS_DIR / "sales_prediction_processor.joblib"
 
-    # CSS + header (Đã bổ sung fix lỗi trong suốt sidebar và tối ưu UI)
+    # Detect available model files and allow user to choose
+    try:
+        model_files = sorted(MODELS_DIR.glob("*.pkl"))
+        model_options = [p.name for p in model_files]
+    except Exception:
+        model_files = []
+        model_options = []
+
+    if not model_options:
+        st.error("Không tìm thấy mô hình (.pkl) trong thư mục models")
+        return
+
+    # default selection (prefer gradient boosting if present)
+    default_name = "best_gradient_boosting_model.pkl"
+    default_index = model_options.index(default_name) if default_name in model_options else 0
+    selected_model_name = st.selectbox("Chọn mô hình", model_options, index=default_index,
+                                       format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title())
+    MODEL_PATH = MODELS_DIR / selected_model_name
+
+    # CSS + header
     st.markdown(
         """
         <style>
@@ -114,7 +147,16 @@ def render(df):
             pass
 
         model = joblib.load(MODEL_PATH)
-        processor = joblib.load(PROCESSOR_PATH)
+        # try to load existing processor, otherwise attempt to build one using a sample processed dataframe
+        try:
+            processor = joblib.load(PROCESSOR_PATH)
+        except Exception:
+            try:
+                # load a sample dataframe to fit a new processor
+                sample_df, _ = load_processed_data()
+                processor = ensure_processor(PROCESSOR_PATH, sample_df=sample_df)
+            except Exception as _err:
+                raise
 
         feature_names = list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else []
 

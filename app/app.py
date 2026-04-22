@@ -3,16 +3,20 @@ import json
 import joblib
 from pathlib import Path
 
-try:
-    p = Path(__file__).resolve().parent / "services" / "models" / "best_gradient_boosting_model.pkl"
-    m = joblib.load(p)
-    dump_path = Path(__file__).resolve().parent / "features_dump.json"
-    with open(dump_path, "w") as f:
-        json.dump(list(m.feature_names_in_) if hasattr(m, 'feature_names_in_') else list(m.feature_names_), f)
-except Exception as e:
-    dump_path = Path(__file__).resolve().parent / "features_dump.json"
-    with open(dump_path, "w") as f:
-        json.dump(str(e), f)
+dump_path = Path(__file__).resolve().parent / "features_dump.json"
+models_dir = Path(__file__).resolve().parent / "services" / "models"
+best_model = models_dir / "gradient_boosting_model.pkl"
+
+# Attempt to populate a features dump only when a model can be loaded successfully.
+# On failure, write an empty list (do not serialize exception strings into the JSON file).
+dump = []
+if best_model.exists():
+    try:
+        m = joblib.load(best_model)
+        dump = list(m.feature_names_in_) if hasattr(m, "feature_names_in_") else list(getattr(m, "feature_names_", []))
+    except Exception as e:
+        # keep dump as empty list; print warning to stdout for debugging
+        print("Warning: failed to load model for features dump:", e)
 
 from components.footer import render_footer
 from components.header import render_header
