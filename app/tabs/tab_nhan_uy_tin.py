@@ -7,8 +7,41 @@ def render(df_raw):
     df = df_raw.copy()
 
     # ══════════════════════════════════════════════════════════════
-    # 1. TIỀN XỬ LÝ DỮ LIỆU
+    # 1. TIỀN XỬ LÝ DỮ LIỆU & MAPPING DANH MỤC
     # ══════════════════════════════════════════════════════════════
+    CATEGORY_MAP = {
+        "electronics_laptops": "Laptop",
+        "electronics_tablets": "Máy Tính Bảng",
+        "electronics_smartphones": "Điện Thoại",
+        "electronics_monitors": "Màn Hình",
+        "electronics_headphones": "Tai Nghe",
+        "electronics_keyboards": "Bàn Phím",
+        "electronics_storage_ssd": "Ổ Cứng & SSD",
+        "electronics_networking": "Thiết Bị Mạng",
+        "electronics_gaming_consoles": "Máy Chơi Game",
+        "home_kitchen_appliances": "Thiết Bị Bếp",
+        "home_cleaning": "Dụng Cụ Vệ Sinh",
+        "home_air_quality": "Máy Lọc Khí",
+        "home_furniture": "Nội Thất",
+        "office_supplies": "Văn Phòng Phẩm",
+        "office_stationery": "Dụng Cụ VP",
+        "fashion_mens": "Thời Trang Nam",
+        "fashion_womens": "Thời Trang Nữ",
+        "fashion_shoes": "Giày Dép",
+        "fashion_bags": "Túi Xách",
+        "beauty_skincare": "Chăm Sóc Da",
+        "beauty_makeup": "Trang Điểm",
+        "health_personal_care": "Chăm Sóc Cá Nhân",
+        "health_supplements": "TPCN & Vitamin",
+        "baby_products": "Sản Phẩm Cho Bé",
+        "toys_games": "Đồ Chơi & Game",
+        "sports_outdoors": "Thể Thao Ngoài Trời",
+        "sports_fitness": "Dụng Cụ Gym",
+        "pet_supplies": "Thú Cưng",
+        "automotive_accessories": "Phụ Kiện Ô Tô",
+        "tools_home_improvement": "Dụng Cụ Sửa Nhà",
+    }
+
     if "is_amazon_choice" not in df.columns:
         df["is_amazon_choice"] = False
     else:
@@ -25,7 +58,7 @@ def render(df_raw):
     if "crawl_category" not in df.columns:
         df["crawl_category"] = "Không rõ"
     else:
-        df["crawl_category"] = df["crawl_category"].fillna("Không rõ")
+        df["crawl_category"] = df["crawl_category"].fillna("Không rõ").map(CATEGORY_MAP).fillna("Khác")
 
     df["current_price"] = pd.to_numeric(df.get("price", 0), errors="coerce").fillna(0.0)
     df["sales_volume_num"] = pd.to_numeric(df.get("sales_volume_num", 0), errors="coerce").fillna(0)
@@ -37,12 +70,20 @@ def render(df_raw):
     else:
         df["title"] = df["title"].fillna("Sản phẩm ẩn danh")
 
+    # Tạo phân khúc giá
+    def get_price_tier(p):
+        if p < 25: return "1. Bình dân (<$25)"
+        elif p < 50: return "2. Phổ thông ($25-$50)"
+        elif p < 100: return "3. Trung cấp ($50-$100)"
+        else: return "4. Cao cấp (>$100)"
+    df["price_tier"] = df["current_price"].apply(get_price_tier)
+
     # ══════════════════════════════════════════════════════════════
     # 2. XUẤT JSON CHO CHART.JS
     # ══════════════════════════════════════════════════════════════
     select_cols = [
         "title", "crawl_category", "is_amazon_choice", "is_best_seller", 
-        "current_price", "sales_volume_num", "rating_val", "reviews_val", "is_prime"
+        "current_price", "sales_volume_num", "rating_val", "reviews_val", "is_prime", "price_tier"
     ]
     export_df = df[select_cols].copy()
     data_json_str = export_df.to_json(orient="records", force_ascii=False)
@@ -169,7 +210,7 @@ def render(df_raw):
         <div class="obj-title">📍 TỔNG QUAN PHÂN TÍCH NHÃN HIỆU (AMAZON'S CHOICE)</div>
         <div class="obj-text">
             <strong>Ghi nhận dữ liệu:</strong> 100% sản phẩm đầu vào đều là <strong>Best Seller</strong>. <br>
-            Do đó, mục tiêu của Dashboard này là <strong>Đào sâu giá trị gia tăng của nhãn Amazon's Choice</strong>: Nhãn này có tác động như thế nào đến giá niêm yết, tỉ lệ đánh giá và quan trọng nhất là mức chênh lệch doanh số bán ra.
+            Do đó, mục tiêu của Dashboard này là <strong>Đào sâu giá trị gia tăng của nhãn Amazon's Choice</strong>: Nhãn này có tác động như thế nào đến giá niêm yết, tỉ lệ đánh giá và quan trọng nhất là mức chênh lệch doanh số bán ra vượt bậc trong chính tập hàng đầu.
         </div>
     </div>
 
@@ -177,15 +218,16 @@ def render(df_raw):
     <div class="section-wrapper">
         <div class="section-sticky">
             <div class="section-title-row">
-                <div class="section-title"><span class="num">1</span> SỰ KHÁC BIỆT CHỈ SỐ: AMAZON'S CHOICE VS BEST SELLER TỰ NHIÊN</div>
+                <div class="section-title"><span class="num">1</span> BÁO CÁO TOÀN DIỆN: AMAZON'S CHOICE VS BEST SELLER TỰ NHIÊN</div>
                 <div class="header-filters">
-                    <div class="hf-item"><span class="hf-label">Danh Mục:</span>
+                    <div class="hf-item"><span class="hf-label">Danh Mục (Đã Map Tiếng Việt):</span>
                         <select id="selCategory" onchange="applyFilters()"><option value="ALL">Tất cả Danh mục</option></select>
                     </div>
                 </div>
             </div>
         </div>
 
+        <!-- 4 KPI CARDS -->
         <div class="kpi-row">
             <div class="kpi-card">
                 <div class="kpi-title">Tỉ Lệ Đạt Amazon's Choice</div>
@@ -193,7 +235,7 @@ def render(df_raw):
                 <div class="kpi-sub" id="kpi_ac_sub">0 / 0 sản phẩm</div>
             </div>
             <div class="kpi-card c-green">
-                <div class="kpi-title">Chênh Lệch Doanh Số Bán Xấp Xỉ</div>
+                <div class="kpi-title">Chênh Lệch Doanh Số Bán</div>
                 <div class="kpi-value" id="kpi_sales_diff">+0%</div>
                 <div class="kpi-sub" id="kpi_sales_sub">Doanh số: 0 vs 0</div>
             </div>
@@ -203,12 +245,13 @@ def render(df_raw):
                 <div class="kpi-sub" id="kpi_price_sub">Giá bán: $0 vs $0</div>
             </div>
             <div class="kpi-card c-amber">
-                <div class="kpi-title">Tỉ Lệ Có Dịch Vụ Prime Tích Hợp</div>
-                <div class="kpi-value" id="kpi_prime_pct">0%</div>
-                <div class="kpi-sub">Trong nhóm Amazon's Choice</div>
+                <div class="kpi-title">Chênh Lệch Rating (⭐)</div>
+                <div class="kpi-value" id="kpi_rating_diff">+0.0</div>
+                <div class="kpi-sub" id="kpi_rating_sub">Rating: 0.0 vs 0.0</div>
             </div>
         </div>
 
+        <!-- ROW 1: Donut & Radar -->
         <div class="chart-row">
             <div class="chart-card" style="flex: 0.8;">
                 <div class="chart-header">
@@ -220,27 +263,47 @@ def render(df_raw):
             
             <div class="chart-card" style="flex: 1.2;">
                 <div class="chart-header">
-                    <div class="chart-title">Hồ Sơ Đa Chiều: Choice vs Non-Choice</div>
-                    <div class="chart-subtitle">Ghi chú: Bản đồ chuẩn hóa 4 trục (Doanh Số, Rev, Giá, Rating) giữa 2 nhóm</div>
+                    <div class="chart-title">Hồ Sơ Cạnh Tranh (Radar Cân Bằng)</div>
+                    <div class="chart-subtitle">So sánh chuẩn hóa: Doanh Số, Lượt Đánh Giá, Giá Bán và Rating</div>
                 </div>
                 <div class="chart-wrapper" style="height: 250px;"><canvas id="cRadar"></canvas></div>
             </div>
         </div>
 
+        <!-- ROW 2: Stacked Bar Price Tier & Sales/Rev Bar -->
         <div class="chart-row">
             <div class="chart-card" style="flex: 1;">
                 <div class="chart-header">
-                    <div class="chart-title">Hiệu Suất Tuyệt Đối: Doanh Số TB và Doanh Thu TB ($)</div>
-                    <div class="chart-subtitle">So sánh số lượng bán ra mặt bằng chung. Khác biệt lớn ở đây minh chứng cho uy tín nhãn.</div>
+                    <div class="chart-title">Phân Bổ Kích Trọng Theo Phân Khúc Giá</div>
+                    <div class="chart-subtitle">Tỉ lệ cột mốc: 100% cột chia theo tỉ lệ đạt Choice từng mức giá</div>
                 </div>
-                <div class="chart-wrapper"><canvas id="cBarSales"></canvas></div>
+                <div class="chart-wrapper" style="height: 280px;"><canvas id="cPriceTier"></canvas></div>
             </div>
             <div class="chart-card" style="flex: 1;">
                 <div class="chart-header">
-                    <div class="chart-title">Nhóm Ngành Hàng Ưu Tiên Của Thuật Toán Amazon</div>
+                    <div class="chart-title">Hiệu Suất Tuyệt Đối: Doanh Số TB và Doanh Thu TB ($)</div>
+                    <div class="chart-subtitle">So sánh số lượng bán ra mặt bằng chung. Khác biệt lớn minh chứng uy tín</div>
+                </div>
+                <div class="chart-wrapper" style="height: 280px;"><canvas id="cBarSales"></canvas></div>
+            </div>
+        </div>
+
+        <!-- ROW 3: Horizontal Categories & Scatter Plots -->
+        <div class="chart-row">
+            <div class="chart-card" style="flex: 0.8;">
+                <div class="chart-header">
+                    <div class="chart-title">Tham Kiếu Nhóm Ngành Hàng Đề Xuất</div>
                     <div class="chart-subtitle">Tỉ lệ xuất hiện Amazon's Choice theo TOP 10 danh mục lớn</div>
                 </div>
-                <div class="chart-wrapper"><canvas id="cBarHorCat"></canvas></div>
+                <div class="chart-wrapper" style="height: 380px;"><canvas id="cBarHorCat"></canvas></div>
+            </div>
+            
+            <div class="chart-card" style="flex: 1.2;">
+                <div class="chart-header">
+                    <div class="chart-title">Bức Tranh Hệ Trục: Giá Bán vs. Doanh Số Bán Ra</div>
+                    <div class="chart-subtitle">Ma trận Scatter xác định "Sweet Spot" định giá của Amazon's Choice</div>
+                </div>
+                <div class="chart-wrapper" style="height: 380px;"><canvas id="cScatter"></canvas></div>
             </div>
         </div>
 
@@ -269,7 +332,7 @@ def render(df_raw):
         <div class="insight-box" id="insightBox1">
             <div class="insight-icon">💡</div>
             <div class="insight-content">
-                <div class="insight-label">INSIGHT CHIẾN LƯỢC: HỆ SINH THÁI NHÃN DÁN</div>
+                <div class="insight-label">INSIGHT CHIẾN LƯỢC: HỆ SINH THÁI NHÃN DÁN CỦA AMAZON</div>
                 <div class="insight-text" id="ins1">Đang phân tích...</div>
             </div>
         </div>
@@ -279,7 +342,7 @@ def render(df_raw):
 <script>
     const RAW = {data_json_str};
     let globalInstances = {{}};
-    const COLORS = {{ choice: '#F97316', non: '#FDBA74', green: '#10B981', dark: '#9A3412', blue: '#3B82F6', amber: '#F59E0B' }};
+    const COLORS = {{ choice: '#F97316', non: '#D6D3D1', green: '#10B981', dark: '#9A3412', blue: '#3B82F6', amber: '#F59E0B' }};
 
     const fmtN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
     const fmtR = n => Number(n).toFixed(2);
@@ -288,7 +351,7 @@ def render(df_raw):
     function setup() {{
         // Lấy danh sách danh mục
         let cats = new Set();
-        RAW.forEach(d => {{ if(d.crawl_category && d.crawl_category !== 'Không rõ') cats.add(d.crawl_category); }});
+        RAW.forEach(d => {{ if(d.crawl_category && d.crawl_category !== 'Không rõ' && d.crawl_category !== 'Khác') cats.add(d.crawl_category); }});
         let sel = document.getElementById('selCategory');
         Array.from(cats).sort().forEach(c => {{
             let opt = document.createElement('option');
@@ -312,7 +375,7 @@ def render(df_raw):
         let G_choice = data.filter(d => d.is_amazon_choice);
         let G_non = data.filter(d => !d.is_amazon_choice);
 
-        // 1. KPIs Update
+        // ------------------ 1. KPIs Update ------------------
         let t_prod = data.length;
         let c_cnt = G_choice.length;
         let c_pct = (c_cnt / t_prod) * 100;
@@ -332,29 +395,34 @@ def render(df_raw):
         let p_c = c_cnt > 0 ? G_choice.reduce((a,b)=>a+b.current_price,0)/c_cnt : 0;
         let p_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+b.current_price,0)/G_non.length : 0;
         let p_diff = p_c - p_n;
-        document.getElementById('kpi_price_diff').innerText = (p_diff >= 0 ? '+$' : '-$') + fmtR(Math.abs(p_diff));
+        let p_elem = document.getElementById('kpi_price_diff');
+        p_elem.innerText = (p_diff >= 0 ? '+$' : '-$') + fmtR(Math.abs(p_diff));
+        p_elem.parentElement.className = 'kpi-card ' + (p_diff < 0 ? 'c-blue' : 'c-amber');
         document.getElementById('kpi_price_sub').innerText = '$' + fmtR(p_c) + ' vs $' + fmtR(p_n);
 
-        let prime_in_c = c_cnt > 0 ? (G_choice.filter(d => d.is_prime).length / c_cnt) * 100 : 0;
-        document.getElementById('kpi_prime_pct').innerText = fmtP(prime_in_c);
+        let r_c = c_cnt > 0 ? G_choice.reduce((a,b)=>a+b.rating_val,0)/c_cnt : 0;
+        let r_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+b.rating_val,0)/G_non.length : 0;
+        let r_diff = r_c - r_n;
+        document.getElementById('kpi_rating_diff').innerText = (r_diff >= 0 ? '+' : '') + fmtR(r_diff);
+        document.getElementById('kpi_rating_sub').innerText = fmtR(r_c) + ' vs ' + fmtR(r_n);
 
-        // 2. INSIGHT GENERATION
+        // ------------------ 2. INSIGHT GENERATION ------------------
         let insHTML = `Khảo sát hiển thị nhóm sản phẩm nhận <strong>Amazon's Choice</strong> chiếm khoảng <strong>${{fmtP(c_pct)}}</strong> tổng hàng mẫu. <br>`;
         if (s_pct > 0) {{
-            insHTML += `Hiệu ứng nhãn dẫn đến doanh số tăng cường vọt lên <strong>${{fmtP(s_pct)}} cao hơn</strong> so với nhóm chỉ là Best Seller (với sales base ngang nhau). Điều này chứng minh thuật toán ưu tiên cực độ cho Choice. `;
+            insHTML += `Hiệu ứng nhãn dẫn đến doanh số trung bình vọt lên mức <strong>+${{fmtP(s_pct)}} cao hơn</strong> so với nhóm chỉ là Best Seller (với baseline là các mặt hàng đã top đầu). Điều này chứng minh thuật toán cực độ cộng hưởng doanh số. `;
         }}
         if (p_diff < 0) {{
-            insHTML += `Đáng chú ý, mặt bằng giá nhóm Choice <strong>thấp hơn -$${{fmtR(Math.abs(p_diff))}}</strong>, chứng thực chiến lược "Giá Cạnh Tranh & Doanh Số Cao" kích hoạt cờ tự động của Amazon. `;
+            insHTML += `Đáng chú ý, mặt bằng giá nhóm Choice <strong>thấp hơn -$${{fmtR(Math.abs(p_diff))}}</strong>. Điều này cho thấy thuật toán Amazon tìm kiếm "Sweet spot" - sản phẩm có rating tốt nhưng định giá cạnh tranh. `;
         }} else {{
-            insHTML += `Tuy nhiên, Amazon's Choice lại duy trì mức định giá ngang hoặc cao hơn (+$${{fmtR(Math.abs(p_diff))}}), thể hiện uy tín tuyệt đối mà thuật toán cấp phát cho sản phẩm chất lượng.`;
+            insHTML += `Nhóm Amazon's Choice dù duy trì mức định giá cao hơn (+$${{fmtR(Math.abs(p_diff))}}) vẫn tạo ra đột phá doanh thu, chứng minh uy tín tuyệt đối mà Amazon tạo ra kích cầu "upsell".`;
         }}
         document.getElementById('ins1').innerHTML = insHTML;
 
-        // 3. CHART: Donut
+        // ------------------ 3. CHART: Donut ------------------
         globalInstances.cDonut.data.datasets[0].data = [c_cnt, G_non.length];
         globalInstances.cDonut.update();
 
-        // 4. CHART: Radar (Normalize: Sales, Rating, Reviews, Price)
+        // ------------------ 4. CHART: Radar (Normalize) ------------------
         let max_s = Math.max(s_c, s_n, 1);
         let max_r = 5;
         let rev_c = c_cnt > 0 ? G_choice.reduce((a,b)=>a+b.reviews_val,0)/c_cnt : 0;
@@ -362,26 +430,39 @@ def render(df_raw):
         let max_rev = Math.max(rev_c, rev_n, 1);
         let max_p = Math.max(p_c, p_n, 1);
 
-        let rat_c = c_cnt > 0 ? G_choice.reduce((a,b)=>a+b.rating_val,0)/c_cnt : 0;
-        let rat_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+b.rating_val,0)/G_non.length : 0;
-
         globalInstances.cRadar.data.datasets[0].data = [
-            (rat_c/max_r)*100, (s_c/max_s)*100, (rev_c/max_rev)*100, (p_c/max_p)*100
+            (r_c/max_r)*100, (s_c/max_s)*100, (rev_c/max_rev)*100, (p_c/max_p)*100
         ];
         globalInstances.cRadar.data.datasets[1].data = [
-            (rat_n/max_r)*100, (s_n/max_s)*100, (rev_n/max_rev)*100, (p_n/max_p)*100
+            (r_n/max_r)*100, (s_n/max_s)*100, (rev_n/max_rev)*100, (p_n/max_p)*100
         ];
         globalInstances.cRadar.update();
 
-        // 5. CHART: Bar Sales Absolute
+        // ------------------ 5. CHART: Stacked Bar Price Tier ------------------
+        let tiers = ["1. Bình dân (<$25)", "2. Phổ thông ($25-$50)", "3. Trung cấp ($50-$100)", "4. Cao cấp (>$100)"];
+        let tierChData = []; let tierNoData = [];
+        tiers.forEach(t => {{
+            let t_data = data.filter(d => d.price_tier === t);
+            let tot = t_data.length;
+            if (tot === 0) {{ tierChData.push(0); tierNoData.push(0); return; }}
+            let ch_p = (t_data.filter(d => d.is_amazon_choice).length / tot) * 100;
+            tierChData.push(ch_p);
+            tierNoData.push(100 - ch_p);
+        }});
+        globalInstances.cPriceTier.data.labels = tiers;
+        globalInstances.cPriceTier.data.datasets[0].data = tierChData;
+        globalInstances.cPriceTier.data.datasets[1].data = tierNoData;
+        globalInstances.cPriceTier.update();
+
+        // ------------------ 6. CHART: Bar Sales Absolute ------------------
         let revS_c = c_cnt > 0 ? G_choice.reduce((a,b)=>a+(b.sales_volume_num*b.current_price),0)/c_cnt : 0;
         let revS_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+(b.sales_volume_num*b.current_price),0)/G_non.length : 0;
 
-        globalInstances.cBarSales.data.datasets[0].data = [s_c, s_n];     // Sales
-        globalInstances.cBarSales.data.datasets[1].data = [revS_c, revS_n]; // Revenue
+        globalInstances.cBarSales.data.datasets[0].data = [s_c, s_n];
+        globalInstances.cBarSales.data.datasets[1].data = [revS_c, revS_n];
         globalInstances.cBarSales.update();
 
-        // 6. CHART: Bar Horizontal Categories
+        // ------------------ 7. CHART: Bar Horizontal Categories ------------------
         let catMap = {{}};
         data.forEach(d => {{
             let c = d.crawl_category;
@@ -389,7 +470,6 @@ def render(df_raw):
             catMap[c].t++;
             if(d.is_amazon_choice) catMap[c].ch++;
         }});
-        // Compute percentage and sort desc
         let catArr = Object.keys(catMap).map(k => ({{
             cat: k,
             pct: (catMap[k].ch / catMap[k].t) * 100,
@@ -401,7 +481,25 @@ def render(df_raw):
         globalInstances.cBarHorCat.data.datasets[0].data = catArr.map(x => x.pct);
         globalInstances.cBarHorCat.update();
 
-        // 7. HTML Table update
+        // ------------------ 8. CHART: Scatter ------------------
+        let scatterCh = []; let scatterNo = [];
+        let max_scatter = 1000;
+        // Limit points dynamically to prevent canvas lag
+        let renderData = data.length > max_scatter 
+            ? [...data].sort(() => 0.5 - Math.random()).slice(0, max_scatter) 
+            : data;
+
+        renderData.forEach(d => {{
+            let pt = {{x: d.current_price, y: d.sales_volume_num}};
+            if (d.is_amazon_choice) scatterCh.push(pt);
+            else scatterNo.push(pt);
+        }});
+        
+        globalInstances.cScatter.data.datasets[0].data = scatterCh;
+        globalInstances.cScatter.data.datasets[1].data = scatterNo;
+        globalInstances.cScatter.update();
+
+        // ------------------ 9. HTML Table update ------------------
         let sorted = [...G_choice].sort((a,b) => b.sales_volume_num - a.sales_volume_num).slice(0,5);
         let tb = document.getElementById('tbTop5Choice');
         tb.innerHTML = "";
@@ -447,28 +545,49 @@ def render(df_raw):
         globalInstances.cRadar = new Chart(ctxRadar, {{
             type: 'radar',
             data: {{
-                labels: ['Điểm Đánh Giá', 'Doanh Số TB', 'Lượt Review TB', 'Giá Bán TB'],
+                labels: ['Rating TB', 'Doanh Số TB', 'Lượt Review TB', 'Giá Bán TB'],
                 datasets: [
-                    {{ label: "Amazon's Choice", data: [0,0,0,0], backgroundColor: 'rgba(249, 115, 22, 0.2)', borderColor: COLORS.choice, borderWidth: 2, pointBackgroundColor: COLORS.choice }},
-                    {{ label: "Chỉ Best Seller", data: [0,0,0,0], backgroundColor: 'rgba(253, 186, 116, 0.1)', borderColor: '#D6D3D1', borderWidth: 2, pointBackgroundColor: '#D6D3D1' }}
+                    {{ label: "Amazon's Choice", data: [0,0,0,0], backgroundColor: 'rgba(249, 115, 22, 0.2)', borderColor: COLORS.choice, borderWidth: 2, pointBackgroundColor: COLORS.choice, pointRadius:3 }},
+                    {{ label: "Chỉ Best Seller", data: [0,0,0,0], backgroundColor: 'rgba(214, 211, 209, 0.2)', borderColor: COLORS.non, borderWidth: 2, pointBackgroundColor: COLORS.non, pointRadius:3 }}
                 ]
             }},
             options: {{
                 responsive: true, maintainAspectRatio: false,
-                scales: {{ r: {{ angleLines: {{ display: true }}, suggestedMin: 0, suggestedMax: 100, ticks:{{display:false}} }} }},
+                scales: {{ r: {{ angleLines: {{ display: true, color:'rgba(0,0,0,0.05)' }}, grid: {{color:'rgba(0,0,0,0.05)'}}, suggestedMin: 0, suggestedMax: 100, ticks:{{display:false}} }} }},
                 plugins: {{ legend: {{position: 'bottom', labels: {{usePointStyle:true, padding:20, font:{{size:11}}}}}} }}
             }}
         }});
 
-        // 3. Bar Sales Absolute
+        // 3. Price Tier Stacked Bar
+        let ctxTier = document.getElementById('cPriceTier').getContext('2d');
+        globalInstances.cPriceTier = new Chart(ctxTier, {{
+            type: 'bar',
+            data: {{
+                labels: [],
+                datasets: [
+                    {{ label: "Amazon's Choice (%)", data: [], backgroundColor: COLORS.choice }},
+                    {{ label: "Non-Choice (%)", data: [], backgroundColor: COLORS.non }}
+                ]
+            }},
+            options: {{
+                responsive: true, maintainAspectRatio: false,
+                plugins: {{ legend: {{ position: 'bottom', labels:{{usePointStyle:true}} }}, tooltip: {{ mode:'index', intersect:false }} }},
+                scales: {{
+                    x: {{ stacked: true, grid: {{ display: false }} }},
+                    y: {{ stacked: true, grid: {{ color: 'rgba(0,0,0,0.05)' }}, max: 100, ticks: {{ callback: v => v+'%' }} }}
+                }}
+            }}
+        }});
+
+        // 4. Bar Sales Absolute
         let ctxBar = document.getElementById('cBarSales').getContext('2d');
         globalInstances.cBarSales = new Chart(ctxBar, {{
             type: 'bar',
             data: {{
                 labels: ["Amazon's Choice", "Chỉ Best Seller"],
                 datasets: [
-                    {{ type: 'bar', label: 'Doanh Số TB', data:[0,0], backgroundColor: COLORS.choice, yAxisID: 'y' }},
-                    {{ type: 'bar', label: 'Doanh Thu TB ($)', data:[0,0], backgroundColor: COLORS.dark, yAxisID: 'yRev' }}
+                    {{ type: 'bar', label: 'Doanh Số Ước Tính', data:[0,0], backgroundColor: COLORS.choice, yAxisID: 'y' }},
+                    {{ type: 'bar', label: 'Doanh Thu ($)', data:[0,0], backgroundColor: COLORS.dark, yAxisID: 'yRev' }}
                 ]
             }},
             options: {{
@@ -481,13 +600,13 @@ def render(df_raw):
             }}
         }});
 
-        // 4. Bar Horizontal Categories
+        // 5. Bar Horizontal Categories
         let ctxHoriz = document.getElementById('cBarHorCat').getContext('2d');
         globalInstances.cBarHorCat = new Chart(ctxHoriz, {{
             type: 'bar',
             data: {{
                 labels: [],
-                datasets: [{{ label: 'Xác suất đạt Amazon Choice (%)', data: [], backgroundColor: COLORS.choice, borderRadius: 4 }}]
+                datasets: [{{ label: 'Xác suất đạt Nhãn (%)', data: [], backgroundColor: COLORS.choice, borderRadius: 4 }}]
             }},
             options: {{
                 indexAxis: 'y', responsive: true, maintainAspectRatio: false,
@@ -498,6 +617,27 @@ def render(df_raw):
                 }}
             }}
         }});
+
+        // 6. Scatter graphic
+        let ctxScatter = document.getElementById('cScatter').getContext('2d');
+        globalInstances.cScatter = new Chart(ctxScatter, {{
+            type: 'scatter',
+            data: {{
+                datasets: [
+                    {{ label: "Amazon's Choice", data: [], backgroundColor: 'rgba(249, 115, 22, 0.8)', borderColor: '#FFFFFF', borderWidth:1, pointRadius: 5 }},
+                    {{ label: "Chỉ Best Seller", data: [], backgroundColor: 'rgba(214, 211, 209, 0.4)', borderColor: 'transparent', pointRadius: 3 }}
+                ]
+            }},
+            options: {{
+                responsive: true, maintainAspectRatio: false,
+                plugins: {{ legend: {{ position: 'bottom', labels:{{usePointStyle:true}} }} }},
+                scales: {{
+                    x: {{ title: {{display:true, text:'Giá bán định giá ($)', color:COLORS.dark}}, grid: {{color:'rgba(0,0,0,0.05)'}} }},
+                    y: {{ title: {{display:true, text:'Doanh Số Ước Tính (/Tháng)', color:COLORS.dark}}, grid: {{color:'rgba(0,0,0,0.05)'}} }}
+                }}
+            }}
+        }});
+
     }}
 
     document.addEventListener("DOMContentLoaded", setup);
@@ -505,5 +645,4 @@ def render(df_raw):
 </body>
 </html>
 """
-    components.html(html_code, height=1300, scrolling=False)
-
+    components.html(html_code, height=1850, scrolling=False)
