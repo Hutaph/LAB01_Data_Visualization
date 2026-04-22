@@ -2,312 +2,511 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
-import os
 from pathlib import Path
 import plotly.graph_objects as go
+import sys
+from services.models.feature_engineering import DiscountFeatureEngineer, OutlierClipper
 
 def render(df):
-    # Setup Paths
+    # PATHS
     MODEL_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "best_gradient_boosting_model.pkl"
+    PROCESSOR_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "sales_prediction_processor.joblib"
 
-    # Custom CSS for polished Technical Dashboard / Clean Utility look
+    # CSS
     st.markdown("""
         <style>
-        .predict-header {
-            background: linear-gradient(90deg, #F97316 0%, #FB923C 100%);
-            padding: 2rem;
-            border-radius: 12px;
-            color: white;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
-        }
         .stButton>button {
             width: 100%;
             background-color: #F97316;
             color: white;
-            border: none;
-            padding: 0.75rem;
             border-radius: 8px;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
-        .stButton>button:hover {
-            background-color: #EA580C;
-            transform: translateY(-1px);
-        }
-        .input-card {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            border: 1px solid #E5E7EB;
-            margin-bottom: 1rem;
-        }
-        .result-card {
-            background: #FFF7ED;
-            padding: 2.5rem;
-            border-radius: 16px;
-            border: 2px solid #FDBA74;
-            text-align: center;
-            margin: 2rem 0;
-            animation: fadeIn 0.5s ease-out;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
         }
         </style>
     """, unsafe_allow_html=True)
 
-    # Header
+    # HEADER
     st.markdown("""
-        <div class="az-header" style="margin-bottom: 24px;">
-            <div class="az-header-logo-wrap">
-                <span class="az-header-logo-fallback">🔮</span>
-            </div>
-            <div class="az-header-left">
-                <div class="az-header-breadcrumb">DỰ BÁO <span>/</span> AI PREDICTION</div>
-                <div class="az-title-line">Dự báo Hiệu suất Sản phẩm</div>
-                <div class="az-subtitle">Ứng dụng máy học Gradient Boosting để tối ưu hóa chiến lược kinh doanh</div>
-            </div>
-        </div>
+        <div class="az-title-line">Dự báo Hiệu suất Sản phẩm</div>
     """, unsafe_allow_html=True)
 
-    # Load Model
+    # LOAD MODEL + PROCESSOR
     if not MODEL_PATH.exists():
-        st.error("⚠️ Không tìm thấy tệp mô hình tại: `app/services/models/best_gradient_boosting_model.pkl`")
+        st.error("Không tìm thấy model")
+        return
+
+    if not PROCESSOR_PATH.exists():
+        st.error("Không tìm thấy processor")
         return
 
     try:
+        # Ensure pickled objects referencing a class defined under
+        # a different top-level module (e.g. "main" when saved)
+        # can still be unpickled here by exposing the class on
+        # those module objects before loading.
+        try:
+            for _m in ("main", "__main__"):
+                mod = sys.modules.get(_m)
+                if mod is not None:
+                    for _cls in (DiscountFeatureEngineer, OutlierClipper):
+                        if not hasattr(mod, _cls.__name__):
+                            setattr(mod, _cls.__name__, _cls)
+        except Exception:
+            pass
+
         model = joblib.load(MODEL_PATH)
+        processor = joblib.load(PROCESSOR_PATH)
+
         feature_names = list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else []
-        # DEBUG: Save feature names to json for inspection
-        import json
-        dump_path = Path(__file__).resolve().parent / "features_dump.json"
-        with open(dump_path, "w") as f:
-            json.dump(feature_names, f)
+
+        # Try to load a features dump (created at app startup) for display
+        features_dump_path = Path(__file__).resolve().parents[1] / "features_dump.json"
+        try:
+            if features_dump_path.exists():
+                import json
+                with open(features_dump_path, "r", encoding="utf-8") as fh:
+                    dump = json.load(fh)
+                    # if dump is a list, prefer it as feature names
+                    if isinstance(dump, list) and len(dump) > 0:
+                        dump_features = list(dump)
+                    else:
+                        dump_features = feature_names
+            else:
+                dump_features = feature_names
+        except Exception:
+            dump_features = feature_names
     except Exception as e:
-        st.error(f"❌ Lỗi khi tải mô hình: {e}")
+        st.error(f"Lỗi load: {e}")
         return
 
-    # Dynamically extract categories from feature names
-    # Cat features usually start with 'cat_' or 'category_'
-    model_categories = {}
-    for f in feature_names:
-        if f.startswith("cat_"):
-            clean_name = f.replace("cat_", "").replace("_", " ").title()
-            model_categories[f.replace("cat_", "")] = clean_name
-        elif f.startswith("category_"):
-            clean_name = f.replace("category_", "").replace("_", " ").title()
-            model_categories[f.replace("category_", "")] = clean_name
-            
-    if not model_categories:
-        # Fallback if names are different or not prefixed
-        model_categories = {"electronics": "Điện tử", "home": "Nhà cửa", "fashion": "Thời trang"}
+    # CATEGORY fallback
+    model_categories = {"electronics": "Điện tử", "home": "Nhà cửa", "fashion": "Thời trang"}
 
-    # Layout: main.css forces the first column of st.columns to 70px.
-    # To avoid squashing our content, we ALWAYS add a 70px dummy column at the start of any st.columns call.
-    
-    # Main content columns
-    dummy_main, col_main = st.columns([1, 20])
-    
-    with col_main:
-        # Split into Input and Result
-        # Again, we add a dummy column at the start to satisfy the CSS rule
-        dummy_split, col_input, col_result = st.columns([0.1, 1.2, 1], gap="medium")
+    # Compute median/default values from available crawled data
+    def load_medians():
+        med = {
+            "price": 25.0,
+            "original_price": 30.0,
+            "rating": 4.2,
+            "reviews": 100,
+            "offers": 1,
+            "is_prime": True,
+            "is_choice": False,
+            "is_climate": False,
+            "has_variation": True,
+            "delivery_fee": 0.0,
+            "category": list(model_categories.keys())[0] if model_categories else None,
+        }
+        try:
+            crawl_dir = Path(__file__).resolve().parents[2] / "data" / "amazon_crawl"
+            files = []
+            if crawl_dir.exists():
+                files = list(crawl_dir.glob("*.csv"))
+            if not files:
+                return med
 
-        with col_input:
-            st.markdown("#### 📋 Thông số sản phẩm")
-            with st.form("prediction_form", border=False):
-                st.markdown("<p style='font-weight:700; color:#7B341E; margin-bottom:5px;'>📊 Chỉ số tài chính & Hiệu suất</p>", unsafe_allow_html=True)
-                f_price = st.number_input("Giá bán hiện tại ($)", min_value=0.0, value=25.0, step=0.1)
-                f_orig_price = st.number_input("Giá niêm yết (Original) ($)", min_value=0.0, value=30.0, step=0.1)
-                f_rating = st.slider("Điểm đánh giá (Rating)", 0.0, 5.0, 4.2, 0.1)
-                f_reviews = st.number_input("Số lượt đánh giá", min_value=0, value=120)
-                f_offers = st.number_input("Số nhà cung cấp", min_value=1, value=1)
-                
-                st.markdown("<p style='font-weight:700; color:#7B341E; margin-top:15px; margin-bottom:5px;'>🏷️ Phân loại & Đặc tính</p>", unsafe_allow_html=True)
-                f_cat = st.selectbox("Danh mục", options=list(model_categories.keys()), format_func=lambda x: model_categories[x])
-                
-                # Checkboxes for binary features
-                c1, c2 = st.columns([1, 1]) # This will also be affected by CSS if we are not careful
-                # Wait, inside a form we can't easily add dummy columns for every small split
-                # Let's just use single column for check boxes or careful layout
-                f_prime = st.checkbox("Sẵn có Prime", value=True)
-                f_choice = st.checkbox("Amazon's Choice", value=False)
-                f_climate = st.checkbox("Climate Choice", value=False)
-                f_vars = st.checkbox("Có biến thể", value=True)
-
-                submit = st.form_submit_button("🚀 THỰC HIỆN DỰ BÁO")
-
-        with col_result:
-            if not submit:
-                st.markdown("""
-                    <div class="az-tab-placeholder" style="min-height: 520px; display: flex; flex-direction: column; justify-content: center; align-items: center; background: rgba(255,255,255,0.3); border: 2px dashed rgba(123,75,23,0.15); border-radius: 12px;">
-                        <div style="font-size: 4rem; margin-bottom: 20px; opacity: 0.5;">🤖</div>
-                        <div style="font-family: 'Montserrat'; font-weight: 700; color: #7B341E; opacity: 0.7;">Hệ thống AI sẵn sàng</div>
-                        <div style="font-size: 0.9rem; color: #7B341E; opacity: 0.5; margin-top: 10px;">Nhấn nút dự báo để bắt đầu mô phỏng</div>
-                    </div>
-                """, unsafe_allow_html=True)
-            else:
-                # PREPROCESSING
-                def safe_log(val):
-                    return np.log1p(max(0, val))
-
-                # derived features
-                discount_amount = f_orig_price - f_price if f_orig_price > f_price else 0.0
-                discount_rate = discount_amount / f_orig_price if f_orig_price > 0 else 0.0
-
-                input_dict = {f: 0.0 for f in feature_names}
-                
-                # Basic values to map (Order matters for substring matching!)
-                mapping_values = {
-                    'original': f_orig_price,
-                    'lowest': f_price * 0.95,
-                    'delivery': 5.99, # fallback average delivery cost
-                    'discount_rate': discount_rate,
-                    'discount': discount_amount,
-                    'price': f_price,
-                    'rating': f_rating,
-                    'review': f_reviews,
-                    'offer': f_offers,
-                }
-                
-                binary_values = {
-                    'choice': f_choice,
-                    'prime': f_prime,
-                    'variation': f_vars,
-                    'climate': f_climate,
-                }
-                
-                for f in feature_names:
-                    f_lower = f.lower()
-                    
-                    # 1. Map Categories
-                    if f_lower.startswith('cat_') or f_lower.startswith('category_'):
-                        if str(f_cat).lower() in f_lower:
-                            input_dict[f] = 1.0
-                        continue
-                        
-                    # 2. Map Binary features
-                    matched_binary = False
-                    for key, val in binary_values.items():
-                        if key in f_lower:
-                            input_dict[f] = 1.0 if val else 0.0
-                            matched_binary = True
-                            break
-                    if matched_binary:
-                        continue
-                        
-                    # 3. Map Numeric features
-                    for key, val in mapping_values.items():
-                        if key in f_lower:
-                            # Check if the feature name suggests it was log-transformed
-                            if 'log' in f_lower:
-                                input_dict[f] = safe_log(val)
-                            else:
-                                input_dict[f] = float(val)
-                            break
-
+            # read a subset of columns and up to first 20000 rows for speed
+            usecols = [
+                "current_price", "original_price", "rating", "reviews",
+                "number_of_offers", "is_prime", "is_amazon_choice",
+                "is_climate_friendly", "has_variations", "delivery_info", "main_category_name"
+            ]
+            dfs = []
+            for f in files:
                 try:
-                    X_input = pd.DataFrame([input_dict])[feature_names]
-                    raw_pred = model.predict(X_input)[0]
-                    
-                    is_classifier = hasattr(model, "classes_")
+                    dfc = pd.read_csv(f, usecols=[c for c in usecols if c in pd.read_csv(f, nrows=0).columns], nrows=20000, low_memory=False)
+                    dfs.append(dfc)
+                except Exception:
+                    continue
+            if not dfs:
+                return med
+            samp = pd.concat(dfs, ignore_index=True, sort=False)
 
-                    if is_classifier:
-                        # Classification target! 0 might mean 'Low', 1 means 'Medium', etc.
-                        pred_class = int(raw_pred)
-                        if pred_class == 0:
-                            final_sales_text = "Thấp (0 - 50)"
-                            kpi_color = "#9CA3AF" # Grey
-                        elif pred_class == 1:
-                            final_sales_text = "Trung bình (50 - 500)"
-                            kpi_color = "#F59E0B" # Yellow
-                        elif pred_class == 2:
-                            final_sales_text = "Cao (500 - 5000)"
-                            kpi_color = "#3B82F6" # Blue
-                        else:
-                            final_sales_text = f"Rất Cao (Nhóm {pred_class})"
-                            kpi_color = "#F97316" # Orange
+            # numeric medians
+            if "current_price" in samp.columns:
+                med["price"] = float(samp["current_price"].replace(["", "NA", "None"], np.nan).dropna().astype(float).median(skipna=True)) if samp["current_price"].notna().any() else med["price"]
+            if "original_price" in samp.columns:
+                try:
+                    med["original_price"] = float(samp["original_price"].replace(["", "NA", "None"], np.nan).dropna().astype(float).median(skipna=True))
+                except Exception:
+                    pass
+            if "rating" in samp.columns:
+                try:
+                    med["rating"] = float(samp["rating"].replace(["", "NA", "None"], np.nan).dropna().astype(float).median(skipna=True))
+                except Exception:
+                    pass
+            if "reviews" in samp.columns:
+                try:
+                    med["reviews"] = int(samp["reviews"].replace(["", "NA", "None"], np.nan).dropna().astype(float).median(skipna=True))
+                except Exception:
+                    pass
+            if "number_of_offers" in samp.columns:
+                try:
+                    med["offers"] = int(samp["number_of_offers"].replace(["", "NA", "None"], np.nan).dropna().astype(float).median(skipna=True))
+                except Exception:
+                    pass
 
-                        st.markdown(f"""
-                            <div class="az-kpi-card" style="border-left-width: 10px; border-left-color: {kpi_color}; padding: 45px 25px; text-align: center; margin-bottom: 25px;">
-                                <div class="az-kpi-title" style="font-size: 1rem; color: #475569; font-weight: 700;">PHÂN QUYỀN DOANH SỐ (CLASS TIER)</div>
-                                <div class="az-kpi-value" style="font-size: 3rem; color: {kpi_color}; line-height: 1.2; margin-top: 10px;">{final_sales_text}</div>
-                                <div style="font-size: 0.85rem; margin-top: 25px; color: #64748B; background: #F8FAFC; padding: 12px; border-radius: 8px; font-weight: 500;">
-                                    Mô hình được huấn luyện theo dạng phân lớp (Classification). Raw Class Pred: {raw_pred}
-                                </div>
-                            </div>
-                        """, unsafe_allow_html=True)
+            # booleans/modes
+            if "is_prime" in samp.columns:
+                try:
+                    med["is_prime"] = bool(samp["is_prime"].dropna().astype(int).mode().iloc[0])
+                except Exception:
+                    pass
+            if "is_amazon_choice" in samp.columns:
+                try:
+                    med["is_choice"] = bool(samp["is_amazon_choice"].dropna().astype(int).mode().iloc[0])
+                except Exception:
+                    pass
+            if "is_climate_friendly" in samp.columns:
+                try:
+                    med["is_climate"] = bool(samp["is_climate_friendly"].dropna().astype(int).mode().iloc[0])
+                except Exception:
+                    pass
+            if "has_variations" in samp.columns:
+                try:
+                    med["has_variation"] = bool(samp["has_variations"].dropna().astype(int).mode().iloc[0])
+                except Exception:
+                    pass
+
+            # delivery fee extraction from delivery_info (simple regex)
+            if "delivery_info" in samp.columns:
+                try:
+                    import re
+                    fees = []
+                    for val in samp["delivery_info"].dropna().astype(str).head(5000):
+                        m = re.search(r"\\$(\\d+(?:\\.\\d+)?)", val)
+                        if m:
+                            try:
+                                fees.append(float(m.group(1)))
+                            except Exception:
+                                continue
+                    if fees:
+                        med["delivery_fee"] = float(pd.Series(fees).median())
+                except Exception:
+                    pass
+
+            # category mapping: try to pick one matching our short keys
+            if "main_category_name" in samp.columns and samp["main_category_name"].notna().any():
+                try:
+                    mode_cat = str(samp["main_category_name"].dropna().mode().iloc[0]).lower()
+                    chosen = None
+                    for k in model_categories:
+                        if k in mode_cat or mode_cat in k:
+                            chosen = k
+                            break
+                    if chosen is None:
+                        # fallback to first mapping key
+                        chosen = list(model_categories.keys())[0]
+                    med["category"] = chosen
+                except Exception:
+                    pass
+
+            return med
+        except Exception:
+            return med
+
+    medians = load_medians()
+
+    # Compute target scaler (mean, std) for sales_volume_num_log_clipped
+    def compute_target_scaler():
+        try:
+            crawl_dir = Path(__file__).resolve().parents[2] / "data" / "amazon_crawl"
+            files = list(crawl_dir.glob("*.csv"))
+            if not files:
+                return None, None
+
+            import re
+            vals = []
+            for f in files:
+                try:
+                    dfc = pd.read_csv(f, usecols=lambda c: c in ['sales_volume', 'search_sales_volume'], nrows=50000, low_memory=False)
+                except Exception:
+                    try:
+                        dfc = pd.read_csv(f, nrows=1000, low_memory=False)
+                    except Exception:
+                        continue
+                # find column
+                col = None
+                for candidate in ['sales_volume', 'search_sales_volume']:
+                    if candidate in dfc.columns:
+                        col = candidate
+                        break
+                if col is None:
+                    continue
+                for v in dfc[col].fillna('0').astype(str).head(50000):
+                    m = re.search(r"(\d+(?:\.\d+)?)\s*([kK]?)\+", v.lower())
+                    if not m:
+                        m2 = re.search(r"(\d{1,6})", v)
+                        if m2:
+                            vals.append(int(m2.group(1)))
                     else:
-                        # Regression target
-                        
-                        st.markdown(f"""
-                            <div style="font-size: 0.85rem; margin-top: 10px; color: #64748B; background: #F8FAFC; padding: 12px; border-radius: 8px; font-weight: 500; margin-bottom: 15px; border: 1px solid #E2E8F0;">
-                                Raw Predictive Output (Giá trị nguyên bản): <strong style="color: #0F172A;">{raw_pred:.4f}</strong>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        
-                        with st.expander("⚙️ Giải mã Output (Inverse Target Transform)", expanded=True):
-                            st.markdown("Số âm (VD: -2.3, +1.4) là 100% bằng chứng: biến mục tiêu Doanh Số đã bị chuẩn hóa `StandardScaler` (hoặc `RobustScaler`) trước khi đưa vào train. Hãy nhập thông số bên dưới để đảo ngược quy trình thu hồi lại Doanh số thực:")
-                            use_target_scaler = st.checkbox("Khôi phục Z-Score (Inverse Transform)", value=True)
-                            
-                            col_s1, col_s2 = st.columns(2)
-                            with col_s1:
-                                target_mean = st.number_input("Target Mean (Giá trị trung bình `mean_`)", value=4.5, step=0.1)
-                            with col_s2:
-                                target_std = st.number_input("Target Std (Độ lệch chuẩn `scale_`)", value=2.0, step=0.1)
-                            
-                            apply_expm = st.checkbox("Khôi phục hệ Log (np.expm1)", value=True, help="Nếu target ban đầu trước khi Scale là log(sales + 1)")
-                        
-                        # Apply Transformations
-                        calculated_pred = raw_pred
-                        
-                        if use_target_scaler:
-                            calculated_pred = (calculated_pred * target_std) + target_mean
-                            
-                        if apply_expm:
-                            calculated_pred = np.expm1(calculated_pred) if calculated_pred < 25 else calculated_pred
-                            
-                        final_sales_disp = max(0, int(calculated_pred))
-                        
-                        # UI Presentation
-                        st.markdown(f"""
-                            <div class="az-kpi-card" style="border-left-width: 10px; padding: 45px 25px; text-align: center; margin-bottom: 25px; margin-top: 25px">
-                                <div class="az-kpi-title" style="font-size: 1rem; color: #64748B; font-weight: 700;">DOANH SỐ DỰ KIẾN (ĐƠN VỊ/THÁNG)</div>
-                                <div class="az-kpi-value" style="font-size: 5rem; color: #146EB4; line-height: 1;">{int(final_sales_disp):,}</div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                        num = float(m.group(1))
+                        if m.group(2) == 'k':
+                            num *= 1000
+                        vals.append(int(num))
 
-                    with st.expander("🔍 Chi tiết Dữ liệu đầu vào (Debug)", expanded=False):
-                        st.json(input_dict)
-                    
-                    if not is_classifier and final_sales_disp > 200:
-                        st.success("💎 **Tiềm năng rất lớn:** Sản phẩm có các chỉ số vượt trội. Hãy đảm bảo chuỗi cung ứng ổn định.")
-                    elif not is_classifier and final_sales_disp > 50:
-                        st.info("📈 **Tiềm năng ổn định:** Sản phẩm có sức bán khá. Có thể đẩy mạnh Marketing để tăng trưởng.")
-                    elif not is_classifier:
-                        st.warning("⚖️ **Cần tối ưu:** Doanh số dự báo thấp. Hãy thử điều chỉnh giá hoặc cải thiện điểm Rating.")
+            if not vals:
+                return None, None
+            arr = np.array(vals)
+            logv = np.log1p(arr)
+            low = np.quantile(logv, 0.01)
+            high = np.quantile(logv, 0.99)
+            clipped = np.clip(logv, low, high)
+            return float(clipped.mean()), float(clipped.std())
+        except Exception:
+            return None, None
 
-                    # Visualizing Feature Impact
+    target_mean, target_std = compute_target_scaler()
+
+    # Layout: left column for inputs and right column for results
+    # Increase left column share so input form balances with results
+    col_form, col_main = st.columns([1, 2], gap="large")
+
+    # ---- Left: Input form ----
+    with col_form:
+        st.markdown('<div class="az-kpi-card" style="padding:12px;">', unsafe_allow_html=True)
+        with st.form("predict_form", clear_on_submit=False):
+            f_price = st.number_input("Price", value=float(medians.get("price", 25.0)), format="%.2f")
+            f_orig_price = st.number_input("Original Price", value=float(medians.get("original_price", 30.0)), format="%.2f")
+            f_rating = st.slider("Rating", 0.0, 5.0, float(medians.get("rating", 4.2)))
+            f_reviews = st.number_input("Reviews", value=int(medians.get("reviews", 120)), min_value=0)
+            f_offers = st.number_input("Offers", value=int(medians.get("offers", 1)), min_value=0)
+            f_delivery_fee = st.number_input("Delivery Fee ($)", value=float(medians.get("delivery_fee", 0.0)), format="%.2f")
+            f_lowest_offer_price = st.number_input("Lowest Offer Price", value=0.0, format="%.2f")
+
+            # Category selector populated from model/dump features if available
+            try:
+                fn = dump_features if 'dump_features' in locals() else feature_names
+                cat_options = [c.replace('cat_', '') for c in fn if isinstance(c, str) and c.startswith('cat_')]
+                if not cat_options:
+                    cat_options = list(model_categories.keys())
+            except Exception:
+                cat_options = list(model_categories.keys())
+
+            # display nicer labels for categories
+            def _fmt_cat(s):
+                return s.replace('_', ' ').title()
+
+            default_cat = medians.get('category', cat_options[0] if cat_options else list(model_categories.keys())[0])
+            sel_index = 0
+            if default_cat in cat_options:
+                sel_index = cat_options.index(default_cat)
+            f_cat = st.selectbox(
+                "Category",
+                cat_options,
+                index=sel_index,
+                format_func=_fmt_cat,
+            )
+
+            col_c1, col_c2 = st.columns(2)
+            with col_c1:
+                f_prime = st.checkbox("Prime", bool(medians.get("is_prime", True)))
+                f_choice = st.checkbox("Choice", bool(medians.get("is_choice", False)))
+            with col_c2:
+                f_climate = st.checkbox("Climate", bool(medians.get("is_climate", False)))
+                f_vars = st.checkbox("Variation", bool(medians.get("has_variation", True)))
+
+            st.write("")
+            submit = st.form_submit_button("Predict", key="predict_btn")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ---- Right: Results / placeholder ----
+    with col_main:
+        if not submit:
+            st.info("Chờ input... Điền thông tin bên trái và nhấn Predict.")
+        else:
+            # RAW INPUT
+            try:
+                raw_input = pd.DataFrame([{
+                "price": f_price,
+                "original_price": f_orig_price,
+                "rating": f_rating,
+                "review_count": f_reviews,
+                "offer_count": f_offers,
+                "delivery_fee": f_delivery_fee,
+                "lowest_offer_price": f_lowest_offer_price,
+                "category": f_cat,
+                "is_prime": f_prime,
+                "is_choice": f_choice,
+                "is_climate": f_climate,
+                "has_variation": f_vars,
+                }])
+            except Exception as _e:
+                st.error(f"Input construction error: {_e}")
+                raw_input = pd.DataFrame([{
+                    "price": medians.get("price", 25.0),
+                    "original_price": medians.get("original_price", 30.0),
+                    "rating": medians.get("rating", 4.2),
+                    "review_count": medians.get("reviews", 0),
+                    "offer_count": medians.get("offers", 1),
+                    "delivery_fee": medians.get("delivery_fee", 0.0),
+                    "lowest_offer_price": 0.0,
+                    "sales_volume": 0,
+                    "category": medians.get("category"),
+                    "is_prime": medians.get("is_prime", True),
+                    "is_choice": medians.get("is_choice", False),
+                    "is_climate": medians.get("is_climate", False),
+                    "has_variation": medians.get("has_variation", True),
+                }])
+
+            try:
+                # PROCESS
+                proc_input = raw_input.copy()
+                col_map = {
+                    "crawl_category": "category",
+                    "has_variations": "has_variation",
+                    "is_amazon_choice": "is_choice",
+                    "is_climate_friendly": "is_climate",
+                    "number_of_offers": "offer_count",
+                    "reviews": "review_count",
+                    "lowest_offer_price": "lowest_offer_price",
+                }
+                defaults = {
+                    "delivery_fee": float(medians.get("delivery_fee", 0.0)),
+                    "number_of_offers": int(medians.get("offers", 0)),
+                    "reviews": int(medians.get("reviews", 0)),
+                }
+                for new_col, src_col in col_map.items():
+                    if new_col not in proc_input.columns:
+                        if src_col in proc_input.columns:
+                            proc_input[new_col] = proc_input[src_col]
+                        else:
+                            proc_input[new_col] = defaults.get(new_col, np.nan)
+                if "delivery_fee" not in proc_input.columns:
+                    proc_input["delivery_fee"] = defaults["delivery_fee"]
+
+                X_processed_array = processor.transform(proc_input)
+
+                # convert processed output to DataFrame
+                if isinstance(X_processed_array, np.ndarray):
+                    arr = X_processed_array
+                    if arr.ndim == 1:
+                        arr = arr.reshape(1, -1)
+                    ncols = arr.shape[1]
+                    cols = None
+                    if isinstance(feature_names, (list, tuple)) and len(feature_names) == ncols:
+                        cols = list(feature_names)
+                    else:
+                        try:
+                            if hasattr(processor, "get_feature_names_out"):
+                                names_out = list(processor.get_feature_names_out())
+                            else:
+                                names_out = None
+                            if names_out and len(names_out) == ncols:
+                                cols = names_out
+                        except Exception:
+                            cols = None
+                    if cols is None:
+                        if isinstance(feature_names, (list, tuple)) and len(feature_names) >= 1:
+                            if len(feature_names) >= ncols:
+                                cols = list(feature_names)[:ncols]
+                            else:
+                                cols = list(feature_names) + [f"f_{i}" for i in range(len(feature_names), ncols)]
+                        else:
+                            cols = [f"f_{i}" for i in range(ncols)]
+                    X_processed = pd.DataFrame(arr, columns=cols)
+                else:
+                    X_processed = X_processed_array
+
+                # align to model columns
+                if hasattr(model, "feature_names_in_"):
+                    expected = list(model.feature_names_in_)
+                    if not isinstance(X_processed, pd.DataFrame):
+                        arr = np.asarray(X_processed)
+                        if arr.ndim == 1:
+                            arr = arr.reshape(1, -1)
+                        X_processed = pd.DataFrame(arr, columns=[f"f_{i}" for i in range(arr.shape[1])])
+                    missing = [c for c in expected if c not in X_processed.columns]
+                    for c in missing:
+                        X_processed[c] = 0
+                    extras = [c for c in X_processed.columns if c not in expected]
+                    if extras:
+                        X_processed = X_processed.drop(columns=extras)
+                    X_processed = X_processed[expected]
+
+                # PREDICT
+                raw_pred = model.predict(X_processed)[0]
+                is_classifier = hasattr(model, "classes_")
+
+                # Display results
+                if is_classifier:
+                    pred_class = int(raw_pred)
+                    txt = "Thấp" if pred_class == 0 else ("Trung bình" if pred_class == 1 else "Cao")
+                    st.success(f"Kết quả: {txt}")
+                else:
+                    st.write(f"Raw output: {raw_pred:.4f}")
+                    use_log = st.checkbox("Inverse log (expm1)", True)
+                    val = raw_pred
+                    if use_log:
+                        # model output appears to be standardized (target was scaled in preprocessing)
+                        if target_mean is not None and target_std is not None:
+                            # inverse standard scaling then inverse log
+                            val_log = (val * target_std) + target_mean
+                            val = np.expm1(val_log)
+                        else:
+                            # fallback: assume raw_pred is already log-scale
+                            val = np.expm1(val)
+                    final_val = int(max(0, round(val)))
+                    st.metric("Sales dự đoán", f"{final_val:,}")
+                    if final_val > 200:
+                        st.success("Tiềm năng cao")
+                    elif final_val > 50:
+                        st.info("Ổn định")
+                    else:
+                        st.warning("Cần tối ưu")
+
+                # RESULT LAYOUT: chart left, debug/model-info right
+                col_chart, col_side = st.columns([3, 1])
+                with col_chart:
                     if hasattr(model, 'feature_importances_'):
-                        imp_data = pd.DataFrame({'f': feature_names, 'v': model.feature_importances_}).sort_values('v', ascending=False).head(8)
-                        fig = go.Figure(go.Bar(x=imp_data['v'], y=imp_data['f'], orientation='h', marker_color='#146EB4'))
-                        fig.update_layout(
-                            title=dict(text='MỨC ĐỘ ẢNH HƯỞNG CỦA CÁC ĐẶC TRƯNG', font=dict(family="Inter", size=13, color="#64748B")),
-                            template='plotly_white', height=330, margin=dict(l=10, r=10, t=50, b=10),
-                            xaxis=dict(showgrid=False, showticklabels=False),
-                            yaxis=dict(autorange="reversed", tickfont=dict(color="#0F172A", family="Inter")),
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            plot_bgcolor="rgba(0,0,0,0)"
-                        )
+                        imp = pd.DataFrame({"f": feature_names, "v": model.feature_importances_}).sort_values("v", ascending=False).head(8)
+                        fig = go.Figure(go.Bar(x=imp["v"], y=imp["f"], orientation='h'))
+                        fig.update_layout(height=320, margin=dict(t=20, b=20, l=40, r=20))
                         st.plotly_chart(fig, use_container_width=True)
+                with col_side:
+                    with st.expander("DEBUG", expanded=False):
+                        st.write("RAW INPUT")
+                        st.dataframe(raw_input, height=120)
+                        st.write("PROCESSED (head)")
+                        try:
+                            st.dataframe(X_processed.head(5), height=260)
+                        except Exception:
+                            st.dataframe(X_processed, height=260)
+                        # session_state debug to diagnose repeated-submit issues
+                        try:
+                            st.write("session_state keys:")
+                            st.write(list(st.session_state.keys()))
+                        except Exception:
+                            pass
 
-                except Exception as e:
-                    st.error(f"Lỗi tính toán AI: {e}")
+                # Show full list of model features and category mapping
+                with st.expander("Model features & categories", expanded=False):
+                    try:
+                        # feature names from model/dump
+                        fn = dump_features if 'dump_features' in locals() else feature_names
+                        st.write(f"Total features: {len(fn)}")
+                        st.dataframe(pd.DataFrame({"feature": fn}))
 
-    # Tech Info Expander
-    with st.expander("🛠️ Chi tiết kỹ thuật của mô hình AI"):
-        st.write(f"**Kiểu mô hình:** `{type(model).__name__}`")
-        st.write(f"**Số lượng đặc trưng đầu vào:** `{len(feature_names)}`")
-        st.dataframe(pd.DataFrame({"Đặc trưng": feature_names}), height=200)
+                        # extract category dummies (common prefix 'cat_')
+                        cats = [c for c in fn if c.startswith('cat_')]
+                        if cats:
+                            st.write("Detected category dummy columns:")
+                            st.write(', '.join(cats))
+                            # try to infer original category names
+                            inferred = [c.replace('cat_', '') for c in cats]
+                            st.write("Inferred categories (suffixes):")
+                            st.write(', '.join(inferred))
+                        else:
+                            st.info("No category dummy columns detected in model features.")
+                    except Exception as e:
+                        st.write("Could not load feature list:", e)
+
+            except Exception as e:
+                st.error(f"Lỗi predict: {e}")
+
+    # =========================
+    # TECH INFO
+    # =========================
+    with st.expander("Model info"):
+        st.write(type(model).__name__)
+        st.write(len(feature_names))
+        st.dataframe(pd.DataFrame({"features": feature_names}))

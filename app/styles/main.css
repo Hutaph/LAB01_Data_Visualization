@@ -85,9 +85,11 @@ body {
 }
 
 [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
-  flex: 0 0 70px !important;
+  /* Allow the first column to expand in nested layouts while
+     keeping a sensible minimum width for the hover navigation. */
+  flex: 0 0 auto !important;
   min-width: 70px !important;
-  max-width: 70px !important;
+  max-width: none !important;
   position: relative !important;
   overflow: visible !important;
   padding-right: 0 !important;
