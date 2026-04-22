@@ -23,7 +23,7 @@ from predictor.loader import load_processed_data
 
 def render(df):
     # PATHS
-    MODELS_DIR = Path(__file__).resolve().parents[1] / "services" / "models"
+    # `MODELS_DIR` is provided by the predictor package (points to app/services/models)
     PROCESSOR_PATH = MODELS_DIR / "sales_prediction_processor.joblib"
 
     # Detect available model files and allow user to choose
@@ -161,7 +161,7 @@ def render(df):
         feature_names = list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else []
 
         # Try to load a features dump (created at app startup) for display
-        features_dump_path = "./services/models/features_dump.json"
+        features_dump_path = Path(__file__).resolve().parents[1] / "features_dump.json"
         try:
             if features_dump_path.exists():
                 import json

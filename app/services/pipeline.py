@@ -12,6 +12,8 @@ from predictor.pipeline import (
     save_processor,
     ensure_processor,
     transform_with_feature_names,
+    PreprocessorTransformer,
+    LogAndClipper,
 )
 
 __all__ = [
@@ -20,4 +22,6 @@ __all__ = [
     "save_processor",
     "ensure_processor",
     "transform_with_feature_names",
+    "PreprocessorTransformer",
+    "LogAndClipper",
 ]
