@@ -9,10 +9,29 @@ from services.models.feature_engineering import DiscountFeatureEngineer, Outlier
 
 def render(df):
     # PATHS
-    MODEL_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "best_gradient_boosting_model.pkl"
-    PROCESSOR_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "sales_prediction_processor.joblib"
+    MODELS_DIR = Path(__file__).resolve().parents[1] / "services" / "models"
+    PROCESSOR_PATH = MODELS_DIR / "sales_prediction_processor.joblib"
 
-    # CSS + header (Đã bổ sung fix lỗi trong suốt sidebar và tối ưu UI)
+    # Detect available model files and allow user to choose
+    try:
+        model_files = sorted(MODELS_DIR.glob("*.pkl"))
+        model_options = [p.name for p in model_files]
+    except Exception:
+        model_files = []
+        model_options = []
+
+    if not model_options:
+        st.error("Không tìm thấy mô hình (.pkl) trong thư mục models")
+        return
+
+    # default selection (prefer gradient boosting if present)
+    default_name = "best_gradient_boosting_model.pkl"
+    default_index = model_options.index(default_name) if default_name in model_options else 0
+    selected_model_name = st.selectbox("Chọn mô hình", model_options, index=default_index,
+                                       format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title())
+    MODEL_PATH = MODELS_DIR / selected_model_name
+
+    # CSS + header
     st.markdown(
         """
         <style>
