@@ -645,4 +645,4 @@ def render(df_raw):
 </body>
 </html>
 """
-    components.html(html_code, height=1850, scrolling=False)
+    components.html(html_code, height=2100, scrolling=False)
