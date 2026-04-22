@@ -79,14 +79,8 @@ body {
   display: none !important;
 }
 
-[data-testid="stHorizontalBlock"] {
-  gap: 0 !important;
-  column-gap: 0 !important;
-}
-
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child {
-  /* Allow the first column to expand in nested layouts while
-     keeping a sensible minimum width for the hover navigation. */
+/* ========= TỐI ƯU HOVER SIDEBAR (CHỈ ÁP DỤNG CỘT CHỨA MENU) ========= */
+[data-testid="stHorizontalBlock"]:has(iframe) > [data-testid="stColumn"]:first-child {
   flex: 0 0 auto !important;
   min-width: 70px !important;
   max-width: none !important;
@@ -95,34 +89,30 @@ body {
   padding-right: 0 !important;
   margin-right: 0 !important;
   align-self: flex-start;
-  z-index: 1000 !important;
+  z-index: 999999 !important; /* Đẩy Menu lên mức cao nhất */
   margin-top: 5px !important;
 }
 
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child
-  [data-testid="stVerticalBlock"],
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child
-  .element-container,
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child
-  .stElementContainer {
+[data-testid="stHorizontalBlock"]:has(iframe) > [data-testid="stColumn"]:first-child [data-testid="stVerticalBlock"],
+[data-testid="stHorizontalBlock"]:has(iframe) > [data-testid="stColumn"]:first-child .element-container,
+[data-testid="stHorizontalBlock"]:has(iframe) > [data-testid="stColumn"]:first-child .stElementContainer {
   overflow: visible !important;
-  z-index: 1000 !important;
+  z-index: 999999 !important;
   position: relative !important;
 }
 
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child iframe {
+[data-testid="stHorizontalBlock"]:has(iframe) > [data-testid="stColumn"]:first-child iframe {
   width: 220px !important;
   min-width: 220px !important;
   border: none !important;
   background: transparent !important;
   position: relative !important;
-  z-index: 1000 !important;
+  z-index: 999999 !important;
 }
 
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child
-  [data-testid="stBaseButton-secondary"],
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:first-child
-  [data-testid="stButton"] {
+/* Ẩn các nút rác do component sinh ra */
+[data-testid="stHorizontalBlock"]:has(iframe) > [data-testid="stColumn"]:first-child [data-testid="stBaseButton-secondary"],
+[data-testid="stHorizontalBlock"]:has(iframe) > [data-testid="stColumn"]:first-child [data-testid="stButton"] {
   position: absolute !important;
   left: -9999px !important;
   top: -9999px !important;
@@ -132,7 +122,6 @@ body {
   opacity: 0 !important;
   pointer-events: none !important;
 }
-
 .az-header {
   position: sticky;
   top: 2.9rem;

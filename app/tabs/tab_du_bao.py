@@ -12,22 +12,82 @@ def render(df):
     MODEL_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "best_gradient_boosting_model.pkl"
     PROCESSOR_PATH = Path(__file__).resolve().parents[1] / "services" / "models" / "sales_prediction_processor.joblib"
 
-    # CSS
-    st.markdown("""
+    # CSS + header (Đã bổ sung fix lỗi trong suốt sidebar và tối ưu UI)
+    st.markdown(
+        """
         <style>
+        /* ========= TỐI ƯU NÚT BẤM VÀ LABEL ========= */
         .stButton>button {
             width: 100%;
-            background-color: #F97316;
-            color: white;
+            background-color: #F97316 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            padding: 10px 12px !important;
+            font-weight: 700 !important;
+            border: none !important;
+            transition: all 0.3s ease !important;
+        }
+        .stButton>button:hover {
+            background-color: #EA580C !important;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);
+        }
+        .stNumberInput>div>label, .stSlider>label, .stSelectbox>label, .stCheckbox>label {
+            font-weight: 700 !important;
+            color: #1d2a39 !important;
+        }
+
+        /* ========= TỐI ƯU THẺ KẾT QUẢ DỰ BÁO ========= */
+        .custom-metric-container {
+            background: #FFFAF5;
+            border: 1px solid #efd9bd;
+            border-left: 5px solid #F97316;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 16px rgba(19, 25, 33, 0.06);
+        }
+        .custom-metric-label {
+            font-size: 14px;
+            color: #6b7280;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .custom-metric-value {
+            font-size: 38px;
+            color: #1d2a39;
+            font-weight: 800;
+            line-height: 1;
+            font-family: 'Montserrat', sans-serif;
+        }
+        .custom-metric-status {
+            font-size: 13px;
+            font-weight: 700;
+            margin-top: 12px;
+            display: inline-block;
+            padding: 5px 12px;
             border-radius: 8px;
         }
+        .status-high { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .status-mid { background: #fef08a; color: #854d0e; border: 1px solid #fde047; }
+        .status-low { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
         </style>
-    """, unsafe_allow_html=True)
 
-    # HEADER
-    st.markdown("""
-        <div class="az-title-line">Dự báo Hiệu suất Sản phẩm</div>
-    """, unsafe_allow_html=True)
+        <div class="section-sticky" style="margin-bottom:16px;">
+            <div class="section-title-row">
+                <div class="section-title">
+                    <div style="display:flex;flex-direction:column;line-height:1;">
+                        <div style="font-size:20px;font-weight:800;color:#9A3412;">Dự báo hiệu suất sản phẩm</div>
+                        <div style="font-size:16px;color:#6b7280;margin-top:4px;">Forecast product performance</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # LOAD MODEL + PROCESSOR
     if not MODEL_PATH.exists():
@@ -258,21 +318,24 @@ def render(df):
     target_mean, target_std = compute_target_scaler()
 
     # Layout: left column for inputs and right column for results
-    # Increase left column share so input form balances with results
     col_form, col_main = st.columns([1, 2], gap="large")
 
     # ---- Left: Input form ----
     with col_form:
-        st.markdown('<div class="az-kpi-card" style="padding:12px;">', unsafe_allow_html=True)
         with st.form("predict_form", clear_on_submit=False):
-            f_price = st.number_input("Price", value=float(medians.get("price", 25.0)), format="%.2f")
-            f_orig_price = st.number_input("Original Price", value=float(medians.get("original_price", 30.0)), format="%.2f")
-            f_rating = st.slider("Rating", 0.0, 5.0, float(medians.get("rating", 4.2)))
-            f_reviews = st.number_input("Reviews", value=int(medians.get("reviews", 120)), min_value=0)
-            f_offers = st.number_input("Offers", value=int(medians.get("offers", 1)), min_value=0)
-            f_delivery_fee = st.number_input("Delivery Fee ($)", value=float(medians.get("delivery_fee", 0.0)), format="%.2f")
-            f_lowest_offer_price = st.number_input("Lowest Offer Price", value=0.0, format="%.2f")
-
+            
+            st.markdown("<h5 style='color:#EA580C; margin-bottom: 0;'>1. Thông tin giá cả & Cạnh tranh</h5>", unsafe_allow_html=True)
+            f_price = st.number_input("Giá hiện tại (USD)", value=float(medians.get("price", 25.0)), format="%.2f")
+            f_orig_price = st.number_input("Giá gốc (USD)", value=float(medians.get("original_price", 30.0)), format="%.2f")
+            f_lowest_offer_price = st.number_input("Giá chào thấp nhất (USD)", value=0.0, format="%.2f")
+            f_delivery_fee = st.number_input("Phí vận chuyển (USD)", value=float(medians.get("delivery_fee", 0.0)), format="%.2f")
+            f_offers = st.number_input("Số nhà bán cạnh tranh", value=int(medians.get("offers", 1)), min_value=0)
+            
+            st.markdown("<h5 style='color:#EA580C; margin-top: 10px; margin-bottom: 0;'>2. Đánh giá Sản phẩm</h5>", unsafe_allow_html=True)
+            f_rating = st.slider("Điểm đánh giá (0-5)", 0.0, 5.0, float(medians.get("rating", 4.2)))
+            f_reviews = st.number_input("Số lượt đánh giá (Reviews)", value=int(medians.get("reviews", 120)), min_value=0)
+            
+            st.markdown("<h5 style='color:#EA580C; margin-top: 10px; margin-bottom: 0;'>3. Phân loại & Đặc tính</h5>", unsafe_allow_html=True)
             # Category selector populated from model/dump features if available
             try:
                 fn = dump_features if 'dump_features' in locals() else feature_names
@@ -290,8 +353,9 @@ def render(df):
             sel_index = 0
             if default_cat in cat_options:
                 sel_index = cat_options.index(default_cat)
+            
             f_cat = st.selectbox(
-                "Category",
+                "Danh mục (Category)",
                 cat_options,
                 index=sel_index,
                 format_func=_fmt_cat,
@@ -300,19 +364,19 @@ def render(df):
             col_c1, col_c2 = st.columns(2)
             with col_c1:
                 f_prime = st.checkbox("Prime", bool(medians.get("is_prime", True)))
-                f_choice = st.checkbox("Choice", bool(medians.get("is_choice", False)))
+                f_choice = st.checkbox("Amazon's Choice", bool(medians.get("is_choice", False)))
             with col_c2:
-                f_climate = st.checkbox("Climate", bool(medians.get("is_climate", False)))
-                f_vars = st.checkbox("Variation", bool(medians.get("has_variation", True)))
+                f_climate = st.checkbox("Climate friendly", bool(medians.get("is_climate", False)))
+                f_vars = st.checkbox("Có biến thể", bool(medians.get("has_variation", True)))
 
             st.write("")
-            submit = st.form_submit_button("Predict", key="predict_btn")
+            submit = st.form_submit_button("Dự đoán", key="predict_btn")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ---- Right: Results / placeholder ----
     with col_main:
         if not submit:
-            st.info("Chờ input... Điền thông tin bên trái và nhấn Predict.")
+            st.info("💡 Vui lòng nhập hoặc điều chỉnh các thông số sản phẩm ở cột bên trái và nhấn 'Dự đoán' để xem kết quả.")
         else:
             # RAW INPUT
             try:
@@ -428,42 +492,66 @@ def render(df):
                 is_classifier = hasattr(model, "classes_")
 
                 # Display results
+                st.markdown("### Kết quả Phân tích & Dự báo")
+                
                 if is_classifier:
                     pred_class = int(raw_pred)
                     txt = "Thấp" if pred_class == 0 else ("Trung bình" if pred_class == 1 else "Cao")
-                    st.success(f"Kết quả: {txt}")
+                    
+                    if pred_class == 2:
+                        status_class = "status-high"
+                    elif pred_class == 1:
+                        status_class = "status-mid"
+                    else:
+                        status_class = "status-low"
+                        
+                    st.markdown(f"""
+                        <div class="custom-metric-container">
+                            <div class="custom-metric-label">Phân hạng sản phẩm</div>
+                            <div class="custom-metric-value">{txt}</div>
+                            <div class="custom-metric-status {status_class}">Dựa trên dữ liệu thị trường</div>
+                        </div>
+                    """, unsafe_allow_html=True)
                 else:
-                    st.write(f"Raw output: {raw_pred:.4f}")
-                    use_log = st.checkbox("Inverse log (expm1)", True)
+                    use_log = True
                     val = raw_pred
                     if use_log:
-                        # model output appears to be standardized (target was scaled in preprocessing)
                         if target_mean is not None and target_std is not None:
-                            # inverse standard scaling then inverse log
                             val_log = (val * target_std) + target_mean
                             val = np.expm1(val_log)
                         else:
-                            # fallback: assume raw_pred is already log-scale
                             val = np.expm1(val)
                     final_val = int(max(0, round(val)))
-                    st.metric("Sales dự đoán", f"{final_val:,}")
+                    
                     if final_val > 200:
-                        st.success("Tiềm năng cao")
+                        status_text = "Tiềm năng cao 🚀"
+                        status_class = "status-high"
                     elif final_val > 50:
-                        st.info("Ổn định")
+                        status_text = "Ổn định ⚖️"
+                        status_class = "status-mid"
                     else:
-                        st.warning("Cần tối ưu")
+                        status_text = "Cần tối ưu thêm ⚠️"
+                        status_class = "status-low"
+
+                    st.markdown(f"""
+                        <div class="custom-metric-container">
+                            <div class="custom-metric-label">Dự đoán Doanh số (Theo Tháng)</div>
+                            <div class="custom-metric-value">{final_val:,} <span style="font-size:20px; color:#9ca3af; font-weight:600;">đơn</span></div>
+                            <div class="custom-metric-status {status_class}">{status_text}</div>
+                        </div>
+                    """, unsafe_allow_html=True)
 
                 # RESULT LAYOUT: chart left, debug/model-info right
                 col_chart, col_side = st.columns([3, 1])
                 with col_chart:
+                    st.markdown("**Mức độ ảnh hưởng của các chỉ số (Feature Importances)**")
                     if hasattr(model, 'feature_importances_'):
                         imp = pd.DataFrame({"f": feature_names, "v": model.feature_importances_}).sort_values("v", ascending=False).head(8)
-                        fig = go.Figure(go.Bar(x=imp["v"], y=imp["f"], orientation='h'))
-                        fig.update_layout(height=320, margin=dict(t=20, b=20, l=40, r=20))
+                        fig = go.Figure(go.Bar(x=imp["v"], y=imp["f"], orientation='h', marker_color='#F97316'))
+                        fig.update_layout(height=320, margin=dict(t=20, b=20, l=40, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
                         st.plotly_chart(fig, use_container_width=True)
                 with col_side:
-                    with st.expander("DEBUG", expanded=False):
+                    with st.expander("🛠️ DEBUG DỮ LIỆU", expanded=False):
                         st.write("RAW INPUT")
                         st.dataframe(raw_input, height=120)
                         st.write("PROCESSED (head)")
@@ -471,7 +559,7 @@ def render(df):
                             st.dataframe(X_processed.head(5), height=260)
                         except Exception:
                             st.dataframe(X_processed, height=260)
-                        # session_state debug to diagnose repeated-submit issues
+                        # session_state debug
                         try:
                             st.write("session_state keys:")
                             st.write(list(st.session_state.keys()))
@@ -479,11 +567,11 @@ def render(df):
                             pass
 
                 # Show full list of model features and category mapping
-                with st.expander("Model features & categories", expanded=False):
+                with st.expander("📚 Cấu trúc Mô hình & Danh mục", expanded=False):
                     try:
                         # feature names from model/dump
                         fn = dump_features if 'dump_features' in locals() else feature_names
-                        st.write(f"Total features: {len(fn)}")
+                        st.write(f"Tổng số features model cần: {len(fn)}")
                         st.dataframe(pd.DataFrame({"feature": fn}))
 
                         # extract category dummies (common prefix 'cat_')
@@ -496,9 +584,9 @@ def render(df):
                             st.write("Inferred categories (suffixes):")
                             st.write(', '.join(inferred))
                         else:
-                            st.info("No category dummy columns detected in model features.")
+                            st.info("Không tìm thấy dummy variables dành cho Danh mục.")
                     except Exception as e:
-                        st.write("Could not load feature list:", e)
+                        st.write("Lỗi tải thông tin model:", e)
 
             except Exception as e:
                 st.error(f"Lỗi predict: {e}")
@@ -506,7 +594,7 @@ def render(df):
     # =========================
     # TECH INFO
     # =========================
-    with st.expander("Model info"):
-        st.write(type(model).__name__)
-        st.write(len(feature_names))
-        st.dataframe(pd.DataFrame({"features": feature_names}))
+    with st.expander("⚙️ Thông tin kỹ thuật", expanded=False):
+        st.write("**Loại mô hình thuật toán:**", type(model).__name__)
+        st.write("**Tổng số Input Feature:**", len(feature_names))
+        st.dataframe(pd.DataFrame({"Các trường dữ liệu Model (Features)": feature_names}))
