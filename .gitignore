@@ -124,5 +124,4 @@ __pycache__/
 *.py[cod]
 
 .agent
-.claude
 CLAUDE.md

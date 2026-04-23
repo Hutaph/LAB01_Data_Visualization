@@ -1,5 +1,22 @@
 import streamlit as st
+import json
+import joblib
 from pathlib import Path
+
+dump_path = Path(__file__).resolve().parent / "features_dump.json"
+models_dir = Path(__file__).resolve().parent / "services" / "models"
+best_model = models_dir / "gradient_boosting_model.pkl"
+
+# Attempt to populate a features dump only when a model can be loaded successfully.
+# On failure, write an empty list (do not serialize exception strings into the JSON file).
+dump = []
+if best_model.exists():
+    try:
+        m = joblib.load(best_model)
+        dump = list(m.feature_names_in_) if hasattr(m, "feature_names_in_") else list(getattr(m, "feature_names_", []))
+    except Exception as e:
+        # keep dump as empty list; print warning to stdout for debugging
+        print("Warning: failed to load model for features dump:", e)
 
 from components.footer import render_footer
 from components.header import render_header
@@ -12,6 +29,7 @@ from tabs.tab_danh_muc import render as render_tab_danh_muc
 from tabs.tab_nhan_uy_tin import render as render_tab_nhan_uy_tin
 from tabs.tab_van_chuyen import render as render_tab_van_chuyen
 from tabs.tab_noi_bat import render as render_tab_noi_bat
+from tabs.tab_du_bao import render as render_tab_du_bao
 from utils.css import inject_css
 
 amazon_icon_path = Path(__file__).resolve().parent / "data" / "Amazon_icon.png"
@@ -58,6 +76,7 @@ TAB_RENDERERS = {
     "Vận chuyển": lambda state, df: render_tab_van_chuyen(df),
     "Nhãn & Uy tín": lambda state, df: render_tab_nhan_uy_tin(df),
     "Nổi bật": lambda state, df: render_tab_noi_bat(df),
+    "Dự báo": lambda state, df: render_tab_du_bao(df),
 }
 
 def route_tab(active_tab: str, state: dict, df):
