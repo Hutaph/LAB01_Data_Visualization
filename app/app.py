@@ -70,15 +70,15 @@ def _build_metrics(df):
     }
 
 TAB_RENDERERS = {
-    "Tổng quan": lambda state, df: render_tab_tong_quan(state),
-    "Danh mục": lambda state, df: render_tab_danh_muc(df),
-    "Định giá": lambda state, df: render_tab_dinh_gia(df),
-    "Đánh giá": lambda state, df: render_tab_danh_gia(df),
-    "Ưu đãi": lambda state, df: render_tab_uu_dai(df),
-    "Độ hoàn thiện": lambda state, df: render_tab_thong_tin(df),
-    "Nhãn & Uy tín": lambda state, df: render_tab_nhan_uy_tin(df),
-    "Nổi bật": lambda state, df: render_tab_noi_bat(df),
-    "Dự báo": lambda state, df: render_tab_du_bao(df),
+    "Tổng quan Thị trường": lambda state, df: render_tab_tong_quan(state),
+    "Phân tích Ngành hàng": lambda state, df: render_tab_danh_muc(df),
+    "Chiến lược Giá cả":   lambda state, df: render_tab_dinh_gia(df),
+    "Chỉ số Tín nhiệm":    lambda state, df: render_tab_danh_gia(df),
+    "Chương trình Ưu đãi": lambda state, df: render_tab_uu_dai(df),
+    "Chất lượng Niêm yết": lambda state, df: render_tab_thong_tin(df),
+    "Vị thế Thương hiệu":  lambda state, df: render_tab_nhan_uy_tin(df),
+    "Xu hướng Nổi bật":    lambda state, df: render_tab_noi_bat(df),
+    "Dự báo Kinh doanh":   lambda state, df: render_tab_du_bao(df),
 }
 
 def route_tab(active_tab: str, state: dict, df):
@@ -105,7 +105,7 @@ with col_nav:
     render_navigation()
 
 with col_content:
-    active_tab = st.session_state.get("active_tab", "Tổng quan")
+    active_tab = st.session_state.get("active_tab", "Tổng quan Thị trường")
     route_tab(active_tab, STATE, DF)
 
 _, col_footer = st.columns([1, 15], gap="small")

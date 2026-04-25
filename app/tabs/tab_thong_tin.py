@@ -71,274 +71,176 @@ def render(df_raw):
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
         :root {{
-            --bg-color: #0b0f19;
-            --card-bg: rgba(19, 26, 42, 0.7);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --accent-blue: #3b82f6;
+            --primary: #F97316;
+            --secondary: #F97316;
+            --dark: #9A3412;
+            --bg: #FEF3E2;
+            --card-bg: #FFFFFF;
+            --text-primary: #1C1917;
+            --text-secondary: #78716C;
+            --border-radius: 8px;
+            --font-family: 'Inter', sans-serif;
             --accent-emerald: #10b981;
-            --accent-purple: #8b5cf6;
-            --accent-amber: #f59e0b;
             --accent-rose: #f43f5e;
-            --accent-cyan: #06b6d4;
-            --font-display: 'Outfit', sans-serif;
-            --font-body: 'Inter', sans-serif;
         }}
         
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         
         body {{
-            background-color: var(--bg-color);
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.15) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
-            color: var(--text-main);
-            font-family: var(--font-body);
+            background-color: var(--bg);
+            color: var(--text-primary);
+            font-family: var(--font-family);
             height: 100vh;
             overflow: hidden;
-            padding: 12px 16px;
+            padding: 20px;
         }}
 
-        .dashboard-header {{
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }}
-
-        .title-group h1 {{
-            font-family: var(--font-display);
-            font-size: 24px;
-            font-weight: 700;
-            background: linear-gradient(to right, #60a5fa, #c084fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 4px;
-        }}
-
-        .title-group p {{
-            font-size: 13px;
-            color: var(--text-muted);
-            max-width: 600px;
-        }}
-
-        .filter-container {{
+        .filter-bar {{
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 24px;
+            margin-bottom: 24px;
             background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            padding: 6px 12px;
-            border-radius: 8px;
-            backdrop-filter: blur(10px);
+            padding: 16px 20px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            flex-wrap: wrap;
         }}
 
-        .filter-label {{
-            font-size: 12px;
+        .f-item {{
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }}
+
+        .f-label {{
+            font-size: 13px;
             font-weight: 600;
-            color: var(--text-muted);
+            color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
         }}
 
         select {{
-            background: rgba(15, 23, 42, 0.8);
-            color: white;
-            border: 1px solid var(--card-border);
-            padding: 6px 10px;
+            padding: 8px 12px;
+            border: 1px solid #D1D5DB;
             border-radius: 6px;
-            font-family: var(--font-body);
-            font-size: 13px;
+            font-family: inherit;
+            color: var(--text-primary);
             outline: none;
             cursor: pointer;
-            transition: all 0.2s;
+            width: 250px;
+            background: #fff;
         }}
-
-        select:hover, select:focus {{
-            border-color: var(--accent-blue);
-        }}
+        select:focus {{ border-color: var(--primary); }}
 
         .kpi-row {{
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 16px;
-            margin-bottom: 16px;
+            margin-bottom: 24px;
         }}
 
         .kpi-card {{
             background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
             padding: 16px;
-            backdrop-filter: blur(10px);
+            border-left: 4px solid var(--primary);
             display: flex;
             flex-direction: column;
-            position: relative;
-            overflow: hidden;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-        }}
-
-        .kpi-card::before {{
-            content: '';
-            position: absolute;
-            top: 0; left: 0; width: 4px; height: 100%;
-            border-radius: 4px 0 0 4px;
-        }}
-
-        .kpi-card.blue::before {{ background: var(--accent-blue); }}
-        .kpi-card.purple::before {{ background: var(--accent-purple); }}
-        .kpi-card.amber::before {{ background: var(--accent-amber); }}
-
-        .kpi-title {{
-            font-size: 12px;
-            color: var(--text-muted);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }}
-
-        .kpi-val {{
-            font-family: var(--font-display);
-            font-size: 28px;
-            font-weight: 700;
-        }}
-
-        .kpi-sub {{
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 4px;
-            display: flex;
-            align-items: center;
             gap: 4px;
         }}
 
+        .kpi-title {{ font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .kpi-val {{ font-size: 26px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .kpi-sub {{ font-size: 12px; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }}
         .trend-up {{ color: var(--accent-emerald); font-weight: 600; }}
         .trend-down {{ color: var(--accent-rose); font-weight: 600; }}
 
         .charts-wrapper {{
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: 1fr 1.2fr 1.2fr;
             grid-template-rows: calc(100vh - 210px);
             gap: 16px;
         }}
 
         .chart-card {{
             background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            padding: 16px;
-            backdrop-filter: blur(10px);
+            border-radius: var(--border-radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            padding: 20px;
             display: flex;
             flex-direction: column;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }}
 
-        .chart-header {{
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }}
-
-        .chart-title {{
-            font-family: var(--font-display);
-            font-size: 16px;
-            font-weight: 600;
-            color: #fff;
-        }}
-
-        .chart-subtitle {{
-            font-size: 11px;
-            color: var(--text-muted);
-        }}
-        
-        .chart-container {{
-            flex: 1;
-            position: relative;
-            min-height: 0;
-            width: 100%;
-        }}
+        .chart-header {{ margin-bottom: 12px; }}
+        .chart-title {{ font-size: 15px; font-weight: 600; margin-bottom: 4px; color: var(--text-primary); }}
+        .chart-subtitle {{ font-size: 12px; color: var(--text-secondary); }}
+        .chart-container {{ flex: 1; position: relative; min-height: 0; width: 100%; }}
     </style>
 </head>
 <body>
 
-    <div class="dashboard-header">
-        <div class="title-group">
-            <h1>Phân Tích Thông Tin Sản Phẩm Đạt Top Doanh Số</h1>
-            <p>Khám phá liên kết trực tiếp giữa sự đầy đủ thông tin (Feature Completeness) và Doanh thu của sản phẩm (Sales Volume), cũng như đặc điểm thông tin chung của các Best Seller (Top 20% doanh thu).</p>
-        </div>
-        <div class="filter-container">
-            <span class="filter-label">Danh Mục</span>
+    <div class="filter-bar">
+        <div class="f-item">
+            <span class="f-label">Danh Mục Sản Phẩm</span>
             <select id="selCategory" onchange="applyFilters()">
                 <option value="ALL">Tất cả danh mục sản phẩm</option>
             </select>
+        </div>
+        <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end;">
+            <div style="font-size:16px; font-weight:700; color:var(--text-primary);">Phân Tích Thông Tin Sản Phẩm Đạt Top Doanh Số</div>
+            <div style="font-size:12px; color:var(--text-secondary);">Mối liên hệ giữa độ hoàn thiện thông tin và doanh thu trung bình</div>
         </div>
     </div>
 
     <!-- KPI ROW -->
     <div class="kpi-row">
-        <div class="kpi-card blue">
+        <div class="kpi-card">
             <div class="kpi-title">DOANH SỐ TB (S.PHẨM THÔNG TIN KỸ LƯỠNG)</div>
             <div class="kpi-val" id="kpi_sales_good">0</div>
-            <div class="kpi-sub">
-                So với SP Sơ sài: <span id="kpi_sales_diff">-</span>
-            </div>
+            <div class="kpi-sub">So với SP Sơ sài: <span id="kpi_sales_diff">-</span></div>
         </div>
-        <div class="kpi-card purple">
+        <div class="kpi-card" style="border-left-color: #9A3412;">
             <div class="kpi-title">MỨC BỎ TRỐNG TRUNG BÌNH TOÀN NGÀNH</div>
             <div class="kpi-val" id="kpi_missing_avg">0</div>
-            <div class="kpi-sub">
-                Trên tổng số {total_features} trường thông tin (Features)
-            </div>
+            <div class="kpi-sub">Trên tổng số {total_features} trường thông tin (Features)</div>
         </div>
-        <div class="kpi-card amber">
+        <div class="kpi-card" style="border-left-color: #F59E0B;">
             <div class="kpi-title">FEATURE QUAN TRỌNG NHẤT (TOP DOANH SỐ)</div>
             <div class="kpi-val" style="font-size: 20px" id="kpi_top_feat">-</div>
-            <div class="kpi-sub">
-                Hầu như có mặt trên tất cả các SP Top Doanh số
-            </div>
+            <div class="kpi-sub">Hầu như có mặt trên tất cả các SP Top Doanh số</div>
         </div>
     </div>
 
     <!-- CHARTS -->
     <div class="charts-wrapper" style="grid-template-columns: 1fr 1.2fr 1.2fr;">
         
-        <!-- Chart 1: Doanh số theo mức độ hoàn thiện -->
         <div class="chart-card">
             <div class="chart-header">
-                <div>
-                    <div class="chart-title">Doanh Số Theo Mức Độ Chi Tiết</div>
-                    <div class="chart-subtitle">Trung bình lượt bán / tháng (Phân nhóm theo số lượng Missing)</div>
-                </div>
+                <div class="chart-title">Doanh Số Theo Mức Độ Chi Tiết</div>
+                <div class="chart-subtitle">Trung bình lượt bán / tháng (Phân nhóm theo số lượng Missing)</div>
             </div>
             <div class="chart-container"><canvas id="c_sales"></canvas></div>
         </div>
 
-        <!-- Chart 2: Top Features of Top Selling Products -->
         <div class="chart-card">
             <div class="chart-header">
-                <div>
-                    <div class="chart-title">Mô Típ Của "Người Chiến Thắng"</div>
-                    <div class="chart-subtitle">Tỷ lệ % cung cấp các Trường Thông Tin này của TOP 20% Doanh Thu</div>
-                </div>
+                <div class="chart-title">Mô Típ Của "Người Chiến Thắng"</div>
+                <div class="chart-subtitle">Tỷ lệ % cung cấp các Trường Thông Tin này của TOP 20% Doanh Thu</div>
             </div>
             <div class="chart-container"><canvas id="c_top_feats"></canvas></div>
         </div>
 
-        <!-- Chart 3: Scatter / Bubble Missing vs Sales -->
         <div class="chart-card">
             <div class="chart-header">
-                <div>
-                    <div class="chart-title">Phân Bổ Doanh Số Theo Thông Tin Khuyết</div>
-                    <div class="chart-subtitle">Trục X: Số lượng thông tin thiếu | Trục Y: Lượt bán TB | Trọng số: Lượng SP</div>
-                </div>
+                <div class="chart-title">Phân Bổ Doanh Số Theo Thông Tin Khuyết</div>
+                <div class="chart-subtitle">Trục X: Số lượng thông tin thiếu | Trục Y: Lượt bán TB | Trọng số: Lượng SP</div>
             </div>
             <div class="chart-container"><canvas id="c_scatter"></canvas></div>
         </div>
@@ -351,15 +253,13 @@ def render(df_raw):
     const TOTAL_FEATS = {total_features};
     let CHARTS = {{}};
 
-    // Formatters
     const fmtN = (n) => new Intl.NumberFormat('en-US').format(Math.round(n));
 
     function setup() {{
         Chart.register(ChartDataLabels);
-        Chart.defaults.color = '#94a3b8';
+        Chart.defaults.color = '#78716C';
         Chart.defaults.font.family = "'Inter', sans-serif";
         
-        // Populate Filter
         let cats = new Set();
         RAW_DATA.forEach(d => {{ if(d['Danh Mục Sản Phẩm'] && d['Danh Mục Sản Phẩm'] !== 'Không Rõ') cats.add(d['Danh Mục Sản Phẩm']); }});
         let sel = document.getElementById('selCategory');
@@ -385,8 +285,7 @@ def render(df_raw):
     }}
 
     function processData(data, cat) {{
-        const TIER_NAMES = ['Kỹ Lưỡng (Thiếu ≤15)', 'Khá (16-30)', 'Cơ Bản (31-39)', 'Sơ Sài (≥40)'];
-        
+        const TIER_NAMES = ['Kỹ Lưỡng (≤15)', 'Khá (16-30)', 'Cơ Bản (31-39)', 'Sơ Sài (≥40)'];
         let bins = [
             {{ sales: 0, count: 0 }},
             {{ sales: 0, count: 0 }},
@@ -401,12 +300,10 @@ def render(df_raw):
             let m = d.missing_count;
             totalMissing += m;
             let t = getCompletenessTier(m);
-            
             bins[t].count++;
             bins[t].sales += (d.sales_volume_num || 0);
 
-            // Scatter mapping (Group by missing count to form bubbles)
-            let scGroup = Math.floor(m / 2) * 2; // Group every 2 points
+            let scGroup = Math.floor(m / 2) * 2;
             if(!scatterMap.has(scGroup)) scatterMap.set(scGroup, {{s:0, c:0}});
             let sc = scatterMap.get(scGroup);
             sc.s += (d.sales_volume_num || 0);
@@ -416,14 +313,12 @@ def render(df_raw):
         let avgMissing = data.length ? totalMissing / data.length : 0;
         let avgSales = bins.map(b => b.count ? b.sales / b.count : 0);
 
-        // Update KPIs
-        let good_idx = 0; // Kỹ Lưỡng
-        let bad_idx = 3;  // Sơ Sài
+        let good_idx = 0;
+        let bad_idx = 3;
 
         document.getElementById('kpi_missing_avg').innerText = Math.round(avgMissing);
-
-        // Sales KPI
         document.getElementById('kpi_sales_good').innerText = fmtN(avgSales[good_idx]);
+        
         let sales_diff = avgSales[good_idx] - avgSales[bad_idx];
         let sales_diff_el = document.getElementById('kpi_sales_diff');
         if (sales_diff > 0) {{
@@ -433,19 +328,16 @@ def render(df_raw):
             sales_diff_el.innerHTML = `<span class="trend-down">Thấp hơn</span>`;
         }}
 
-        // Features Info KPI for selected Category
         let topFeatDataForCat = TOP_FEATS_DATA[cat] || {{}};
         let topFeatLabels = Object.keys(topFeatDataForCat);
         let topFeatStats = Object.values(topFeatDataForCat);
         
         let topFeatName = topFeatLabels.length > 0 ? topFeatLabels[0] : "N/A";
         let topFeatPct = topFeatStats.length > 0 ? topFeatStats[0] : 0;
-        
         document.getElementById('kpi_top_feat').innerText = topFeatName.toUpperCase() + ` (${{topFeatPct}}%)`;
 
-        // UPDATE CHARTS
         updateSalesChart(TIER_NAMES, avgSales);
-        updateTopFeatsChart(topFeatLabels.slice(0, 10), topFeatStats.slice(0, 10)); // Draw Top 10 Features
+        updateTopFeatsChart(topFeatLabels.slice(0, 10), topFeatStats.slice(0, 10));
         updateScatterChart(scatterMap);
     }}
 
@@ -466,27 +358,20 @@ def render(df_raw):
         let scData = sortedKeys.map(k => {{
             let st = scatterMap.get(k);
             let avgS = st.s / st.c;
-            // Radius scales logrithmically based on frequency
             let r = Math.min(Math.max(Math.log(st.c) * 4, 3), 30);
             return {{ x: k, y: avgS, r: r, count: st.c }};
         }});
-
         CHARTS.scatter.data.datasets[0].data = scData;
         CHARTS.scatter.update();
     }}
 
     const baseConfig = {{
         responsive: true, maintainAspectRatio: false,
-        plugins: {{ legend: {{ labels: {{ color: '#cbd5e1' }} }} }}
+        plugins: {{ legend: {{ display: false }} }}
     }};
 
     function initCharts() {{
-        // 1. Sales Chart (Bar)
         let ctxSales = document.getElementById('c_sales').getContext('2d');
-        let gradSales = ctxSales.createLinearGradient(0, 0, 0, 400);
-        gradSales.addColorStop(0, 'rgba(56, 189, 248, 0.8)');
-        gradSales.addColorStop(1, 'rgba(2, 132, 199, 0.8)');
-
         CHARTS.sales = new Chart(ctxSales, {{
             type: 'bar',
             data: {{
@@ -494,29 +379,24 @@ def render(df_raw):
                 datasets: [{{
                     label: 'Doanh Số TB',
                     data: [],
-                    backgroundColor: gradSales,
-                    borderRadius: 6
+                    backgroundColor: '#F97316',
+                    borderRadius: 4
                 }}]
             }},
             options: {{
                 ...baseConfig,
                 scales: {{
-                    y: {{ grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ callback: (v)=>fmtN(v) }} }},
+                    y: {{ grid: {{ color: 'rgba(0,0,0,0.05)' }}, ticks: {{ callback: (v)=>fmtN(v) }} }},
                     x: {{ grid: {{ display: false }} }}
                 }},
                 plugins: {{
                     legend: {{ display: false }},
-                    datalabels: {{ color: '#fff', font: {{ weight: 'bold' }}, formatter: (v)=>fmtN(v), anchor: 'end', align: 'end', offset: -4 }}
+                    datalabels: {{ color: '#78716C', font: {{ weight: '600' }}, formatter: (v)=>fmtN(v), anchor: 'end', align: 'top', offset: 2 }}
                 }}
             }}
         }});
 
-        // 2. Top Features Chart (Horizontal Bar)
         let ctxTop = document.getElementById('c_top_feats').getContext('2d');
-        let gradTop = ctxTop.createLinearGradient(400, 0, 0, 0);
-        gradTop.addColorStop(0, 'rgba(245, 158, 11, 0.8)'); // Amber
-        gradTop.addColorStop(1, 'rgba(217, 119, 6, 0.8)');
-
         CHARTS.topFeats = new Chart(ctxTop, {{
             type: 'bar',
             data: {{
@@ -524,7 +404,7 @@ def render(df_raw):
                 datasets: [{{
                     label: '% Cung Cấp',
                     data: [],
-                    backgroundColor: gradTop,
+                    backgroundColor: '#FED7AA',
                     borderRadius: 4
                 }}]
             }},
@@ -532,17 +412,16 @@ def render(df_raw):
                 ...baseConfig,
                 indexAxis: 'y',
                 scales: {{
-                    x: {{ grid: {{ color: 'rgba(255,255,255,0.05)' }}, max: 100, ticks: {{ callback: (v)=>v+'%' }} }},
+                    x: {{ grid: {{ color: 'rgba(0,0,0,0.05)' }}, max: 100, ticks: {{ callback: (v)=>v+'%' }} }},
                     y: {{ grid: {{ display: false }} }}
                 }},
                 plugins: {{
                     legend: {{ display: false }},
-                    datalabels: {{ color: '#fff', font: {{ weight: 'bold' }}, formatter: (v)=>v+'%', anchor: 'end', align: 'right', offset: 2 }}
+                    datalabels: {{ color: '#9A3412', font: {{ weight: '600', size: 10 }}, formatter: (v)=>v+'%', anchor: 'end', align: 'right', offset: 2 }}
                 }}
             }}
         }});
 
-        // 3. Scatter Chart (Missing count vs Sales)
         let ctxScatter = document.getElementById('c_scatter').getContext('2d');
         CHARTS.scatter = new Chart(ctxScatter, {{
             type: 'bubble',
@@ -550,22 +429,16 @@ def render(df_raw):
                 datasets: [{{
                     label: 'Sales vs Missing',
                     data: [],
-                    backgroundColor: 'rgba(139, 92, 246, 0.6)',
-                    borderColor: 'rgba(139, 92, 246, 1)',
+                    backgroundColor: 'rgba(249, 115, 22, 0.4)',
+                    borderColor: '#ea580c',
                     borderWidth: 1
                 }}]
             }},
             options: {{
                 ...baseConfig,
                 scales: {{
-                    x: {{ 
-                        title: {{ display: true, text: 'Số lượng Features Thiếu', color: '#94a3b8' }},
-                        grid: {{ color: 'rgba(255,255,255,0.05)' }} 
-                    }},
-                    y: {{ 
-                        title: {{ display: true, text: 'Lượt Bán TB', color: '#94a3b8' }},
-                        grid: {{ color: 'rgba(255,255,255,0.05)' }} 
-                    }}
+                    x: {{ title: {{ display: true, text: 'Số lượng Features Thiếu', color: '#78716C' }}, grid: {{ color: 'rgba(0,0,0,0.05)' }} }},
+                    y: {{ title: {{ display: true, text: 'Lượt Bán TB', color: '#78716C' }}, grid: {{ color: 'rgba(0,0,0,0.05)' }} }}
                 }},
                 plugins: {{
                     legend: {{ display: false }},
@@ -574,7 +447,7 @@ def render(df_raw):
                         callbacks: {{
                             label: function(ctx) {{
                                 let d = ctx.raw;
-                                return `Thiếu ${{d.x}} | Lượt Bán TB: ${{fmtN(d.y)}} | SL SP Ghi nhận: ${{d.count}}`;
+                                return `Thiếu ${{d.x}} | Lượt Bán TB: ${{fmtN(d.y)}} | SL SP: ${{d.count}}`;
                             }}
                         }}
                     }}
@@ -589,4 +462,4 @@ def render(df_raw):
 </html>
     """
     
-    components.html(html_code, height=900, scrolling=False)
+    components.html(html_code, height=650, scrolling=False)
