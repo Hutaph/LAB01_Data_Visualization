@@ -16,8 +16,14 @@ def render(df_raw):
     else:
         df["Danh Mục Sản Phẩm"] = "Không Rõ"
 
+    # Prices & Segments thresholds
+    df["price_num"] = pd.to_numeric(df.get("price", 0), errors="coerce").fillna(0)
+    price_nonzero = df["price_num"][df["price_num"] > 0]
+    p33 = round(float(price_nonzero.quantile(0.33)), 2) if not price_nonzero.empty else 10.0
+    p67 = round(float(price_nonzero.quantile(0.67)), 2) if not price_nonzero.empty else 30.0
+
     # Evaluate missing columns
-    exclude_cols = ['asin', 'title', 'price', 'original_price', 'sales_volume', 'sales_volume_num', 'currency', 'is_best_seller', 'link', 'Danh Mục Sản Phẩm', 'crawl_category']
+    exclude_cols = ['asin', 'title', 'price', 'original_price', 'sales_volume', 'sales_volume_num', 'currency', 'is_best_seller', 'link', 'Danh Mục Sản Phẩm', 'crawl_category', 'price_num']
     eval_cols = [c for c in df.columns if c not in exclude_cols]
     
     def is_missing_series(series):
@@ -31,7 +37,7 @@ def render(df_raw):
     total_features = len(eval_cols)
     
     # --- Pre-calculate Top Features for TOP 10% Sales products ---
-    # We calculate both for top 10% AND for ALL products, to enable comparison
+    # We calculate for Category x Price Segment combinations
     top_features_dict = {}
     all_features_dict = {}
     top_counts_dict = {}
@@ -52,35 +58,37 @@ def render(df_raw):
         prov_pct = (prov_counts / len(top_indices) * 100).round(1)
         return prov_pct.to_dict(), prov_counts.to_dict()
 
-    t_pct, t_cnt = calc_top_provided_features_with_count(df, provided_df)
-    top_features_dict["ALL"] = t_pct
-    top_counts_dict["ALL"] = t_cnt
+    # Pre-calculate for every combination of Category and Segment
+    price_segments = {
+        "ALL": lambda d: d,
+        "LOW": lambda d: d[d["price_num"] <= p33],
+        "MID": lambda d: d[(d["price_num"] > p33) & (d["price_num"] <= p67)],
+        "HIGH": lambda d: d[d["price_num"] > p67]
+    }
 
-    a_pct, a_cnt = calc_provided_features_with_count(df, provided_df)
-    all_features_dict["ALL"] = a_pct
-    all_counts_dict["ALL"] = a_cnt
-    
-    for cat in df["Danh Mục Sản Phẩm"].unique():
-        cat_df = df[df["Danh Mục Sản Phẩm"] == cat]
-        t_p, t_c = calc_top_provided_features_with_count(cat_df, provided_df)
-        a_p, a_c = calc_provided_features_with_count(cat_df, provided_df)
-        top_features_dict[cat] = t_p
-        top_counts_dict[cat] = t_c
-        all_features_dict[cat] = a_p
-        all_counts_dict[cat] = a_c
+    unique_cats = ["ALL"] + list(df["Danh Mục Sản Phẩm"].unique())
+    for cat in unique_cats:
+        cat_df = df if cat == "ALL" else df[df["Danh Mục Sản Phẩm"] == cat]
+        
+        top_features_dict[cat] = {}
+        all_features_dict[cat] = {}
+        top_counts_dict[cat] = {}
+        all_counts_dict[cat] = {}
+        
+        for seg_name, filter_fn in price_segments.items():
+            seg_df = filter_fn(cat_df)
+            t_p, t_c = calc_top_provided_features_with_count(seg_df, provided_df)
+            a_p, a_c = calc_provided_features_with_count(seg_df, provided_df)
+            
+            top_features_dict[cat][seg_name] = t_p
+            top_counts_dict[cat][seg_name] = t_c
+            all_features_dict[cat][seg_name] = a_p
+            all_counts_dict[cat][seg_name] = a_c
 
     top_feats_json_str = json.dumps(top_features_dict)
     all_feats_json_str = json.dumps(all_features_dict)
     top_counts_json_str = json.dumps(top_counts_dict)
     all_counts_json_str = json.dumps(all_counts_dict, ensure_ascii=False)
-
-    # Select columns & dump JSON (include price for segment filtering)
-    df["price_num"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
-    
-    # Compute tertile thresholds for 3 price segments
-    price_nonzero = df["price_num"][df["price_num"] > 0]
-    p33 = round(float(price_nonzero.quantile(0.33)), 2)
-    p67 = round(float(price_nonzero.quantile(0.67)), 2)
 
     select_cols = ["Danh Mục Sản Phẩm", "sales_volume_num", "missing_count", "price_num"]
     export_df = df[select_cols].copy()
@@ -325,7 +333,7 @@ def render(df_raw):
         <div class="chart-card">
             <div class="chart-header">
                 <div class="chart-title">Trường Thông Tin Phân Hoá: Top 10% Doanh Số so với Toàn Bộ</div>
-                <div class="chart-subtitle">Ưu tiên hiển thị các trường thông tin có độ chênh lệch cao nhất</div>
+                <div class="chart-subtitle">Top các feature có mức độ chênh lệch tỷ lệ xuất hiện cao nhất</div>
             </div>
             <div class="chart-container"><canvas id="c_features"></canvas></div>
         </div>
@@ -477,8 +485,9 @@ def render(df_raw):
             diff_el.innerHTML = `<span style="color:#9CA3AF">Không đủ dữ liệu so sánh</span>`;
         }}
 
-        let topFeatData = TOP_FEATS_DATA[cat] || {{}};
-        let allFeatData = ALL_FEATS_DATA[cat] || {{}};
+        let segForKPI = document.getElementById('selPrice').value;
+        let topFeatData = (TOP_FEATS_DATA[cat] && TOP_FEATS_DATA[cat][segForKPI]) || {{}};
+        let allFeatData = (ALL_FEATS_DATA[cat] && ALL_FEATS_DATA[cat][segForKPI]) || {{}};
         
         let diffsList = Object.keys(topFeatData).map(f => {{
             return {{
@@ -508,8 +517,9 @@ def render(df_raw):
         updateTrendChart(trendLabels, trendSales, trendCounts);
 
         // --- Chart 2: Feature distribution comparison ---
-        let topFeats = TOP_FEATS_DATA[cat] || {{}};
-        let allFeats = ALL_FEATS_DATA[cat] || {{}};
+        let seg = document.getElementById('selPrice').value;
+        let topFeats = (TOP_FEATS_DATA[cat] && TOP_FEATS_DATA[cat][seg]) || {{}};
+        let allFeats = (ALL_FEATS_DATA[cat] && ALL_FEATS_DATA[cat][seg]) || {{}};
         
         // Calculate diff to find the features with highest gap
         let diffList = Object.keys(topFeats).map(f => {{
@@ -518,24 +528,21 @@ def render(df_raw):
             return {{ f: f, t: t, a: a, diff: t - a }};
         }});
         
-        // Sort by biggest positive difference, then by max Top%
-        diffList.sort((a,b) => {{
-            if (Math.abs(b.diff - a.diff) > 0.1) return b.diff - a.diff; 
-            return b.t - a.t;
-        }});
+        // Sort by biggest difference descending
+        diffList.sort((a,b) => b.diff - a.diff);
         
         // Take top 14 features that matter most
         let topDiffs = diffList.slice(0, 14);
         
         let featLabels = topDiffs.map(d => d.f);
-        let topValues = topDiffs.map(d => d.t);
-        let allValues = topDiffs.map(d => d.a);
 
-        updateFeaturesChart(featLabels, topValues, allValues);
+        let diffValues = topDiffs.map(d => d.diff);
+        updateFeaturesChart(featLabels, diffValues);
 
         // --- Chart 3: Feature Concentration (Top 10% vs Rest) ---
-        let topCounts = TOP_COUNTS_DATA[cat] || {{}};
-        let allCounts = ALL_COUNTS_DATA[cat] || {{}};
+        let segForConc = document.getElementById('selPrice').value;
+        let topCounts = (TOP_COUNTS_DATA[cat] && TOP_COUNTS_DATA[cat][segForConc]) || {{}};
+        let allCounts = (ALL_COUNTS_DATA[cat] && ALL_COUNTS_DATA[cat][segForConc]) || {{}};
         
         // Only consider features where at least a meaningful number of products have it
         let MIN_COUNT = Math.max(10, data.length * 0.01);
@@ -609,10 +616,9 @@ def render(df_raw):
         CHARTS.trend.update();
     }}
 
-    function updateFeaturesChart(labels, topData, allData) {{
+    function updateFeaturesChart(labels, diffData) {{
         CHARTS.features.data.labels = labels;
-        CHARTS.features.data.datasets[0].data = topData;
-        CHARTS.features.data.datasets[1].data = allData;
+        CHARTS.features.data.datasets[0].data = diffData;
         CHARTS.features.update();
     }}
 
@@ -735,7 +741,7 @@ def render(df_raw):
             }}
         }});
         
-        // --- Chart 2: Grouped Horizontal Bar (Feature comparison) ---
+        // --- Chart 2: Difference Bar Chart (Feature comparison) ---
         let ctxFeats = document.getElementById('c_features').getContext('2d');
         CHARTS.features = new Chart(ctxFeats, {{
             type: 'bar',
@@ -743,24 +749,13 @@ def render(df_raw):
                 labels: [],
                 datasets: [
                     {{
-                        label: 'Top 10% Doanh Số',
+                        label: 'Chênh lệch (% Sản phẩm)',
                         data: [],
                         backgroundColor: 'rgba(249, 115, 22, 0.75)',
                         borderColor: '#ea580c',
                         borderWidth: 1,
                         borderRadius: 3,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
-                    }},
-                    {{
-                        label: 'Tất Cả Sản Phẩm',
-                        data: [],
-                        backgroundColor: 'rgba(59, 130, 246, 0.45)',
-                        borderColor: '#3b82f6',
-                        borderWidth: 1,
-                        borderRadius: 3,
-                        barPercentage: 0.7,
-                        categoryPercentage: 0.8
+                        barPercentage: 0.8
                     }}
                 ]
             }},
@@ -771,9 +766,8 @@ def render(df_raw):
                 scales: {{
                     x: {{
                         grid: {{ color: 'rgba(0,0,0,0.04)' }},
-                        max: 100,
-                        ticks: {{ callback: (v) => v + '%', font: {{ size: 10 }} }},
-                        title: {{ display: true, text: '% Sản Phẩm Cung Cấp Trường Thông Tin Này', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
+                        ticks: {{ callback: (v) => (v > 0 ? '+' : '') + v + '%', font: {{ size: 10 }} }},
+                        title: {{ display: true, text: 'Mức độ ảnh hưởng (Chênh lệch % độ phủ)', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
                     }},
                     y: {{
                         grid: {{ display: false }},
@@ -781,29 +775,15 @@ def render(df_raw):
                     }}
                 }},
                 plugins: {{
-                    legend: {{
-                        display: true,
-                        position: 'bottom',
-                        labels: {{
-                            boxWidth: 12,
-                            boxHeight: 12,
-                            borderRadius: 3,
-                            useBorderRadius: true,
-                            padding: 16,
-                            font: {{ size: 11, weight: '500' }},
-                            color: '#44403C'
-                        }}
-                    }},
+                    legend: {{ display: false }},
                     datalabels: {{
-                        display: function(ctx) {{
-                            return ctx.datasetIndex === 0; // Only show labels for top 20%
-                        }},
+                        display: true,
                         color: '#9A3412',
-                        font: {{ weight: '700', size: 10 }},
-                        formatter: (v) => v + '%',
+                        font: {{ weight: '800', size: 11 }},
+                        formatter: (v) => (v > 0 ? '+' : '') + v.toFixed(1) + '%',
                         anchor: 'end',
                         align: 'right',
-                        offset: 2
+                        offset: 4
                     }},
                     tooltip: {{
                         backgroundColor: 'rgba(28,25,23,0.92)',
@@ -813,8 +793,8 @@ def render(df_raw):
                         cornerRadius: 6,
                         callbacks: {{
                             label: function(ctx) {{
-                                let dsLabel = ctx.dataset.label;
-                                return `  ${{dsLabel}}: ${{ctx.raw}}%`;
+                                let v = ctx.raw;
+                                return `  Phổ biến hơn ${{v > 0 ? '+' : ''}}${{v.toFixed(1)}}% ở nhóm Top 10% Doanh Số`;
                             }}
                         }}
                     }}
