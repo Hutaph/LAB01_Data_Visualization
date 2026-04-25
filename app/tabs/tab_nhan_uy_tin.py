@@ -105,12 +105,17 @@ def render(df_raw):
         .tg-lbl{font-size:13px;font-weight:600;color:var(--t1)}
 
         /* ── KPI ── */
-        .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
-        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;border-left:3px solid var(--t3);}
-        .kc.hi{border-left-color:var(--pr);background:#FFF7ED}
-        .kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-        .kv{font-family:var(--ft);font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
-        .ks{font-size:10.5px;color:var(--t3)}
+        .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 4px}
+        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.08);padding:14px 16px;display:flex;align-items:flex-start;gap:12px;border:1px solid var(--bd);transition:transform .2s, box-shadow .2s;cursor:default}
+        .kc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
+        .kc.hi{border-color:var(--pr);background:linear-gradient(135deg, #FFF 0%, #FFF7ED 100%)}
+        .ki{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+        .kc.hi .ki{background:rgba(249,115,22,0.1);color:var(--pr)}
+        .kc:not(.hi) .ki{background:rgba(120,113,108,0.06);color:var(--t2)}
+        .kb{flex:1;min-width:0}
+        .kt{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+        .kv{font-family:var(--ft);font-size:20px;font-weight:800;color:var(--t1);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .ks{font-size:10.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .kc.hi .kv{color:var(--dk)}
 
         /* ── CHARTS ── */
