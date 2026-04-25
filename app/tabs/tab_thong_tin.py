@@ -164,6 +164,31 @@ def render(df_raw):
         }}
         select:focus {{ border-color: var(--primary); box-shadow: 0 0 0 3px rgba(249,115,22,0.1); }}
 
+        .toggle-group {{
+            display: flex;
+            background: #F3F4F6;
+            border-radius: 6px;
+            padding: 3px;
+            gap: 2px;
+        }}
+        .toggle-btn {{
+            border: none;
+            background: transparent;
+            font-family: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 6px 14px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }}
+        .toggle-btn.active {{
+            background: #FFFFFF;
+            color: var(--primary);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }}
+
         .kpi-row {{
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -190,8 +215,8 @@ def render(df_raw):
 
         .charts-wrapper {{
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: calc(100vh - 230px);
+            grid-template-columns: repeat(2, 1fr);
+            grid-template-rows: calc((100vh - 240px) / 2) calc((100vh - 240px) / 2);
             gap: 14px;
         }}
 
@@ -244,9 +269,9 @@ def render(df_raw):
             <span class="f-label">Phân Khúc Giá</span>
             <select id="selPrice" onchange="applyFilters()">
                 <option value="ALL">Tất cả phân khúc</option>
-                <option value="LOW">💲 Bình Dân (≤ ${p33})</option>
-                <option value="MID">💰 Trung Cấp (${p33}–${p67})</option>
-                <option value="HIGH">💎 Cao Cấp (≥ ${p67})</option>
+                <option value="LOW">Bình Dân (≤ {p33})</option>
+                <option value="MID">Trung Cấp ({p33}–{p67})</option>
+                <option value="HIGH">Cao Cấp (≥ {p67})</option>
             </select>
         </div>
         <div class="f-item">
@@ -265,22 +290,22 @@ def render(df_raw):
     <!-- KPI ROW -->
     <div class="kpi-row">
         <div class="kpi-card">
-            <div class="kpi-title" id="kpi_sales_title">Doanh Số (50% Ít Thiếu)</div>
+            <div class="kpi-title" id="kpi_sales_title">Doanh Số Nhóm Đầy Đủ Nhất</div>
             <div class="kpi-val" id="kpi_sales_good">0</div>
-            <div class="kpi-sub">So với 50% Thiếu Nhiều: <span id="kpi_sales_diff">-</span></div>
+            <div class="kpi-sub" id="kpi_sales_diff">-</div>
         </div>
         <div class="kpi-card" style="border-left-color: #9A3412;">
-            <div class="kpi-title">Bỏ Trống TB Toàn Ngành</div>
+            <div class="kpi-title">Bỏ Trống Trung Bình Toàn Ngành</div>
             <div class="kpi-val" id="kpi_missing_avg">0</div>
             <div class="kpi-sub">Trên tổng {total_features} trường thông tin</div>
         </div>
         <div class="kpi-card" style="border-left-color: #F59E0B;">
-            <div class="kpi-title">Feature #1 Của Top Doanh Số</div>
+            <div class="kpi-title">Trường Thông Tin #1 Của Top Doanh Số</div>
             <div class="kpi-val" style="font-size: 17px" id="kpi_top_feat">-</div>
-            <div class="kpi-sub">Xuất hiện nhiều nhất ở SP bán chạy</div>
+            <div class="kpi-sub">Xuất hiện nhiều nhất ở sản phẩm bán chạy</div>
         </div>
         <div class="kpi-card" style="border-left-color: var(--accent-blue);">
-            <div class="kpi-title">Tổng SP Đang Phân Tích</div>
+            <div class="kpi-title">Tổng Sản Phẩm Đang Phân Tích</div>
             <div class="kpi-val" id="kpi_total_products">0</div>
             <div class="kpi-sub">Tổng sản phẩm theo bộ lọc</div>
         </div>
@@ -291,30 +316,36 @@ def render(df_raw):
         
         <div class="chart-card">
             <div class="chart-header">
-                <div class="chart-title">📉 Sự Chuyển Biến Doanh Số</div>
-                <div class="chart-subtitle">Trục X: Số Features Thiếu | Y: Doanh Số & Số SP</div>
+                <div class="chart-title">Sự Chuyển Biến Doanh Số</div>
+                <div class="chart-subtitle">Trục X: Số Trường Thông Tin Thiếu | Trục Y: Doanh Số & Số Lượng Sản Phẩm</div>
             </div>
             <div class="chart-container"><canvas id="c_trend"></canvas></div>
-            <div class="legend-row">
-                <div class="legend-item"><div class="legend-dot" style="background: rgba(249,115,22,0.85);"></div>Doanh số TB</div>
-                <div class="legend-item"><div class="legend-dot" style="background: rgba(251,146,60,0.35);"></div>Số lượng SP</div>
-            </div>
         </div>
 
         <div class="chart-card">
             <div class="chart-header">
-                <div class="chart-title">🏆 Feature Phân Hoá: Top 10% Doanh Số vs Toàn Bộ</div>
-                <div class="chart-subtitle">Ưu tiên hiển thị các trường thông tin có độ chênh lệch cao nhất</div>
-            </div>
-            <div class="chart-container"><canvas id="c_features"></canvas></div>
-        </div>
-
-        <div class="chart-card">
-            <div class="chart-header">
-                <div class="chart-title">⭐ Mức Độ Tập Trung Ở Top 10%</div>
+                <div class="chart-title">Mức Độ Tập Trung Ở Top 10% Doanh Số</div>
                 <div class="chart-subtitle">Đường đỏ (10%): Tỷ lệ kỳ vọng ngẫu nhiên (Baseline)</div>
             </div>
             <div class="chart-container"><canvas id="c_concentration"></canvas></div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title">Phân Bố Độ Đầy Đủ Ở Top 10% Bán Chạy</div>
+                <div class="chart-subtitle">Tỷ trọng các nhóm "Số thông tin thiếu" trong Top 10% Doanh Số</div>
+            </div>
+            <div class="chart-container" style="display:flex; justify-content:center; align-items:center;">
+                <canvas id="c_top_missing_dist"></canvas>
+            </div>
+        </div>
+
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title">Trường Thông Tin Phân Hoá: Top 10% Doanh Số so với Toàn Bộ</div>
+                <div class="chart-subtitle">Ưu tiên hiển thị các trường thông tin có độ chênh lệch cao nhất</div>
+            </div>
+            <div class="chart-container"><canvas id="c_features"></canvas></div>
         </div>
     </div>
 
@@ -342,7 +373,7 @@ def render(df_raw):
         document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
         document.getElementById('btn_median').classList.toggle('active', m === 'median');
         // Update KPI title
-        document.getElementById('kpi_sales_title').innerText = m === 'mean' ? 'Mean Doanh Số (50% Ít Thiếu)' : 'Median Doanh Số (50% Ít Thiếu)';
+        document.getElementById('kpi_sales_title').innerText = m === 'mean' ? 'Doanh Số Trung Bình (Nhóm Tốt Nhất)' : 'Doanh Số Trung Vị (Nhóm Tốt Nhất)';
         // Update chart 1 y-axis title
         if (CHARTS.trend) {{
             CHARTS.trend.options.scales.y.title.text = m === 'mean' ? 'Doanh Số Mean (lượt bán)' : 'Doanh Số Median (lượt bán)';
@@ -413,29 +444,37 @@ def render(df_raw):
         data.forEach(d => totalMissing += d.missing_count);
         let avgMissing = data.length ? totalMissing / data.length : 0;
 
-        // Use first bucket (fewest missing) vs last bucket (most missing)
-        // This mirrors exactly what Chart 1 shows at both extremes
-        let statLow = trendSales.length ? trendSales[0] : 0;
-        let statHigh = trendSales.length ? trendSales[trendSales.length - 1] : 0;
-        let labelLow = trendLabels.length ? trendLabels[0] : '?';
-        let labelHigh = trendLabels.length ? trendLabels[trendLabels.length - 1] : '?';
+        // --- Compare Best Bucket vs Worst Bucket ---
+        let statTop = 0, statBot = 0;
+        if (sortedBuckets.length >= 2) {{
+            let firstBucket = bucketMap.get(sortedBuckets[0]);
+            let lastBucket = bucketMap.get(sortedBuckets[sortedBuckets.length - 1]);
+            
+            if (METRIC === 'median') {{
+                statTop = Math.round(median(firstBucket.salesArr));
+                statBot = Math.round(median(lastBucket.salesArr));
+            }} else {{
+                statTop = Math.round(firstBucket.salesArr.reduce((a,b)=>a+b,0) / firstBucket.salesArr.length);
+                statBot = Math.round(lastBucket.salesArr.reduce((a,b)=>a+b,0) / lastBucket.salesArr.length);
+            }}
+        }}
 
         document.getElementById('kpi_missing_avg').innerText = Math.round(avgMissing);
-        document.getElementById('kpi_sales_good').innerText = fmtN(statLow);
+        document.getElementById('kpi_sales_good').innerText = statTop > 0 ? fmtN(statTop) : 0;
         document.getElementById('kpi_total_products').innerText = fmtN(data.length);
 
-        // Update title to show which bucket is being compared
-        let metricLabel = METRIC === 'median' ? 'Median' : 'Mean';
-        document.getElementById('kpi_sales_title').innerText = `${{metricLabel}} Bucket '${{labelLow}}' Thiếu`;
-        
         let diff_el = document.getElementById('kpi_sales_diff');
-        if (statHigh > 0 && statLow > statHigh) {{
-            let mult = (statLow / statHigh).toFixed(1);
-            diff_el.innerHTML = `So '${{labelHigh}}': <span class="trend-up">Gấp ${{mult}}x</span>`;
-        }} else if (statLow <= statHigh) {{
-            diff_el.innerHTML = `So '${{labelHigh}}': <span class="trend-down">Thấp hơn</span>`;
+        let diff = statTop - statBot;
+        if (sortedBuckets.length >= 2) {{
+            if (diff > 0) {{
+                diff_el.innerHTML = `So với nhóm thiếu nhiều nhất: <span class="trend-up">Cao hơn +${{fmtN(diff)}}</span>`;
+            }} else if (diff < 0) {{
+                diff_el.innerHTML = `So với nhóm thiếu nhiều nhất: <span class="trend-down">Thấp hơn ${{fmtN(Math.abs(diff))}}</span>`;
+            }} else {{
+                diff_el.innerHTML = `<span style="color:#9CA3AF">Bằng với nhóm tệ nhất</span>`;
+            }}
         }} else {{
-            diff_el.innerHTML = `<span style="color:#9CA3AF">N/A</span>`;
+            diff_el.innerHTML = `<span style="color:#9CA3AF">Không đủ dữ liệu so sánh</span>`;
         }}
 
         let topFeatData = TOP_FEATS_DATA[cat] || {{}};
@@ -523,6 +562,40 @@ def render(df_raw):
         let rawCountsList = topConcFeatures.map(d => ({{ t: d.t, a: d.a }}));
 
         updateConcentrationChart(concFeatLabels, topConcData, restConcData, rawCountsList);
+
+        // --- Chart 4: Top 10% Missing Distribution ---
+        let sortedTop10 = [...data].sort((a,b) => b.sales_volume_num - a.sales_volume_num);
+        let top10Size = Math.max(1, Math.floor(sortedTop10.length * 0.1));
+        let top10Data = sortedTop10.slice(0, top10Size);
+        
+        let missDistMap = new Map();
+        sortedBuckets.forEach(b => {{
+             let label = b + '-' + (b + bucketSize - 1) + ' Thiếu';
+             missDistMap.set(label, 0);
+        }});
+
+        top10Data.forEach(d => {{
+            let bucket = Math.floor(d.missing_count / bucketSize) * bucketSize;
+            let label = bucket + '-' + (bucket + bucketSize - 1) + ' Thiếu';
+            if (missDistMap.has(label)) {{
+                missDistMap.set(label, missDistMap.get(label) + 1);
+            }} else {{
+                missDistMap.set(label, 1);
+            }}
+        }});
+
+        let distLabels = [];
+        let distData = [];
+        missDistMap.forEach((val, key) => {{
+            if (val > 0) {{
+                distLabels.push(key);
+                distData.push(val);
+            }}
+        }});
+
+        CHARTS.missingDist.data.labels = distLabels;
+        CHARTS.missingDist.data.datasets[0].data = distData;
+        CHARTS.missingDist.update();
     }}
 
     function updateTrendChart(labels, salesData, countData) {{
@@ -566,7 +639,7 @@ def render(df_raw):
                 labels: [],
                 datasets: [
                     {{
-                        label: 'Doanh Số TB',
+                        label: 'Doanh Số Trung Bình',
                         type: 'line',
                         data: [],
                         borderColor: '#ea580c',
@@ -600,7 +673,7 @@ def render(df_raw):
                         }}
                     }},
                     {{
-                        label: 'Số Lượng SP',
+                        label: 'Số Lượng Sản Phẩm',
                         type: 'bar',
                         data: [],
                         backgroundColor: 'rgba(251, 146, 60, 0.3)',
@@ -624,7 +697,7 @@ def render(df_raw):
                     x: {{
                         grid: {{ display: false }},
                         ticks: {{ font: {{ size: 10 }}, maxRotation: 45, minRotation: 0 }},
-                        title: {{ display: true, text: 'Số Features Thiếu', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
+                        title: {{ display: true, text: 'Số Trường Thông Tin Thiếu', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
                     }},
                     y: {{
                         position: 'left',
@@ -636,16 +709,12 @@ def render(df_raw):
                         position: 'right',
                         grid: {{ drawOnChartArea: false }},
                         ticks: {{ font: {{ size: 10 }} }},
-                        title: {{ display: true, text: 'Số Lượng SP', color: 'rgba(251,146,60,0.8)', font: {{ size: 11, weight: '600' }} }},
+                        title: {{ display: true, text: 'Số Lượng Sản Phẩm', color: 'rgba(251,146,60,0.8)', font: {{ size: 11, weight: '600' }} }},
                         max: 100
                     }}
                 }},
                 plugins: {{
-                    legend: {{ 
-                        display: true,
-                        position: 'top',
-                        labels: {{ boxWidth: 10, boxHeight: 10, font: {{ size: 10 }}, useBorderRadius: true, borderRadius: 2 }}
-                    }},
+                    legend: {{ display: false }},
                     tooltip: {{
                         backgroundColor: 'rgba(28,25,23,0.92)',
                         titleFont: {{ size: 12, weight: '600' }},
@@ -654,11 +723,11 @@ def render(df_raw):
                         cornerRadius: 6,
                         callbacks: {{
                             title: function(tooltipItems) {{
-                                return 'Thiếu ' + tooltipItems[0].label + ' features';
+                                return 'Thiếu ' + tooltipItems[0].label + ' trường thông tin';
                             }},
                             label: function(ctx) {{
-                                if (ctx.datasetIndex === 0) return '  Doanh Số TB: ' + fmtN(ctx.raw) + ' lượt';
-                                return '  Số SP: ' + fmtN(ctx.raw) + ' sản phẩm';
+                                if (ctx.datasetIndex === 0) return '  Doanh Số Trung Bình: ' + fmtN(ctx.raw) + ' lượt';
+                                return '  Số Sản Phẩm: ' + fmtN(ctx.raw) + ' sản phẩm';
                             }}
                         }}
                     }}
@@ -704,7 +773,7 @@ def render(df_raw):
                         grid: {{ color: 'rgba(0,0,0,0.04)' }},
                         max: 100,
                         ticks: {{ callback: (v) => v + '%', font: {{ size: 10 }} }},
-                        title: {{ display: true, text: '% Sản Phẩm Cung Cấp Feature Này', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
+                        title: {{ display: true, text: '% Sản Phẩm Cung Cấp Trường Thông Tin Này', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
                     }},
                     y: {{
                         grid: {{ display: false }},
@@ -817,7 +886,7 @@ def render(df_raw):
                                 let d = CHARTS.concentration._rawCounts[ctx[0].dataIndex];
                                 let topPct = ctx[0].chart.data.datasets[0].data[ctx[0].dataIndex];
                                 let upliftX = (topPct / 10).toFixed(1);
-                                return `\n  Tổng SP có thông tin này: ${{d.a}} sản phẩm\n  Độ tập trung gấp ${{upliftX}} lần mức kỳ vọng ngẫu nhiên`;
+                                return `\n  Tổng Sản Phẩm chứa thông tin này: ${{d.a}}\n  Độ tập trung gấp ${{upliftX}} lần mức kỳ vọng ngẫu nhiên`;
                             }}
                         }}
                     }}
@@ -839,6 +908,52 @@ def render(df_raw):
                     ctx.restore();
                 }}
             }}]
+        }});
+
+        // --- Chart 4: Top 10% Missing Distribution (Doughnut) ---
+        let ctxMissDist = document.getElementById('c_top_missing_dist').getContext('2d');
+        CHARTS.missingDist = new Chart(ctxMissDist, {{
+            type: 'doughnut',
+            data: {{
+                labels: [],
+                datasets: [{{
+                    data: [],
+                    backgroundColor: [
+                        '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', 
+                        '#EC4899', '#6366F1', '#14B8A6', '#F43F5E', '#A855F7'
+                    ],
+                    borderWidth: 2,
+                    borderColor: '#ffffff'
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '55%',
+                plugins: {{
+                    legend: {{ position: 'right', labels: {{ boxWidth: 12, padding: 15, font: {{size: 11}} }} }},
+                    tooltip: {{
+                        backgroundColor: 'rgba(28,25,23,0.92)',
+                        callbacks: {{
+                            label: function(ctx) {{
+                                let val = ctx.parsed || 0;
+                                let total = ctx.dataset.data.reduce((a,b)=>a+b, 0);
+                                let pct = total > 0 ? (val * 100 / total).toFixed(1) : 0;
+                                return `  ${{ctx.label}}: ${{val}} sp (${{pct}}%)`;
+                            }}
+                        }}
+                    }},
+                    datalabels: {{
+                        color: '#fff',
+                        font: {{ weight: '700', size: 10 }},
+                        formatter: (val, ctx) => {{
+                            let total = ctx.dataset.data.reduce((a,b)=>a+b, 0);
+                            let pct = total > 0 ? Math.round(val * 100 / total) : 0;
+                            return pct > 5 ? pct + '%' : '';
+                        }}
+                    }}
+                }}
+            }}
         }});
     }}
 
