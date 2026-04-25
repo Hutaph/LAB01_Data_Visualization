@@ -51,6 +51,11 @@ def _resolve_latest_csv() -> Path:
             "Không tìm thấy file CSV trong data/Processed hoặc data/processed."
         )
 
+    # Ưu tiên các file có chứa 'viz' (dành cho visualization)
+    viz_files = [p for p in csv_files if "viz" in p.stem.lower()]
+    if viz_files:
+        return max(viz_files, key=lambda p: p.stat().st_mtime)
+
     preferred = [p for p in csv_files if p.stem.lower() == "data_tmp"]
     if preferred:
         return preferred[-1]
