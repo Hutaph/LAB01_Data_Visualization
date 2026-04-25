@@ -5,11 +5,9 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # Import category mapping from utility script
-from utils.constants import CATEGORY_MAP
-
-def add_display_column(df, source_col="crawl_category", target_col="display_category"):
-    df[target_col] = df[source_col].map(CATEGORY_MAP).fillna(df[source_col])
-    return df
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from utils.category_mapping import CATEGORY_MAP, add_display_column
 
 def render(df_raw):
     df = df_raw.copy()
@@ -141,7 +139,7 @@ def render(df_raw):
 
     <div class="chart-grid">
         <div class="chart-card">
-            <div class="chart-title">Phân phối Mức giảm giá (%)</div>
+            <div class="chart-title" id="histTitle">Phân phối Mức giảm giá (%)</div>
             <div class="chart-container"><canvas id="histChart"></canvas></div>
         </div>
         <div class="chart-card">
@@ -169,6 +167,9 @@ def render(df_raw):
         const RAW_DATA = {data_json_str};
         let charts = {{}};
         let primeOn = false;
+        let selectedBin = -1;
+        const BINS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 101];
+        const BIN_LABELS = ['0-10%','10-20%','20-30%','30-40%','40-50%','50-60%','60-70%','70-80%','80-90%','>90%'];
 
         // Compact number: 1500 -> 1.5K
         function fmtK(val) {{
@@ -192,25 +193,42 @@ def render(df_raw):
             updateDashboard(data, cat);
         }}
 
+        function selectBin(idx) {{
+            selectedBin = (selectedBin === idx) ? -1 : idx;
 
-        function updateDashboard(data, selectedCat) {{
-            // KPIs
-            const withD = data.filter(x => x.discount_rate > 0);
-            const avgD = data.length ? data.reduce((a, b) => a + b.discount_rate, 0) / data.length : 0;
-            const avgP = data.length ? data.reduce((a, b) => a + b.price, 0) / data.length : 0;
-            const totalS = data.reduce((a, b) => a + (b.sales_volume_num || 0), 0);
+            // Update histogram bar colors directly
+            const ds = charts.hist.data.datasets[0];
+            const n = ds.data.length;
+            
+            if (selectedBin === -1) {{
+                ds.backgroundColor = new Array(n).fill('#F97316');
+                document.getElementById('histTitle').innerText = 'Phân phối Mức giảm giá (%)';
+            }} else {{
+                // Fade others, highlight selected
+                const newColors = new Array(n).fill('rgba(249,115,22,0.25)');
+                newColors[selectedBin] = '#EA580C';
+                ds.backgroundColor = newColors;
+                document.getElementById('histTitle').innerText = 'Phân phối Mức giảm giá (%) — lọc: ' + BIN_LABELS[selectedBin];
+            }}
+            
+            charts.hist.update();
+            applyFilters();
+        }}
 
-            document.getElementById('kpi_avg_discount').innerText = avgD.toFixed(1) + "%";
-            document.getElementById('kpi_sale_count').innerText = (data.length ? (withD.length / data.length * 100) : 0).toFixed(1) + "%";
-            document.getElementById('kpi_avg_price').innerText = "$" + avgP.toFixed(2);
-            document.getElementById('kpi_sales_impact').innerText = totalS.toLocaleString();
+        function handleHistClick(e) {{
+            const points = charts.hist.getElementsAtEventForMode(e, 'index', {{ intersect: false }}, true);
+            if (points.length > 0) {{
+                selectBin(points[0].index);
+            }}
+        }}
 
-            // Histogram + Sales Effectiveness
-            const bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 101];
+
+        function updateDashboard(fullData, selectedCat) {{
+            // Histogram always uses full data (not bin-filtered)
             const counts = new Array(10).fill(0), sumS = new Array(10).fill(0), cntS = new Array(10).fill(0);
-            data.forEach(d => {{
+            fullData.forEach(d => {{
                 for (let i = 0; i < 10; i++) {{
-                    if (d.discount_rate >= bins[i] && d.discount_rate < bins[i + 1]) {{
+                    if (d.discount_rate >= BINS[i] && d.discount_rate < BINS[i + 1]) {{
                         counts[i]++;
                         if (d.sales_volume_num > 0) {{ sumS[i] += d.sales_volume_num; cntS[i]++; }}
                         break;
@@ -218,11 +236,39 @@ def render(df_raw):
                 }}
             }});
             charts.hist.data.datasets[0].data = counts;
+            // Re-apply bin highlight colors
+            const n = counts.length;
+            if (selectedBin === -1) {{
+                charts.hist.data.datasets[0].backgroundColor = new Array(n).fill('#F97316');
+            }} else {{
+                const cols = new Array(n).fill('rgba(249,115,22,0.2)');
+                cols[selectedBin] = '#EA580C';
+                charts.hist.data.datasets[0].backgroundColor = cols;
+            }}
             charts.hist.update();
+
+            // Filter data by selected bin for all other charts
+            let data = fullData;
+            if (selectedBin >= 0) {{
+                const lo = BINS[selectedBin], hi = BINS[selectedBin + 1];
+                data = fullData.filter(d => d.discount_rate >= lo && d.discount_rate < hi);
+            }}
+
+            // KPIs (use bin-filtered data)
+            const withD = data.filter(x => x.discount_rate > 0);
+            const avgD = data.length ? data.reduce((a, b) => a + b.discount_rate, 0) / data.length : 0;
+            const avgP = data.length ? data.reduce((a, b) => a + b.price, 0) / data.length : 0;
+            const totalS = data.reduce((a, b) => a + (b.sales_volume_num || 0), 0);
+            document.getElementById('kpi_avg_discount').innerText = avgD.toFixed(1) + '%';
+            document.getElementById('kpi_sale_count').innerText = (data.length ? (withD.length / data.length * 100) : 0).toFixed(1) + '%';
+            document.getElementById('kpi_avg_price').innerText = '$' + avgP.toFixed(2);
+            document.getElementById('kpi_sales_impact').innerText = '$' + totalS.toLocaleString();
+
+            // Line chart (use bin-filtered data)
             charts.sales.data.datasets[0].data = sumS.map((s, i) => cntS[i] ? Math.round(s / cntS[i]) : 0);
             charts.sales.update();
 
-            // Pie
+            // Pie (use bin-filtered data)
             const seg = [
                 data.filter(x => x.discount_rate <= 0).length,
                 data.filter(x => x.discount_rate > 0 && x.discount_rate <= 20).length,
@@ -232,7 +278,7 @@ def render(df_raw):
             charts.pie.data.datasets[0].data = seg;
             charts.pie.update();
 
-            // Bottom charts
+            // Bottom charts (use bin-filtered data)
             renderBottom(data, selectedCat);
         }}
 
@@ -289,12 +335,12 @@ def render(df_raw):
             charts.hist = new Chart(document.getElementById('histChart'), {{
                 type: 'bar',
                 data: {{ labels, datasets: [{{ data: [], backgroundColor: '#F97316', borderRadius: 4 }}] }},
-                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true }}, x: {{ grid: {{ display: false }} }} }} }}
+                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true, title: {{ display: true, text: 'Số sản phẩm', font: {{ size: 11 }} }} }}, x: {{ grid: {{ display: false }} }} }} }}
             }});
             charts.sales = new Chart(document.getElementById('salesBarChart'), {{
                 type: 'line',
                 data: {{ labels, datasets: [{{ data: [], borderColor: '#9A3412', backgroundColor: 'rgba(154,52,18,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#9A3412', pointBorderColor: '#fff', pointBorderWidth: 2 }}] }},
-                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true }}, x: {{ grid: {{ display: false }} }} }} }}
+                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true, title: {{ display: true, text: 'Doanh số TB/SP', font: {{ size: 11 }} }} }}, x: {{ grid: {{ display: false }} }} }} }}
             }});
             charts.pie = new Chart(document.getElementById('discountPieChart'), {{
                 type: 'doughnut',
@@ -306,12 +352,12 @@ def render(df_raw):
             charts.bLeft = new Chart(document.getElementById('bottomLeftChart'), {{
                 type: 'bar',
                 data: {{ labels: [], datasets: [{{ data: [], backgroundColor: '#EA580C', borderRadius: 4 }}] }},
-                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, ticks: {{ callback: function(v) {{ return v; }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
+                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, title: {{ display: true, text: 'Giảm giá TB (%)', font: {{ size: 11 }} }}, ticks: {{ callback: function(v) {{ return v; }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
             }});
             charts.bRight = new Chart(document.getElementById('bottomRightChart'), {{
                 type: 'bar',
                 data: {{ labels: [], datasets: [{{ data: [], backgroundColor: '#9A3412', borderRadius: 4 }}] }},
-                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, ticks: {{ callback: function(v) {{ return fmtK(v); }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
+                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, title: {{ display: true, text: 'Tổng doanh số (lượt)', font: {{ size: 11 }} }}, ticks: {{ callback: function(v) {{ return fmtK(v); }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
             }});
         }}
 
@@ -327,6 +373,10 @@ def render(df_raw):
                 }}
             }});
             initCharts();
+            
+            // Native click listener on histogram canvas
+            document.getElementById('histChart').addEventListener('click', handleHistClick);
+
             applyFilters();
         }}
 

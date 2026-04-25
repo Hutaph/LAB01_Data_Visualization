@@ -18,7 +18,6 @@ if best_model.exists():
         # keep dump as empty list; print warning to stdout for debugging
         print("Warning: failed to load model for features dump:", e)
 
-from components.footer import render_footer
 from components.header import render_header
 from components.navigation import render_navigation
 from services.data_loader import COLOR_SEQUENCE, load_data
@@ -74,7 +73,7 @@ TAB_RENDERERS = {
     "Phân tích Ngành hàng": lambda state, df: render_tab_danh_muc(df),
     "Chiến lược Giá cả":   lambda state, df: render_tab_dinh_gia(df),
     "Chỉ số Tín nhiệm":    lambda state, df: render_tab_danh_gia(df),
-    "Chương trình Ưu đãi": lambda state, df: render_tab_uu_dai(df),
+    "Chiến lược Ưu đãi": lambda state, df: render_tab_uu_dai(df),
     "Chất lượng Niêm yết": lambda state, df: render_tab_thong_tin(df),
     "Vị thế Thương hiệu":  lambda state, df: render_tab_nhan_uy_tin(df),
     "Xu hướng Nổi bật":    lambda state, df: render_tab_noi_bat(df),
