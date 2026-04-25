@@ -1,3 +1,13 @@
+"""
+Data loader utilities
+---------------------
+
+This module provides lightweight data-loading helpers used across the
+web app. Functions here are intentionally small and focused on
+resolving the latest processed CSV, parsing text fields (sales_volume,
+delivery_info) and doing minimal type coercion for display/aggregation.
+"""
+
 from pathlib import Path
 import re
 
