@@ -201,7 +201,7 @@ def render(df_raw):
             document.getElementById('kpi_avg_discount').innerText = avgD.toFixed(1) + "%";
             document.getElementById('kpi_sale_count').innerText = (data.length ? (withD.length / data.length * 100) : 0).toFixed(1) + "%";
             document.getElementById('kpi_avg_price').innerText = "$" + avgP.toFixed(2);
-            document.getElementById('kpi_sales_impact').innerText = totalS.toLocaleString();
+            document.getElementById('kpi_sales_impact').innerText = "$" + totalS.toLocaleString();
 
             // Histogram + Sales Effectiveness
             const bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 101];
@@ -287,12 +287,12 @@ def render(df_raw):
             charts.hist = new Chart(document.getElementById('histChart'), {{
                 type: 'bar',
                 data: {{ labels, datasets: [{{ data: [], backgroundColor: '#F97316', borderRadius: 4 }}] }},
-                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true }}, x: {{ grid: {{ display: false }} }} }} }}
+                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true, title: {{ display: true, text: 'Số sản phẩm', font: {{ size: 11 }} }} }}, x: {{ grid: {{ display: false }} }} }} }}
             }});
             charts.sales = new Chart(document.getElementById('salesBarChart'), {{
                 type: 'line',
                 data: {{ labels, datasets: [{{ data: [], borderColor: '#9A3412', backgroundColor: 'rgba(154,52,18,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#9A3412', pointBorderColor: '#fff', pointBorderWidth: 2 }}] }},
-                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true }}, x: {{ grid: {{ display: false }} }} }} }}
+                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true, title: {{ display: true, text: 'Doanh số TB/SP', font: {{ size: 11 }} }} }}, x: {{ grid: {{ display: false }} }} }} }}
             }});
             charts.pie = new Chart(document.getElementById('discountPieChart'), {{
                 type: 'doughnut',
@@ -304,12 +304,12 @@ def render(df_raw):
             charts.bLeft = new Chart(document.getElementById('bottomLeftChart'), {{
                 type: 'bar',
                 data: {{ labels: [], datasets: [{{ data: [], backgroundColor: '#EA580C', borderRadius: 4 }}] }},
-                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, ticks: {{ callback: function(v) {{ return v; }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
+                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, title: {{ display: true, text: 'Giảm giá TB (%)', font: {{ size: 11 }} }}, ticks: {{ callback: function(v) {{ return v; }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
             }});
             charts.bRight = new Chart(document.getElementById('bottomRightChart'), {{
                 type: 'bar',
                 data: {{ labels: [], datasets: [{{ data: [], backgroundColor: '#9A3412', borderRadius: 4 }}] }},
-                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, ticks: {{ callback: function(v) {{ return fmtK(v); }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
+                options: {{ ...opt, indexAxis: 'y', scales: {{ x: {{ beginAtZero: true, title: {{ display: true, text: 'Tổng doanh số (lượt)', font: {{ size: 11 }} }}, ticks: {{ callback: function(v) {{ return fmtK(v); }} }} }}, y: {{ ticks: {{ font: {{ size: 11 }} }} }} }} }}
             }});
         }}
 
