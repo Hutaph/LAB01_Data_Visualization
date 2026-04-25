@@ -110,7 +110,7 @@ body::-webkit-scrollbar {{
     gap: 16px;
     flex-wrap: wrap;
     background: var(--card-bg);
-    padding: 8px 10px;
+    padding: 10px 14px;
     border-radius: var(--border-radius);
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     margin-bottom: 20px;
@@ -267,7 +267,7 @@ select:focus {{ border-color: var(--primary); }}
     border-left: 4px solid var(--primary);
     border-radius: var(--border-radius);
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    padding: 8px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -1067,4 +1067,4 @@ document.addEventListener('DOMContentLoaded', () => {{
 </body>
 </html>"""
 
-    components.html(html_code, height=648, scrolling=False)
+    components.html(html_code, height=680, scrolling=False)
