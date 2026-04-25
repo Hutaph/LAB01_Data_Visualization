@@ -27,10 +27,10 @@ from tabs.tab_danh_gia import render as render_tab_danh_gia
 from tabs.tab_dinh_gia import render as render_tab_dinh_gia
 from tabs.tab_danh_muc import render as render_tab_danh_muc
 from tabs.tab_nhan_uy_tin import render as render_tab_nhan_uy_tin
-from tabs.tab_van_chuyen import render as render_tab_van_chuyen
 from tabs.tab_uu_dai import render as render_tab_uu_dai
 from tabs.tab_noi_bat import render as render_tab_noi_bat
 from tabs.tab_du_bao import render as render_tab_du_bao
+from tabs.tab_thong_tin import render as render_tab_thong_tin
 from utils.css import inject_css
 
 amazon_icon_path = Path(__file__).resolve().parent / "data" / "Amazon_icon.png"
@@ -74,8 +74,8 @@ TAB_RENDERERS = {
     "Danh mục": lambda state, df: render_tab_danh_muc(df),
     "Định giá": lambda state, df: render_tab_dinh_gia(df),
     "Đánh giá": lambda state, df: render_tab_danh_gia(df),
-    "Vận chuyển": lambda state, df: render_tab_van_chuyen(df),
     "Ưu đãi": lambda state, df: render_tab_uu_dai(df),
+    "Độ hoàn thiện": lambda state, df: render_tab_thong_tin(df),
     "Nhãn & Uy tín": lambda state, df: render_tab_nhan_uy_tin(df),
     "Nổi bật": lambda state, df: render_tab_noi_bat(df),
     "Dự báo": lambda state, df: render_tab_du_bao(df),

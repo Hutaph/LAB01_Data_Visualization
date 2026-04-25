@@ -9,38 +9,7 @@ def render(df_raw):
     # ══════════════════════════════════════════════════════════════
     # 1. TIỀN XỬ LÝ DỮ LIỆU & MAPPING DANH MỤC
     # ══════════════════════════════════════════════════════════════
-    CATEGORY_MAP = {
-        "electronics_laptops": "Laptop",
-        "electronics_tablets": "Máy Tính Bảng",
-        "electronics_smartphones": "Điện Thoại",
-        "electronics_monitors": "Màn Hình",
-        "electronics_headphones": "Tai Nghe",
-        "electronics_keyboards": "Bàn Phím",
-        "electronics_storage_ssd": "Ổ Cứng & SSD",
-        "electronics_networking": "Thiết Bị Mạng",
-        "electronics_gaming_consoles": "Máy Chơi Game",
-        "home_kitchen_appliances": "Thiết Bị Bếp",
-        "home_cleaning": "Dụng Cụ Vệ Sinh",
-        "home_air_quality": "Máy Lọc Khí",
-        "home_furniture": "Nội Thất",
-        "office_supplies": "Văn Phòng Phẩm",
-        "office_stationery": "Dụng Cụ VP",
-        "fashion_mens": "Thời Trang Nam",
-        "fashion_womens": "Thời Trang Nữ",
-        "fashion_shoes": "Giày Dép",
-        "fashion_bags": "Túi Xách",
-        "beauty_skincare": "Chăm Sóc Da",
-        "beauty_makeup": "Trang Điểm",
-        "health_personal_care": "Chăm Sóc Cá Nhân",
-        "health_supplements": "TPCN & Vitamin",
-        "baby_products": "Sản Phẩm Cho Bé",
-        "toys_games": "Đồ Chơi & Game",
-        "sports_outdoors": "Thể Thao Ngoài Trời",
-        "sports_fitness": "Dụng Cụ Gym",
-        "pet_supplies": "Thú Cưng",
-        "automotive_accessories": "Phụ Kiện Ô Tô",
-        "tools_home_improvement": "Dụng Cụ Sửa Nhà",
-    }
+    from utils.constants import CATEGORY_MAP
 
     if "is_amazon_choice" not in df.columns:
         df["is_amazon_choice"] = False
