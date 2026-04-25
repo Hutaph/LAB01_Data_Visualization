@@ -22,8 +22,26 @@ def _prep(df):
     sv = "sales_volume_num" if "sales_volume_num" in o.columns else None
     o["sales_vol"] = pd.to_numeric(o[sv], errors="coerce").fillna(0) if sv else 0.0
     o = o[o["current_price"] > 0].copy()
-    o["segment"] = o["current_price"].apply(lambda p: "Bình dân" if p<20 else ("Trung cấp" if p<=70 else "Cao cấp"))
-    return o
+    
+    # Categories logic (matching tab_thong_tin)
+    from utils.constants import CATEGORY_MAP
+    if "crawl_category" in o.columns:
+        o["category"] = o["crawl_category"].map(CATEGORY_MAP).fillna(o["crawl_category"])
+    else:
+        o["category"] = "Không Rõ"
+        
+    # Dynamic segments (matching tab_thong_tin)
+    price_nonzero = o["current_price"][o["current_price"] > 0]
+    p33 = round(float(price_nonzero.quantile(0.33)), 2) if not price_nonzero.empty else 20.0
+    p67 = round(float(price_nonzero.quantile(0.67)), 2) if not price_nonzero.empty else 70.0
+    
+    def get_seg(p):
+        if p <= p33: return "Bình dân"
+        if p <= p67: return "Trung cấp"
+        return "Cao cấp"
+    o["segment"] = o["current_price"].apply(get_seg)
+    
+    return o, p33, p67
 
 
 def _payload(df):
@@ -93,71 +111,98 @@ body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px
 
 /* ── FILTER BAR ── */
 .fb{
-  display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;
-  background:#fff;border:1px solid var(--bd);border-radius:10px;
-  padding:12px 16px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;
+  display:flex;align-items:center;gap:20px;
+  background:#fff;border:1px solid var(--bd);border-radius:12px;
+  padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;
 }
+.fb-item{display:flex;flex-direction:column;gap:5px;}
 .fb-item label{
-  display:block;font-size:10px;font-weight:700;color:var(--t2);
-  text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;
+  font-size:11px;font-weight:700;color:var(--t2);
+  text-transform:uppercase;letter-spacing:.8px;
 }
 .fb-item select{
-  width:100%;padding:7px 30px 7px 10px;
-  border:1px solid var(--bd);border-radius:6px;
+  padding:8px 12px;
+  border:1px solid var(--bd);border-radius:8px;
   font-size:13px;font-family:var(--fn);color:var(--t1);
   background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
   appearance:none;cursor:pointer;outline:none;transition:border-color .15s;
+  min-width:190px;
 }
 .fb-item select:hover{border-color:var(--pr);}
 .fb-item select:focus{border-color:var(--pr);box-shadow:0 0 0 3px rgba(249,115,22,.12);}
 
+.toggle-group {
+    display: flex;
+    background: #F3F4F6;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}
+.toggle-btn {
+    border: none;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--t2);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.toggle-btn.active {
+    background: #FFFFFF;
+    color: var(--pr);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
 /* ── KPI ── */
-.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;flex-shrink:0}
-.kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;border-left:3px solid var(--pr);}
+.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;flex-shrink:0}
+.kc{background:var(--card);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:12px 16px;border-left:4px solid var(--pr);}
 .kc.hi{border-left-color:var(--dk);background:#FFF7ED}
-.kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-.kv{font-family:var(--ft);font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
-.ks{font-size:10.5px;color:var(--t3)}
+.kt{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kv{font-family:var(--ft);font-size:22px;font-weight:700;color:var(--t1);margin-bottom:2px}
+.ks{font-size:11px;color:var(--t3);font-weight:500}
 .kc.hi .kv{color:var(--dk)}
 
 /* ── CHARTS ── */
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
-.cc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
-.ct{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
-.cs{font-size:11px;color:var(--t2);margin-bottom:10px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0}
+.cc{background:var(--card);border-radius:12px;box-shadow:0 2px 5px rgba(0,0,0,.04);padding:16px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.ct{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:4px}
+.cs{font-size:11px;color:var(--t2);margin-bottom:12px;line-height:1.4}
 .cw{position:relative;flex:1;min-height:0}
-.leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px}
-.li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2);font-weight:500}
-.ld{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.leg{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px;justify-content:center}
+.li{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--t2);font-weight:600}
+.ld{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 </style></head><body>
 
 <!-- FILTER BAR -->
 <div class="fb">
   <div class="fb-item">
-    <label>Phân khúc giá</label>
-    <select id="fSeg">
-      <option value="all">Tất cả</option>
-      <option value="Bình dân">Bình dân (&lt;$20)</option>
-      <option value="Trung cấp">Trung cấp ($20–$70)</option>
-      <option value="Cao cấp">Cao cấp (&gt;$70)</option>
+    <label>Danh Mục Sản Phẩm</label>
+    <select id="fCat" onchange="applyFilters()">
+      <option value="all">Tất cả danh mục sản phẩm</option>
     </select>
   </div>
   <div class="fb-item">
-    <label>Khuyến mãi</label>
-    <select id="fDisc">
-      <option value="all">Tất cả</option>
-      <option value="on">Đang giảm giá</option>
-      <option value="off">Không giảm giá</option>
+    <label>Phân Khúc Giá</label>
+    <select id="fSeg" onchange="applyFilters()">
+      <option value="all">Tất cả phân khúc</option>
+      <option value="Bình dân">Bình Dân (≤ $__P33__)</option>
+      <option value="Trung cấp">Trung Cấp ($__P33__–$__P67__)</option>
+      <option value="Cao cấp">Cao Cấp (≥ $__P67__)</option>
     </select>
   </div>
   <div class="fb-item">
-    <label>Rating tối thiểu</label>
-    <select id="fStar">
-      <option value="0">Tất cả</option>
-      <option value="3">3.0+</option>
-      <option value="4">4.0+</option>
-      <option value="4.5">4.5+</option>
-    </select>
+    <label>Chỉ Số Doanh Số</label>
+    <div class="toggle-group">
+      <button class="toggle-btn" id="btn_mean" onclick="setMetric('mean')">Mean</button>
+      <button class="toggle-btn active" id="btn_median" onclick="setMetric('median')">Median</button>
+    </div>
+  </div>
+  <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
+      <div style="font-size:16px; font-weight:800; color:var(--dk); font-family:var(--ft);">PHÂN TÍCH CHIẾN LƯỢC ĐỊNH GIÁ</div>
+      <div style="font-size:11px; color:var(--t2); font-weight:500;">Tương quan giữa giá bán và hiệu quả kinh doanh thực tế</div>
   </div>
 </div>
 
@@ -174,18 +219,18 @@ body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px
   </div>
   <div class="cc">
     <div class="ct">Tương quan Giá — Doanh số</div>
-    <div class="cs">Mỗi điểm = 1 sản phẩm. Xu hướng giảm rõ rệt khi giá tăng.</div>
+    <div class="cs">Mối quan hệ giữa giá bán niêm yết và số lượng đơn hàng đã bán</div>
     <div class="leg" id="sLeg"></div>
     <div class="cw"><canvas id="cScat"></canvas></div>
   </div>
   <div class="cc">
-    <div class="ct">Doanh số trung vị theo mốc giá</div>
-    <div class="cs">Hiệu suất bán hàng thực tế tại từng khung giá</div>
+    <div class="ct" id="titleBin">Doanh số trung vị theo mốc giá</div>
+    <div class="cs">Hiệu suất bán hàng thực tế được phân nhóm theo các khoảng giá bán</div>
     <div class="cw"><canvas id="cBinSales"></canvas></div>
   </div>
   <div class="cc">
-    <div class="ct">Tác động của mức giảm giá lên doanh số</div>
-    <div class="cs">Doanh số trung vị theo nhóm % giảm giá so với giá gốc</div>
+    <div class="ct" id="titleDisc">Tác động của giảm giá</div>
+    <div class="cs" id="subDisc">So sánh hiệu quả bán hàng giữa các mức độ giảm giá khác nhau</div>
     <div class="cw"><canvas id="cDisc"></canvas></div>
   </div>
 </div>
@@ -201,10 +246,39 @@ const DL = ["Không giảm","Giảm <15%","Giảm 15-30%","Giảm >30%"];
 Chart.defaults.font.family="'Inter',sans-serif"; Chart.defaults.color='#78716C';
 const fN = n => Number(n).toLocaleString('vi-VN');
 const fR = (n,d=1) => Number(n).toFixed(d);
+const fmtK = v => {
+    if (v >= 1000000) return (v / 1000000).toFixed(1) + 'M';
+    if (v >= 1000) return (v / 1000).toFixed(1) + 'K';
+    return v;
+};
 const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
 const median = a => { if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y),m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; };
 
 let charts = {};
+let METRIC = 'median';
+
+function setMetric(m) {
+  METRIC = m;
+  document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
+  document.getElementById('btn_median').classList.toggle('active', m === 'median');
+  
+  const mLabel = m === 'mean' ? 'trung bình' : 'trung vị';
+  document.getElementById('titleBin').innerText = `Doanh số ${mLabel} theo mốc giá`;
+  document.getElementById('subDisc').innerText = `Doanh số ${mLabel} theo nhóm % giảm giá so với giá gốc`;
+  
+  applyFilters();
+}
+
+function setup() {
+  const cats = new Set();
+  ALL_ROWS.forEach(r => { if(r.cat && r.cat !== 'Không Rõ') cats.add(r.cat); });
+  const sel = document.getElementById('fCat');
+  Array.from(cats).sort().forEach(c => {
+    const opt = document.createElement('option'); opt.value = c; opt.innerText = c; sel.appendChild(opt);
+  });
+}
+setup();
+
 function destroy() { Object.values(charts).forEach(c=>c&&c.destroy()); charts={}; }
 
 function render(rows) {
@@ -240,9 +314,9 @@ function render(rows) {
   const kpis = [
     {t:'Giá niêm yết TB',   v:'$'+fR(avgPrice,2),  s:'Trung vị: $'+fR(medPrice,2)},
     {t:'Phân khúc ưu thế',  v:domSeg,              s:'Chiếm '+(segCnt[domSeg]/t*100).toFixed(1)+'% thị phần', hi:1},
-    {t:'Tương quan Giá–Cầu',v:sp,                  s:'Spearman (Âm = nghịch biến)'},
+    {t:'Tương quan Giá–Cầu',v:sp,                  s:'Hệ số tương quan Spearman'},
     {t:'SP có giảm giá',    v:pctDisc+'%',          s:'Mức giảm TB: '+fR(avgDisc,1)+'%'},
-    {t:'Tổng sản phẩm',     v:fN(t),                s:'Có giá bán hợp lệ'},
+    {t:'Tổng sản phẩm',     v:fN(t),                s:'Trong bộ lọc hiện tại'},
   ];
   const kRow = document.getElementById('kpiRow');
   kRow.innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div><div class="ks">${x.s}</div></div>`).join('');
@@ -262,46 +336,46 @@ function render(rows) {
   let scPts = rows.filter(r=>r.sales>0&&r.price<=200);
   if(scPts.length>500) scPts=scPts.sort(()=>Math.random()-.5).slice(0,500);
   charts.scat = new Chart(document.getElementById('cScat'),{type:'scatter',
-    data:{datasets:segs.map(sg=>({label:sg,data:scPts.filter(r=>r.seg===sg).map(r=>({x:r.price,y:r.sales})),backgroundColor:SC[sg]+'60',pointRadius:4}))},
+    data:{datasets:segs.map(sg=>({label:sg,data:scPts.filter(r=>r.seg===sg).map(r=>({x:r.price,y:r.sales})),backgroundColor:SC[sg]+'60',pointRadius:4,pointHoverRadius:6}))},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${c.parsed.x} | ${fN(c.parsed.y)} đơn`}}},
-      scales:{x:{title:{display:true,text:'Giá ($)',font:{size:11}},grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:10}}},
-              y:{title:{display:true,text:'Doanh số',font:{size:11}},ticks:{font:{size:10},callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v},grid:{color:'rgba(0,0,0,0.04)'}}}}});
+      scales:{x:{title:{display:true,text:'Giá niêm yết ($)',font:{size:11,weight:'600'}},grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:10}}},
+              y:{beginAtZero:true,title:{display:true,text:'Doanh số (lượt)',font:{size:11,weight:'600'}},ticks:{font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
   // Bin Sales
   const binBuckets = BL.map(()=>[]);
   rows.forEach(r=>{ for(let i=0;i<BINS.length-1;i++){if(r.price>=BINS[i]&&r.price<BINS[i+1]){binBuckets[i].push(r.sales);break;}} });
+  const binData = binBuckets.map(b => METRIC === 'median' ? Math.round(median(b)) : Math.round(avg(b)));
+  
   charts.bin = new Chart(document.getElementById('cBinSales'),{type:'bar',
-    data:{labels:BL,datasets:[{data:binBuckets.map(b=>Math.round(median(b))),backgroundColor:'#F97316',borderRadius:3}]},
+    data:{labels:BL,datasets:[{data:binData,backgroundColor:'#F97316',borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.parsed.y)} đơn`}}},
-      scales:{x:{title:{display:true,text:'Khoảng giá ($)',font:{size:11}},ticks:{font:{size:10},maxRotation:45},grid:{display:false}},
-              y:{title:{display:true,text:'Doanh số trung vị',font:{size:11}},ticks:{font:{size:10},callback:v=>fN(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}});
+      scales:{x:{title:{display:true,text:'Khoảng giá bán ($)',font:{size:11,weight:'600'}},ticks:{font:{size:10},maxRotation:45},grid:{display:false}},
+              y:{beginAtZero:true,title:{display:true,text:METRIC === 'median' ? 'Doanh số trung vị' : 'Doanh số trung bình',font:{size:11,weight:'600'}},ticks:{font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
   // Discount
   const dBands = [[],[],[],[]];
   rows.forEach(r=>{ if(r.disc===0)dBands[0].push(r.sales); else if(r.disc<15)dBands[1].push(r.sales); else if(r.disc<=30)dBands[2].push(r.sales); else dBands[3].push(r.sales); });
+  const discData = dBands.map(b => METRIC === 'median' ? Math.round(median(b)) : Math.round(avg(b)));
+
   charts.disc = new Chart(document.getElementById('cDisc'),{type:'bar',
-    data:{labels:DL,datasets:[{data:dBands.map(b=>Math.round(median(b))),backgroundColor:'#9A3412',borderRadius:3}]},
+    data:{labels:DL,datasets:[{data:discData,backgroundColor:'#9A3412',borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.parsed.y)} đơn`}}},
-      scales:{x:{title:{display:true,text:'Mức giảm giá',font:{size:11}},grid:{display:false},ticks:{font:{size:11}}},
-              y:{title:{display:true,text:'Doanh số trung vị',font:{size:11}},grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:10},callback:v=>fN(v)}}}}});
+      scales:{x:{title:{display:true,text:'Mức độ giảm giá so với gốc',font:{size:11,weight:'600'}},grid:{display:false},ticks:{font:{size:10}}},
+              y:{beginAtZero:true,title:{display:true,text:METRIC === 'median' ? 'Doanh số trung vị' : 'Doanh số trung bình',font:{size:11,weight:'600'}},grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:10},callback:v=>fmtK(v)}}}}});
 }
 
 function applyFilters() {
   const seg  = document.getElementById('fSeg').value;
-  const disc = document.getElementById('fDisc').value;
-  const star = parseFloat(document.getElementById('fStar').value);
+  const cat  = document.getElementById('fCat').value;
   let rows = ALL_ROWS;
   if (seg  !== 'all') rows = rows.filter(r => r.seg === seg);
-  if (disc === 'on')  rows = rows.filter(r => r.disc > 0);
-  if (disc === 'off') rows = rows.filter(r => r.disc === 0);
-  if (star > 0)       rows = rows.filter(r => r.rating >= star);
+  if (cat  !== 'all') rows = rows.filter(r => r.cat === cat);
   render(rows);
 }
 
-['fSeg','fDisc','fStar'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
 render(ALL_ROWS);
 </script></body></html>"""
 
@@ -309,7 +383,7 @@ render(ALL_ROWS);
 def render(df):
     st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
 
-    d = _prep(df)
+    d, p33, p67 = _prep(df)
     if d.empty:
         st.warning("Không có dữ liệu giá hợp lệ.")
         return
@@ -323,7 +397,9 @@ def render(df):
             disc=round(float(r["discount_pct"]), 1),
             sales=int(r["sales_vol"]),
             seg=r["segment"],
+            cat=r.get("category", "Không Rõ"),
         ))
 
     html = _HTML.replace("__ALL_ROWS__", json.dumps(rows, ensure_ascii=False))
+    html = html.replace("__P33__", str(p33)).replace("__P67__", str(p67))
     components.html(html, height=650, scrolling=False)
