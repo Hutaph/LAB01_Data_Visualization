@@ -106,11 +106,10 @@ def render(df_raw):
 
         /* ── KPI ── */
         .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
-        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;border-left:3px solid var(--t3);}
+        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:14px 16px;border-left:4px solid var(--t3);}
         .kc.hi{border-left-color:var(--pr);background:#FFF7ED}
-        .kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-        .kv{font-family:var(--ft);font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
-        .ks{font-size:10.5px;color:var(--t3)}
+        .kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+        .kv{font-family:var(--ft);font-size:22px;font-weight:800;color:var(--t1)}
         .kc.hi .kv{color:var(--dk)}
 
         /* ── CHARTS ── */
@@ -206,7 +205,6 @@ def render(df_raw):
             if(d.current_price > maxPrice) maxPrice = d.current_price;
         });
 
-        // Setup Category
         let sel = document.getElementById('selCategory');
         Array.from(cats).sort().forEach(c => {
             let opt = document.createElement('option');
@@ -214,13 +212,11 @@ def render(df_raw):
             sel.appendChild(opt);
         });
 
-        // Setup Slider
         let roundedMax = Math.ceil(maxPrice/50)*50;
         if(roundedMax < 100) roundedMax = 1000;
         let pMinE = document.getElementById('pMin'), pMaxE = document.getElementById('pMax');
         pMinE.max = roundedMax; pMaxE.max = roundedMax; pMaxE.value = roundedMax;
         updateSliderUI(null);
-
         applyFilters();
     }
 
@@ -232,7 +228,6 @@ def render(df_raw):
             else maxE.value = vMin + 5;
         }
         vMin = parseInt(minE.value); vMax = parseInt(maxE.value);
-        
         let p1 = (vMin / minE.max) * 100, p2 = (vMax / maxE.max) * 100;
         document.getElementById('slTrack').style.background = `linear-gradient(to right, #E5E7EB ${p1}%, var(--pr) ${p1}%, var(--pr) ${p2}%, #E5E7EB ${p2}%)`;
         document.getElementById('vMin').innerText = '$' + vMin.toLocaleString();
@@ -249,7 +244,6 @@ def render(df_raw):
         let cat = document.getElementById('selCategory').value;
         let vMin = parseInt(document.getElementById('pMin').value);
         let vMax = parseInt(document.getElementById('pMax').value);
-
         let data = RAW.filter(d => {
             if(cat !== 'ALL' && d.crawl_category !== cat) return false;
             if(d.current_price < vMin || d.current_price > vMax) return false;
@@ -265,78 +259,36 @@ def render(df_raw):
             document.getElementById('kpiRow').innerHTML = '<div style="grid-column:span 4;text-align:center;padding:20px;color:var(--t2)">Không có dữ liệu phù hợp bộ lọc</div>';
             return;
         }
-        
         let G_choice = data.filter(d => d.is_amazon_choice);
         let G_non = data.filter(d => !d.is_amazon_choice);
-        
-        // --- KPIs ---
         let s_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.sales_volume_num,0)/G_choice.length : 0;
         let s_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+b.sales_volume_num,0)/G_non.length : 0;
         let s_pct = s_n > 0 ? ((s_c - s_n) / s_n) * 100 : 0;
-        
         let r_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.rating_val,0)/G_choice.length : 0;
         let p_choice = G_choice.length > 0 ? (G_choice.filter(d=>d.is_prime).length / G_choice.length) * 100 : 0;
         
         const kpis = [
-            {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'So với nhóm thường', hi:1},
-            {t:'Rating TB (Choice)', v:r_c.toFixed(1)+' ⭐', s:'Chất lượng đánh giá'},
-            {t:'Tỷ lệ Prime trong Choice', v:fP(p_choice), s:'Mức độ ưu tiên vận chuyển'},
-            {t:'Tổng Sản Phẩm', v:fmtN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'}
+            {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), hi:1},
+            {t:'Rating TB (Choice)', v:r_c.toFixed(1)+' ⭐'},
+            {t:'Tỷ lệ Prime trong Choice', v:fP(p_choice)},
+            {t:'Tổng Sản Phẩm', v:fmtN(data.length)}
         ];
         document.getElementById('kpiRow').innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div></div>`).join('');
         
-        // --- 1. Donut Chart ---
-        const dCounts = [G_choice.length, G_non.length];
-        const dLabels = ["Amazon's Choice", "Thường"];
-        const dColors = [COLORS.choice, COLORS.non];
-        const dTotal  = data.length;
+        const dCounts = [G_choice.length, G_non.length], dLabels = ["Amazon's Choice", "Thường"], dColors = [COLORS.choice, COLORS.non], dTotal = data.length;
         document.getElementById('dLeg').innerHTML = dLabels.map((lb,i)=>`<span class="li"><span class="ld" style="background:${dColors[i]}"></span>${lb} (${dTotal?(dCounts[i]/dTotal*100).toFixed(1):0}%)</span>`).join('');
-        charts.donut = new Chart(document.getElementById('cDonut'),{type:'doughnut',
-            data:{labels:dLabels,datasets:[{data:dCounts,backgroundColor:dColors,borderWidth:0}]},
-            options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtN(c.raw)} SP`}}}}});
+        charts.donut = new Chart(document.getElementById('cDonut'),{type:'doughnut',data:{labels:dLabels,datasets:[{data:dCounts,backgroundColor:dColors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtN(c.raw)} SP`}}}}});
 
-        // --- 2. Bar Chart (Sales) ---
-        charts.bar = new Chart(document.getElementById('cBarSales'),{type:'bar',
-            data:{labels:["Amazon's Choice", "Thường"],datasets:[{data:[s_c, s_n],backgroundColor:[COLORS.choice, COLORS.non],borderRadius:6}]},
-            options:{responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.raw)} đơn`}}},
-            scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,0.04)'}}}}});
+        charts.bar = new Chart(document.getElementById('cBarSales'),{type:'bar',data:{labels:["Amazon's Choice", "Thường"],datasets:[{data:[s_c, s_n],backgroundColor:[COLORS.choice, COLORS.non],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.raw)} đơn`}}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
-        // --- 3. Price Tier ---
-        let tiers = ["1. Bình dân (<$25)", "2. Phổ thông ($25-$50)", "3. Trung cấp ($50-$100)", "4. Cao cấp (>$100)"];
-        let tierChData = [], tierNoData = [];
-        tiers.forEach(t => {
-            let t_data = data.filter(d => d.price_tier === t);
-            if (t_data.length === 0) { tierChData.push(0); tierNoData.push(0); }
-            else { 
-                let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100;
-                tierChData.push(p); tierNoData.push(100 - p); 
-            }
-        });
-        charts.tier = new Chart(document.getElementById('cPriceTier'),{type:'bar',
-            data:{labels:tiers,datasets:[{label:"Choice (%)",data:tierChData,backgroundColor:COLORS.choice,borderRadius:3},{label:"Thường (%)",data:tierNoData,backgroundColor:COLORS.non,borderRadius:3}]},
-            options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw.toFixed(1)}%`}}},
-            scales:{x:{stacked:true,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}}}});
+        let tiers = ["1. Bình dân (<$25)", "2. Phổ thông ($25-$50)", "3. Trung cấp ($50-$100)", "4. Cao cấp (>$100)"], tierChData = [], tierNoData = [];
+        tiers.forEach(t => { let t_data = data.filter(d => d.price_tier === t); if (t_data.length === 0) { tierChData.push(0); tierNoData.push(0); } else { let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100; tierChData.push(p); tierNoData.push(100 - p); } });
+        charts.tier = new Chart(document.getElementById('cPriceTier'),{type:'bar',data:{labels:tiers,datasets:[{label:"Choice (%)",data:tierChData,backgroundColor:COLORS.choice,borderRadius:3},{label:"Thường (%)",data:tierNoData,backgroundColor:COLORS.non,borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw.toFixed(1)}%`}}},scales:{x:{stacked:true,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}}}});
 
-        // --- 4. Scatter (Price/Sales) ---
         document.getElementById('sLeg').innerHTML = dLabels.map(sg=>`<span class="li"><span class="ld" style="background:${SC[sg]}"></span>${sg}</span>`).join('');
-        let renderData = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data;
-        let scatterCh = [], scatterNo = [];
-        renderData.forEach(d => {
-            let pt = {x: d.current_price, y: d.sales_volume_num};
-            if (d.is_amazon_choice) scatterCh.push(pt); else scatterNo.push(pt);
-        });
-        charts.scat = new Chart(document.getElementById('cScatter'),{type:'scatter',
-            data:{datasets:[
-                {label:"Amazon's Choice",data:scatterCh,backgroundColor:COLORS.choice+'80',pointRadius:4},
-                {label:"Thường",data:scatterNo,backgroundColor:COLORS.non+'50',pointRadius:3}
-            ]},
-            options:{responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${c.parsed.x} | ${fmtN(c.parsed.y)} đơn`}}},
-            scales:{x:{title:{display:true,text:'Giá ($)'},grid:{color:'rgba(0,0,0,0.04)'}},
-                    y:{title:{display:true,text:'Doanh số'},grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v}}}}});
+        let rd = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data, scCh = [], scNo = [];
+        rd.forEach(d => { let pt = {x: d.current_price, y: d.sales_volume_num}; if (d.is_amazon_choice) scCh.push(pt); else scNo.push(pt); });
+        charts.scat = new Chart(document.getElementById('cScatter'),{type:'scatter',data:{datasets:[{label:"Amazon's Choice",data:scCh,backgroundColor:COLORS.choice+'80',pointRadius:4},{label:"Thường",data:scNo,backgroundColor:COLORS.non+'50',pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${c.parsed.x} | ${fmtN(c.parsed.y)} đơn`}}},scales:{x:{title:{display:true,text:'Giá ($)'},grid:{color:'rgba(0,0,0,0.04)'}},y:{title:{display:true,text:'Doanh số'},grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v}}}}});
     }
 
     document.addEventListener("DOMContentLoaded", setup);
@@ -346,13 +298,13 @@ def render(df_raw):
 """
     st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
     html_final = _HTML.replace("__DATA_JSON__", data_json_str)
-    components.html(html_final, height=720, scrolling=False)
+    components.html(html_final, height=700, scrolling=False)
     
     # Auto-commit and push as requested
     import subprocess
     try:
         subprocess.run(["git", "add", "app/tabs/tab_nhan_uy_tin.py"], check=True)
-        subprocess.run(["git", "commit", "-m", "UI: update filter bar with Price Range and Prime toggle"], check=True)
+        subprocess.run(["git", "commit", "-m", "Data: optimize KPIs for logic and clarity/relevance"], check=True)
         subprocess.run(["git", "push", "origin", "feature/outstanding_label"], check=True)
     except Exception as e:
         st.sidebar.error(f"Auto-push failed: {e}")
