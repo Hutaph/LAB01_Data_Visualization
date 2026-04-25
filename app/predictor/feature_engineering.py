@@ -23,7 +23,8 @@ class DiscountFeatureEngineer:
         X = X.copy()
         X["discount"] = X.get("original_price", 0) - X.get("price", 0)
         # avoid division by zero
-        X["discount_rate"] = X["discount"] / X["original_price"].replace({0: pd.NA}).astype(float)
+        import numpy as np
+        X["discount_rate"] = X["discount"] / X["original_price"].replace({0: np.nan}).astype(float)
         X["discount_rate"] = X["discount_rate"].fillna(0.0)
         return X
 

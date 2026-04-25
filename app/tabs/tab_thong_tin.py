@@ -324,10 +324,10 @@ def render(df_raw):
 
         <div class="chart-card">
             <div class="chart-header">
-                <div class="chart-title">Mức Độ Tập Trung Ở Top 10% Doanh Số</div>
-                <div class="chart-subtitle">Đường đỏ (10%): Tỷ lệ kỳ vọng ngẫu nhiên (Baseline)</div>
+                <div class="chart-title">Trường Thông Tin Phân Hoá: Top 10% Doanh Số so với Toàn Bộ</div>
+                <div class="chart-subtitle">Ưu tiên hiển thị các trường thông tin có độ chênh lệch cao nhất</div>
             </div>
-            <div class="chart-container"><canvas id="c_concentration"></canvas></div>
+            <div class="chart-container"><canvas id="c_features"></canvas></div>
         </div>
 
         <div class="chart-card">
@@ -342,10 +342,10 @@ def render(df_raw):
 
         <div class="chart-card">
             <div class="chart-header">
-                <div class="chart-title">Trường Thông Tin Phân Hoá: Top 10% Doanh Số so với Toàn Bộ</div>
-                <div class="chart-subtitle">Ưu tiên hiển thị các trường thông tin có độ chênh lệch cao nhất</div>
+                <div class="chart-title">Mức Độ Tập Trung Ở Top 10% Doanh Số</div>
+                <div class="chart-subtitle">Đường đỏ (10%): Tỷ lệ kỳ vọng ngẫu nhiên (Baseline)</div>
             </div>
-            <div class="chart-container"><canvas id="c_features"></canvas></div>
+            <div class="chart-container"><canvas id="c_concentration"></canvas></div>
         </div>
     </div>
 

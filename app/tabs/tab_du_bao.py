@@ -365,18 +365,18 @@ def render(df):
     # ---- Left: Input form ----
     with col_form:
         with st.form("predict_form", clear_on_submit=False):
-            
+
             st.markdown("<h5 style='color:#EA580C; margin-bottom: 0;'>1. Thông tin giá cả & Cạnh tranh</h5>", unsafe_allow_html=True)
             f_price = st.number_input("Giá hiện tại (USD)", value=float(medians.get("price", 25.0)), format="%.2f")
             f_orig_price = st.number_input("Giá gốc (USD)", value=float(medians.get("original_price", 30.0)), format="%.2f")
             f_lowest_offer_price = st.number_input("Giá chào thấp nhất (USD)", value=0.0, format="%.2f")
             f_delivery_fee = st.number_input("Phí vận chuyển (USD)", value=float(medians.get("delivery_fee", 0.0)), format="%.2f")
             f_offers = st.number_input("Số nhà bán cạnh tranh", value=int(medians.get("offers", 1)), min_value=0)
-            
+
             st.markdown("<h5 style='color:#EA580C; margin-top: 10px; margin-bottom: 0;'>2. Đánh giá Sản phẩm</h5>", unsafe_allow_html=True)
             f_rating = st.slider("Điểm đánh giá (0-5)", 0.0, 5.0, float(medians.get("rating", 4.2)))
             f_reviews = st.number_input("Số lượt đánh giá (Reviews)", value=int(medians.get("reviews", 120)), min_value=0)
-            
+
             st.markdown("<h5 style='color:#EA580C; margin-top: 10px; margin-bottom: 0;'>3. Phân loại & Đặc tính</h5>", unsafe_allow_html=True)
             # Category selector populated from model/dump features if available
             try:
@@ -395,7 +395,7 @@ def render(df):
             sel_index = 0
             if default_cat in cat_options:
                 sel_index = cat_options.index(default_cat)
-            
+
             f_cat = st.selectbox(
                 "Danh mục (Category)",
                 cat_options,
@@ -535,18 +535,18 @@ def render(df):
 
                 # Display results
                 st.markdown("### Kết quả Phân tích & Dự báo")
-                
+
                 if is_classifier:
                     pred_class = int(raw_pred)
                     txt = "Thấp" if pred_class == 0 else ("Trung bình" if pred_class == 1 else "Cao")
-                    
+
                     if pred_class == 2:
                         status_class = "status-high"
                     elif pred_class == 1:
                         status_class = "status-mid"
                     else:
                         status_class = "status-low"
-                        
+
                     st.markdown(f"""
                         <div class="custom-metric-container">
                             <div class="custom-metric-label">Phân hạng sản phẩm</div>
@@ -564,7 +564,7 @@ def render(df):
                         else:
                             val = np.expm1(val)
                     final_val = int(max(0, round(val)))
-                    
+
                     if final_val > 200:
                         status_text = "Tiềm năng cao 🚀"
                         status_class = "status-high"
@@ -591,7 +591,7 @@ def render(df):
                         imp = pd.DataFrame({"f": feature_names, "v": model.feature_importances_}).sort_values("v", ascending=False).head(8)
                         fig = go.Figure(go.Bar(x=imp["v"], y=imp["f"], orientation='h', marker_color='#F97316'))
                         fig.update_layout(height=320, margin=dict(t=20, b=20, l=40, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                        st.plotly_chart(fig, width='stretch')
+                        st.plotly_chart(fig, use_container_width=True)
                 with col_side:
                     with st.expander("🛠️ DEBUG DỮ LIỆU", expanded=False):
                         st.write("RAW INPUT")
@@ -608,27 +608,7 @@ def render(df):
                         except Exception:
                             pass
 
-                # Show full list of model features and category mapping
-                with st.expander("📚 Cấu trúc Mô hình & Danh mục", expanded=False):
-                    try:
-                        # feature names from model/dump
-                        fn = dump_features if 'dump_features' in locals() else feature_names
-                        st.write(f"Tổng số features model cần: {len(fn)}")
-                        st.dataframe(pd.DataFrame({"feature": fn}))
-
-                        # extract category dummies (common prefix 'cat_')
-                        cats = [c for c in fn if c.startswith('cat_')]
-                        if cats:
-                            st.write("Detected category dummy columns:")
-                            st.write(', '.join(cats))
-                            # try to infer original category names
-                            inferred = [c.replace('cat_', '') for c in cats]
-                            st.write("Inferred categories (suffixes):")
-                            st.write(', '.join(inferred))
-                        else:
-                            st.info("Không tìm thấy dummy variables dành cho Danh mục.")
-                    except Exception as e:
-                        st.write("Lỗi tải thông tin model:", e)
+               
 
             except Exception as e:
                 st.error(f"Lỗi predict: {e}")
@@ -639,4 +619,3 @@ def render(df):
     with st.expander("⚙️ Thông tin kỹ thuật", expanded=False):
         st.write("**Loại mô hình thuật toán:**", type(model).__name__)
         st.write("**Tổng số Input Feature:**", len(feature_names))
-        st.dataframe(pd.DataFrame({"Các trường dữ liệu Model (Features)": feature_names}))

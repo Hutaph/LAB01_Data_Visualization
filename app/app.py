@@ -1,7 +1,14 @@
-import streamlit as st
-import json
-import joblib
+import sys
+import os
 from pathlib import Path
+import streamlit as st
+import joblib
+
+# Fix: Ensure 'app' directory is in sys.path for absolute imports in tabs
+app_dir = os.path.dirname(os.path.abspath(__file__))
+if app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
+
 
 dump_path = Path(__file__).resolve().parent / "features_dump.json"
 models_dir = Path(__file__).resolve().parent / "services" / "models"

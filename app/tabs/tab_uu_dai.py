@@ -6,7 +6,7 @@ import streamlit.components.v1 as components
 
 # Import category mapping from utility script
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils.category_mapping import CATEGORY_MAP, add_display_column
 
 def render(df_raw):
