@@ -14,6 +14,7 @@ TAB_CONFIG = [
     {"label": "Định giá",      "icon": "bi-tag-fill"},
     {"label": "Đánh giá",      "icon": "bi-star-fill"},
     {"label": "Vận chuyển",    "icon": "bi-truck-front-fill"},
+    {"label": "Độ hoàn thiện", "icon": "bi-ui-checks-grid"},
     {"label": "Nhãn & Uy tín", "icon": "bi-patch-check-fill"},
     {"label": "Nổi bật",       "icon": "bi-bar-chart-fill", "icon_style": "font-size: 24px;"},
     {"label": "Dự báo",        "icon": "bi-cpu-fill"},
@@ -202,7 +203,7 @@ function triggerBtn(btnKey) {{
 </html>
 """
 
-    components.html(html_code, height=460, scrolling=False)
+    components.html(html_code, height=520, scrolling=False)
 
     for cfg in TAB_CONFIG:
         label = cfg["label"]

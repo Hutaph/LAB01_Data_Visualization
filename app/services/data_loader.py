@@ -51,7 +51,7 @@ def _resolve_latest_csv() -> Path:
             "Không tìm thấy file CSV trong data/Processed hoặc data/processed."
         )
 
-    preferred = [p for p in csv_files if p.stem.lower() == "data_tmp"]
+    preferred = [p for p in csv_files if p.stem.lower() == "amazon_products_viz"]
     if preferred:
         return preferred[-1]
 
@@ -59,6 +59,7 @@ def _resolve_latest_csv() -> Path:
 
 @st.cache_data(show_spinner=False)
 def load_data() -> tuple[pd.DataFrame, dict]:
+    # Force cache invalidation to re-read amazon_products_viz.csv
     csv_path = _resolve_latest_csv()
     df = pd.read_csv(csv_path, low_memory=False)
 
