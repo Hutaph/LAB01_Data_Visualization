@@ -291,12 +291,20 @@ def render(df_raw):
         let rev_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.reviews_val,0)/G_choice.length : 0;
         
         const kpis = [
-            {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'TB: '+fN(s_c)+' (Choice) vs '+fN(s_n)+' (Thường)', hi:1},
-            {t:'Rating Trung Bình (Choice)', v:r_c.toFixed(1)+' ⭐', s:'Chất lượng đánh giá'},
-            {t:'Số Review TB (Choice)', v:fmtN(rev_c), s:'Độ nhận diện sản phẩm'},
-            {t:'Tổng Sản Phẩm', v:fmtN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'}
+            {i:ICONS.lift, t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'TB: '+fC(s_c)+' vs '+fC(s_n), hi:1},
+            {i:ICONS.star, t:'Rating TB (Choice)', v:r_c.toFixed(1)+' ⭐', s:'Chất lượng đánh giá'},
+            {i:ICONS.rev, t:'Review TB (Choice)', v:fC(rev_c), s:'Độ nhận diện thương hiệu'},
+            {i:ICONS.box, t:'Tổng Sản Phẩm', v:fN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'}
         ];
-        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div><div class="ks">${x.s}</div></div>`).join('');
+        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`
+            <div class="kc${x.hi?' hi':''}">
+                <div class="ki">${x.i}</div>
+                <div class="kb">
+                    <div class="kt">${x.t}</div>
+                    <div class="kv">${x.v}</div>
+                    <div class="ks">${x.s}</div>
+                </div>
+            </div>`).join('');
         
         // --- 1. Donut Chart ---
         const dCounts = [G_choice.length, G_non.length];
