@@ -531,8 +531,8 @@ def render(df_raw):
         // Sort by biggest difference descending
         diffList.sort((a,b) => b.diff - a.diff);
         
-        // Take top 14 features that matter most
-        let topDiffs = diffList.slice(0, 14);
+        // Take top 7 features that matter most
+        let topDiffs = diffList.slice(0, 7);
         
         let featLabels = topDiffs.map(d => d.f);
 
@@ -561,7 +561,7 @@ def render(df_raw):
         // Sort by highest concentration in Top 10%
         concList.sort((a,b) => b.topPct - a.topPct);
         
-        let topConcFeatures = concList.slice(0, 14);
+        let topConcFeatures = concList.slice(0, 7);
         
         let concFeatLabels = topConcFeatures.map(d => d.f);
         let topConcData = topConcFeatures.map(d => d.topPct); // Top 10% percentage
