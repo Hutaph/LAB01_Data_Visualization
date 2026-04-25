@@ -105,17 +105,12 @@ def render(df_raw):
         .tg-lbl{font-size:13px;font-weight:600;color:var(--t1)}
 
         /* ── KPI ── */
-        .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:8px 0 4px}
-        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.08);padding:14px 16px;display:flex;align-items:flex-start;gap:12px;border:1px solid var(--bd);transition:transform .2s, box-shadow .2s;cursor:default}
-        .kc:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.08)}
-        .kc.hi{border-color:var(--pr);background:linear-gradient(135deg, #FFF 0%, #FFF7ED 100%)}
-        .ki{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-        .kc.hi .ki{background:rgba(249,115,22,0.1);color:var(--pr)}
-        .kc:not(.hi) .ki{background:rgba(120,113,108,0.06);color:var(--t2)}
-        .kb{flex:1;min-width:0}
-        .kt{font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-        .kv{font-family:var(--ft);font-size:20px;font-weight:800;color:var(--t1);margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        .ks{font-size:10.5px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
+        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;border-left:3px solid var(--t3);}
+        .kc.hi{border-left-color:var(--pr);background:#FFF7ED}
+        .kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+        .kv{font-family:var(--ft);font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
+        .ks{font-size:10.5px;color:var(--t3)}
         .kc.hi .kv{color:var(--dk)}
 
         /* ── CHARTS ── */
@@ -200,14 +195,6 @@ def render(df_raw):
     const fN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
     const fP = n => Number(n).toFixed(1) + '%';
     const fmtN = n => Number(n).toLocaleString('vi-VN');
-    const fC = n => n >= 1e6 ? (n/1e6).toFixed(1) + 'M' : (n >= 1e3 ? (n/1e3).toFixed(1) + 'K' : n);
-
-    const ICONS = {
-      lift: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg>`,
-      star: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`,
-      rev: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>`,
-      box: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`
-    };
 
     function destroy() { Object.values(charts).forEach(c=>c&&c.destroy()); charts={}; }
 
@@ -291,20 +278,12 @@ def render(df_raw):
         let rev_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.reviews_val,0)/G_choice.length : 0;
         
         const kpis = [
-            {i:ICONS.lift, t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'TB: '+fC(s_c)+' vs '+fC(s_n), hi:1},
-            {i:ICONS.star, t:'Rating TB (Choice)', v:r_c.toFixed(1)+' ⭐', s:'Chất lượng đánh giá'},
-            {i:ICONS.rev, t:'Review TB (Choice)', v:fC(rev_c), s:'Độ nhận diện thương hiệu'},
-            {i:ICONS.box, t:'Tổng Sản Phẩm', v:fN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'}
+            {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'TB: '+fN(s_c)+' (Choice) vs '+fN(s_n)+' (Thường)', hi:1},
+            {t:'Rating Trung Bình (Choice)', v:r_c.toFixed(1)+' ⭐', s:'Chất lượng đánh giá'},
+            {t:'Số Review TB (Choice)', v:fmtN(rev_c), s:'Độ nhận diện sản phẩm'},
+            {t:'Tổng Sản Phẩm', v:fmtN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'}
         ];
-        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`
-            <div class="kc${x.hi?' hi':''}">
-                <div class="ki">${x.i}</div>
-                <div class="kb">
-                    <div class="kt">${x.t}</div>
-                    <div class="kv">${x.v}</div>
-                    <div class="ks">${x.s}</div>
-                </div>
-            </div>`).join('');
+        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div><div class="ks">${x.s}</div></div>`).join('');
         
         // --- 1. Donut Chart ---
         const dCounts = [G_choice.length, G_non.length];
@@ -367,13 +346,13 @@ def render(df_raw):
 """
     st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
     html_final = _HTML.replace("__DATA_JSON__", data_json_str)
-    components.html(html_final, height=750, scrolling=False)
+    components.html(html_final, height=720, scrolling=False)
     
     # Auto-commit and push as requested
     import subprocess
     try:
         subprocess.run(["git", "add", "app/tabs/tab_nhan_uy_tin.py"], check=True)
-        subprocess.run(["git", "commit", "-m", "UI: enhance KPI cards with icons and compact formatting"], check=True)
+        subprocess.run(["git", "commit", "-m", "UI: update filter bar with Price Range and Prime toggle"], check=True)
         subprocess.run(["git", "push", "origin", "feature/outstanding_label"], check=True)
     except Exception as e:
         st.sidebar.error(f"Auto-push failed: {e}")
