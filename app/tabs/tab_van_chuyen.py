@@ -9,6 +9,7 @@ def render(df_raw):
 
     # Preprocessing
     df["is_prime"] = df.get("is_prime", pd.Series(False, index=df.index)).fillna(False).astype(bool)
+    df["is_amazon_choice"] = df.get("is_amazon_choice", pd.Series(False, index=df.index)).fillna(False).astype(bool)
     df["delivery_fee"] = pd.to_numeric(df.get("delivery_fee", 0.0), errors="coerce").fillna(0.0).clip(lower=0)
     df["sales_volume_num"] = pd.to_numeric(df.get("sales_volume_num", 0), errors="coerce").fillna(0).astype(int)
     df["current_price"] = pd.to_numeric(df.get("price", 0.0), errors="coerce").fillna(0.0).clip(lower=0)
@@ -29,27 +30,65 @@ def render(df_raw):
     }
     
     if "crawl_category" in df.columns:
-        df["Danh Mục"] = df["crawl_category"].map(CATEGORY_MAP).fillna(df["crawl_category"])
+        df["Danh Mục Sản Phẩm"] = df["crawl_category"].map(CATEGORY_MAP).fillna(df["crawl_category"])
     else:
-        df["Danh Mục"] = "Không Rõ"
+        df["Danh Mục Sản Phẩm"] = "Không Rõ"
 
-    def parse_est_days(text):
+    def parse_est_days_row(row):
+        text = row.get("delivery_date_text")
+        date_str = "2026-03-24"
+        if "date" in row and not pd.isna(row["date"]):
+            date_str = row["date"]
+            
         if pd.isna(text): return None
-        s = str(text)
-        m = re.search(r'\w+,\s*Apr\s+(\d+)', s)
-        if m: return max(1, int(m.group(1)) - 6)
-        m2 = re.search(r'Apr\s+(\d+)\s*-\s*(\d+)', s)
-        if m2: return max(1, round((int(m2.group(1)) + int(m2.group(2))) / 2.0 - 6))
+        s = str(text).lower()
+        
+        try:
+            base_date = pd.to_datetime(date_str)
+        except:
+            return None
+            
+        months = {'jan': 1, 'feb': 2, 'mar': 3, 'march': 3, 'apr': 4, 'april': 4, 'may': 5, 'jun': 6, 'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}
+        month_pattern = r'(jan|feb|mar|march|apr|april|may|jun|jul|aug|sep|oct|nov|dec)'
+        
+        m_range = re.search(month_pattern + r'\s+(\d+)\s*-\s*(\d+)', s)
+        if m_range:
+            m_val = months[m_range.group(1)]
+            d1 = int(m_range.group(2))
+            d2 = int(m_range.group(3))
+            try:
+                target_date1 = pd.to_datetime(f"{base_date.year}-{m_val}-{d1}")
+                target_date2 = pd.to_datetime(f"{base_date.year}-{m_val}-{d2}")
+                days1 = (target_date1 - base_date).days
+                days2 = (target_date2 - base_date).days
+                if days1 < 0: days1 += 365
+                if days2 < 0: days2 += 365
+                return max(1, round((days1 + days2) / 2.0))
+            except:
+                pass
+                
+        m_single = re.search(month_pattern + r'\s+(\d+)', s)
+        if m_single:
+            m_val = months[m_single.group(1)]
+            d1 = int(m_single.group(2))
+            try:
+                target_date = pd.to_datetime(f"{base_date.year}-{m_val}-{d1}")
+                days = (target_date - base_date).days
+                if days < 0: days += 365
+                return max(1, days)
+            except:
+                pass
+                
         return None
 
     if "delivery_date_text" in df.columns:
-        df["est_delivery_days"] = df["delivery_date_text"].apply(parse_est_days)
+        df["est_delivery_days"] = df.apply(parse_est_days_row, axis=1)
     else:
         df["est_delivery_days"] = None
 
     select_cols = [
-        "Danh Mục", "delivery_fee", "sales_volume_num", "current_price", 
-        "rating_val", "is_prime", "est_delivery_days"
+        "Danh Mục Sản Phẩm", "delivery_fee", "sales_volume_num", "current_price", 
+        "rating_val", "is_prime", "est_delivery_days", "is_amazon_choice"
     ]
     export_df = df[select_cols].copy()
     data_json = export_df.to_dict(orient="records")
@@ -62,6 +101,7 @@ def render(df_raw):
     <meta charset="UTF-8">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
     <style>
         :root {{
             --primary: #F97316;
@@ -69,7 +109,7 @@ def render(df_raw):
             --card-bg: #FFFFFF;
             --text-primary: #1C1917;
             --text-secondary: #78716C;
-            --border-radius: 8px;
+            --border-radius: 6px;
             --font-family: 'Inter', sans-serif;
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -77,37 +117,45 @@ def render(df_raw):
             background-color: var(--bg);
             font-family: var(--font-family);
             color: var(--text-primary);
-            padding: 10px 20px;
+            padding: 5px;
             overflow: hidden;
         }}
         .filter-bar {{
-            display: flex; align-items: center; gap: 24px; margin-bottom: 20px;
-            background: var(--card-bg); padding: 12px 20px; border-radius: var(--border-radius);
+            display: flex; align-items: center; gap: 15px; margin-bottom: 5px;
+            background: var(--card-bg); padding: 4px 10px; border-radius: var(--border-radius);
             box-shadow: 0 1px 3px rgba(0,0,0,0.05); 
         }}
-        .f-item {{ display: flex; align-items: center; gap: 10px; }}
-        .f-label {{ font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }}
+        .f-item {{ display: flex; align-items: center; gap: 8px; }}
+        .f-label {{ font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }}
         select {{
-            padding: 8px 12px; border: 1px solid #D1D5DB; border-radius: 6px;
-            font-family: inherit; color: var(--text-primary); outline: none; cursor: pointer; width: 220px; font-weight: 500;
+            padding: 2px 6px; border: 1px solid #D1D5DB; border-radius: 4px; height: 26px;
+            font-family: inherit; font-size: 11px; color: var(--text-primary); outline: none; cursor: pointer; width: 180px; font-weight: 500;
         }}
         select:focus {{ border-color: var(--primary); }}
         
         .main-grid {{
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            height: calc(100vh - 85px);
+            gap: 10px;
         }}
-        .col-wrapper {{ display: flex; flex-direction: column; gap: 20px; height: 100%; }}
+        .col-wrapper {{ display: flex; flex-direction: column; gap: 6px; }}
+        .header-title-box {{
+            background: var(--card-bg);
+            border-radius: var(--border-radius) var(--border-radius) 0 0;
+            padding: 4px;
+            text-align: center;
+            border-bottom: 2px solid var(--primary);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }}
+        .col-title {{ font-size: 11px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.5px; margin: 0; }}
         .chart-card {{
-            background: var(--card-bg); border-radius: var(--border-radius);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 16px;
-            flex: 1; display: flex; flex-direction: column; justify-content: flex-start;
+            background: var(--card-bg);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05); padding: 6px 8px;
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+            display: flex; flex-direction: column;
         }}
-        .col-title {{ font-size: 15px; font-weight: 700; color: var(--text-primary); text-align: center; margin-bottom: 0px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }}
-        .chart-title {{ font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 15px; color: var(--text-secondary); }}
-        .chart-wrapper {{ position: relative; width: 100%; flex-grow: 1; min-height: 0; }}
+        .chart-title {{ font-size: 11px; font-weight: 600; text-align: center; margin-bottom: 4px; color: var(--text-secondary); }}
+        .chart-wrapper {{ position: relative; width: 100%; height: 220px; }}
     </style>
 </head>
 <body>
@@ -115,7 +163,7 @@ def render(df_raw):
     <!-- Filter -->
     <div class="filter-bar">
         <div class="f-item">
-            <span class="f-label">Danh mục sản phẩm</span>
+            <span class="f-label">Danh mục Sản Phẩm:</span>
             <select id="selCategory" onchange="applyFilters()">
                 <option value="ALL">Tất cả danh mục</option>
             </select>
@@ -126,56 +174,68 @@ def render(df_raw):
     <div class="main-grid">
         <!-- COL 1 -->
         <div class="col-wrapper">
-            <div class="col-title">Định Giá & Phí Vận Chuyển</div>
-            <div class="chart-card">
-                <div class="chart-title">Miễn Phí Ship so với Có Phí</div>
-                <div class="chart-wrapper"><canvas id="c1_bar"></canvas></div>
+            <div class="header-title-box"><div class="col-title">Định Giá & Phí Vận Chuyển</div></div>
+            <div class="chart-card" style="border-radius: 0">
+                <div class="chart-title">Tác Động Của Tỷ Trọng Phí Vận Chuyển Lên Sức Bán (Phí / Giá)</div>
+                <div class="chart-wrapper" style="height: 486px;"><canvas id="c1_ratio"></canvas></div>
             </div>
-            <div class="chart-card">
-                <div class="chart-title">Cơ Cấu Doanh Thu Toàn Ngành</div>
-                <div class="chart-wrapper"><canvas id="c1_donut"></canvas></div>
+            <div class="chart-card" style="background:#f8fafc; border: 1px solid #e2e8f0;">
+                <div class="chart-title">Định Giá Phí Trong Top 10% Doanh Số</div>
+                <div class="chart-wrapper"><canvas id="c1_top10"></canvas></div>
             </div>
         </div>
         
         <!-- COL 2 -->
         <div class="col-wrapper">
-            <div class="col-title">Top Seller & Prime</div>
-            <div class="chart-card">
-                <div class="chart-title">Tỷ Lệ Prime Nhóm Top 20% Bán Chạy</div>
+            <div class="header-title-box"><div class="col-title">Top Ưa Chuộng (Sellers) & Prime</div></div>
+            <div class="chart-card" style="border-radius: 0">
+                <div class="chart-title">Thị Phần Doanh Số Nhãn Prime (Nhóm Top 20%)</div>
                 <div class="chart-wrapper"><canvas id="c2_donut"></canvas></div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">Chênh Lệch Doanh Số Bán Hàng</div>
+                <div class="chart-title">Mức Giá Của Mặt Hàng Có Prime và Không Prime</div>
                 <div class="chart-wrapper"><canvas id="c2_bar"></canvas></div>
+            </div>
+            <div class="chart-card" style="background:#f8fafc; border: 1px solid #e2e8f0;">
+                <div class="chart-title">Tỷ Lệ Prime Trong Top 10% Doanh Số</div>
+                <div class="chart-wrapper"><canvas id="c2_top10"></canvas></div>
             </div>
         </div>
 
         <!-- COL 3 -->
         <div class="col-wrapper">
-            <div class="col-title">Tốc Độ Giao & Rating</div>
-            <div class="chart-card">
-                <div class="chart-title">Trải Nghiệm Khách Hàng (Tốc Độ vs Đánh Giá)</div>
+            <div class="header-title-box"><div class="col-title">Tốc Độ Giao & Doanh Số</div></div>
+            <div class="chart-card" style="border-radius: 0">
+                <div class="chart-title">Tỷ Lệ Doanh Số Trung Bình</div>
                 <div class="chart-wrapper"><canvas id="c3_combo"></canvas></div>
             </div>
             <div class="chart-card">
-                <div class="chart-title">Tỷ Trọng Cam Kết Thời Gian Giao</div>
+                <div class="chart-title">Phân Bổ Ngày Giao Của Top 20 Sản Phẩm Bán Chạy Nhất</div>
                 <div class="chart-wrapper"><canvas id="c3_donut"></canvas></div>
             </div>
+            <div class="chart-card" style="background:#f8fafc; border: 1px solid #e2e8f0;">
+                <div class="chart-title">Tốc Độ Giao Hàng Trong Top 10% Doanh Số</div>
+                <div class="chart-wrapper"><canvas id="c3_top10"></canvas></div>
+            </div>
         </div>
+
     </div>
 
 <script>
     const RAW_DATA = {data_json_str};
     let GI = {{}};
     const fmtN = (n) => new Intl.NumberFormat('en-US').format(Math.round(n));
+    const fmtR = (n) => typeof n === 'number' ? Number(n).toFixed(2) : n;
 
     function setup() {{
+        Chart.register(ChartDataLabels);
+        Chart.defaults.plugins.datalabels = {{ display: false }};
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#78716C';
-        Chart.defaults.font.size = 11;
+        Chart.defaults.font.size = 10;
         
         let cats = new Set();
-        RAW_DATA.forEach(d => {{ if(d['Danh Mục'] && d['Danh Mục'] !== 'Không Rõ') cats.add(d['Danh Mục']); }});
+        RAW_DATA.forEach(d => {{ if(d['Danh Mục Sản Phẩm'] && d['Danh Mục Sản Phẩm'] !== 'Không Rõ') cats.add(d['Danh Mục Sản Phẩm']); }});
         let sel = document.getElementById('selCategory');
         Array.from(cats).sort().forEach(c => {{
             let opt = document.createElement('option'); opt.value = c; opt.innerText = c; sel.appendChild(opt);
@@ -187,122 +247,179 @@ def render(df_raw):
 
     function applyFilters() {{
         let cat = document.getElementById('selCategory').value;
-        let data = RAW_DATA.filter(d => (cat === 'ALL' || d['Danh Mục'] === cat));
+        let data = RAW_DATA.filter(d => (cat === 'ALL' || d['Danh Mục Sản Phẩm'] === cat));
         updateData(data);
     }}
 
     function updateData(data) {{
-        let p_cheap=[], p_mid=[], p_high=[];
-        if(data.length > 0) {{
-            let sortedP = [...data].sort((a,b)=>a.current_price - b.current_price);
-            let third = Math.floor(sortedP.length/3);
-            p_cheap = sortedP.slice(0, third).map(d=>d.current_price);
-            p_mid = sortedP.slice(third, third*2).map(d=>d.current_price);
-            p_high = sortedP.slice(third*2).map(d=>d.current_price);
-        }}
-        let maxC = p_cheap.length>0 ? p_cheap[p_cheap.length-1] : 0;
-        let maxM = p_mid.length>0 ? p_mid[p_mid.length-1] : 0;
-
-        let agg = {{}};
-        ['Giá Thấp','Giá Tầm Trung','Giá Cao Cấp'].forEach(k=> {{
-            agg[k] = {{ freeS:0, freeC:0, paidS:0, paidC:0, freeRev:0, paidRev:0 }};
-        }});
+        let ratioList = ['0%', '1 - 50%', '51 - 100%', '> 100%'];
+        let rAgg = {{}};
+        ratioList.forEach(k => {{ rAgg[k] = {{s:0,c:0}}; }});
 
         data.forEach(d => {{
-            let seg = 'Giá Tầm Trung';
-            if(d.current_price <= maxC) seg = 'Giá Thấp';
-            else if(d.current_price > maxM) seg = 'Giá Cao Cấp';
-            
-            if(d.delivery_fee === 0) {{
-                agg[seg].freeS += (d.sales_volume_num||0); agg[seg].freeC++;
-                agg[seg].freeRev += (d.sales_volume_num||0)*d.current_price;
-            }} else {{
-                agg[seg].paidS += (d.sales_volume_num||0); agg[seg].paidC++;
-                agg[seg].paidRev += (d.sales_volume_num||0)*d.current_price;
+            if (d.current_price > 0) {{
+                let ratio = (d.delivery_fee / d.current_price) * 100;
+                let rK = '> 100%';
+                if (ratio === 0) rK = '0%';
+                else if (ratio <= 50) rK = '1 - 50%';
+                else if (ratio <= 100) rK = '51 - 100%';
+                
+                rAgg[rK].s += (d.sales_volume_num || 0);
+                rAgg[rK].c++;
             }}
         }});
 
-        GI.c1_bar.data.labels = ['Giá Thấp','Giá Tầm Trung','Giá Cao Cấp'];
-        GI.c1_bar.data.datasets[0].data = [agg['Giá Thấp'].freeC>0?agg['Giá Thấp'].freeS/agg['Giá Thấp'].freeC:0, agg['Giá Tầm Trung'].freeC>0?agg['Giá Tầm Trung'].freeS/agg['Giá Tầm Trung'].freeC:0, agg['Giá Cao Cấp'].freeC>0?agg['Giá Cao Cấp'].freeS/agg['Giá Cao Cấp'].freeC:0];
-        GI.c1_bar.data.datasets[1].data = [agg['Giá Thấp'].paidC>0?agg['Giá Thấp'].paidS/agg['Giá Thấp'].paidC:0, agg['Giá Tầm Trung'].paidC>0?agg['Giá Tầm Trung'].paidS/agg['Giá Tầm Trung'].paidC:0, agg['Giá Cao Cấp'].paidC>0?agg['Giá Cao Cấp'].paidS/agg['Giá Cao Cấp'].paidC:0];
-        GI.c1_bar.update();
-
-        let tF=0, tP=0;
-        ['Giá Thấp','Giá Tầm Trung','Giá Cao Cấp'].forEach(k=> {{ tF+=agg[k].freeRev; tP+=agg[k].paidRev; }});
-        GI.c1_donut.data.datasets[0].data = [tF, tP];
-        GI.c1_donut.update();
+        window.rAggData = rAgg;
+        GI.c1_ratio.data.labels = ratioList;
+        GI.c1_ratio.data.datasets[0].data = ratioList.map(k => rAgg[k].c > 0 ? rAgg[k].s / rAgg[k].c : 0);
+        GI.c1_ratio.update();
 
         let sortedS = [...data].sort((a,b)=>(b.sales_volume_num||0) - (a.sales_volume_num||0));
         let top20count = Math.max(1, Math.floor(data.length*0.2));
         let top20 = sortedS.slice(0, top20count);
-        let primeT = top20.filter(d=>d.is_prime).length;
-        let nonT = top20.length - primeT;
+        let pSales = 0, npSales = 0;
+        top20.forEach(d => {{
+            if(d.is_prime) pSales += (d.sales_volume_num||0);
+            else npSales += (d.sales_volume_num||0);
+        }});
         
-        GI.c2_donut.data.datasets[0].data = [primeT, nonT];
+        GI.c2_donut.data.datasets[0].data = [pSales, npSales];
         GI.c2_donut.update();
 
-        let sPr=0, cPr=0, sNp=0, cNp=0;
-        data.forEach(d=> {{
-            if(d.is_prime) {{ sPr+=(d.sales_volume_num||0); cPr++; }}
-            else {{ sNp+=(d.sales_volume_num||0); cNp++; }}
+        let pPriceSum = 0, pPriceC = 0;
+        let npPriceSum = 0, npPriceC = 0;
+        data.forEach(d => {{
+            if(d.is_prime) {{ pPriceSum += d.current_price; pPriceC++; }}
+            else {{ npPriceSum += d.current_price; npPriceC++; }}
         }});
-        GI.c2_bar.data.datasets[0].data = [cPr>0?sPr/cPr:0, cNp>0?sNp/cNp:0];
+        GI.c2_bar.data.datasets[0].data = [pPriceC>0 ? pPriceSum/pPriceC : 0, npPriceC>0 ? npPriceSum/npPriceC : 0];
         GI.c2_bar.update();
 
-        let dAgg = {{'1-3d':{{s:0,r:0,c:0}},'4-7d':{{s:0,r:0,c:0}},'8-14d':{{s:0,r:0,c:0}},'>14d':{{s:0,r:0,c:0}}}};
-        let fastC=0, slowC=0;
+        let c_fast=0, c_slow=0, s_fast=0, s_slow=0;
         data.forEach(d=> {{
-            if(d.est_delivery_days != null) {{
-                let k = '>14d';
-                if(d.est_delivery_days <= 3) k='1-3d';
-                else if(d.est_delivery_days <= 7) k='4-7d';
-                else if(d.est_delivery_days <= 14) k='8-14d';
-                dAgg[k].s += (d.sales_volume_num||0); dAgg[k].r += (d.rating_val||0); dAgg[k].c++;
-                
-                if(d.est_delivery_days <= 7) fastC++; else slowC++;
+            if(d.est_delivery_days != null && !isNaN(d.est_delivery_days)) {{
+                if(d.est_delivery_days <= 20) {{ c_fast++; s_fast += (d.sales_volume_num||0); }}
+                else {{ c_slow++; s_slow += (d.sales_volume_num||0); }}
             }}
         }});
-        let dl = ['1-3d','4-7d','8-14d','>14d'];
-        GI.c3_combo.data.labels = dl;
-        GI.c3_combo.data.datasets[0].data = dl.map(k=> dAgg[k].c>0?dAgg[k].s/dAgg[k].c:0);
-        GI.c3_combo.data.datasets[1].data = dl.map(k=> dAgg[k].c>0?dAgg[k].r/dAgg[k].c:0);
+        
+        GI.c3_combo.data.labels = [`≤ 20 ngày (${{fmtN(c_fast)}} sp)`, `> 20 ngày (${{fmtN(c_slow)}} sp)`];
+        GI.c3_combo.data.datasets[0].data = [c_fast>0?s_fast/c_fast:0, c_slow>0?s_slow/c_slow:0];
         GI.c3_combo.update();
 
-        GI.c3_donut.data.datasets[0].data = [fastC, slowC];
+        let validItems = data.filter(d=>d.est_delivery_days != null && !isNaN(d.est_delivery_days));
+        validItems.sort((a,b) => (b.sales_volume_num||0) - (a.sales_volume_num||0));
+        let top20Items = validItems.slice(0, 20);
+        let top20Agg = {{}};
+        top20Items.forEach(d => {{
+            let k = d.est_delivery_days + ' ngày';
+            top20Agg[k] = (top20Agg[k]||0) + 1;
+        }});
+        
+        let t20Labels = Object.keys(top20Agg).sort((a,b)=> parseInt(a)-parseInt(b));
+        let t20Data = t20Labels.map(k=>top20Agg[k]);
+        
+        GI.c3_donut.data.labels = t20Labels;
+        GI.c3_donut.data.datasets[0].data = t20Data;
+        GI.c3_donut.data.datasets[0].backgroundColor = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
         GI.c3_donut.update();
+
+        // TOP 10% Sales Data Insights
+        let top10count = Math.max(1, Math.floor(validItems.length * 0.1));
+        let top10Data = validItems.slice(0, top10count);
+        
+        let c1_r0=0, c1_r50=0, c1_r100=0, c1_ro=0;
+        let c2_p=0, c2_np=0;
+        let c3_fast=0, c3_slow=0;
+
+        top10Data.forEach(d => {{
+            if (d.current_price > 0) {{
+                let ratio = (d.delivery_fee / d.current_price) * 100;
+                if (ratio === 0) c1_r0++;
+                else if (ratio <= 50) c1_r50++;
+                else if (ratio <= 100) c1_r100++;
+                else c1_ro++;
+            }} else if (d.delivery_fee === 0) {{
+                c1_r0++;
+            }} else {{
+                c1_ro++;
+            }}
+
+            if(d.is_prime) c2_p++; else c2_np++;
+            if(d.est_delivery_days != null && !isNaN(d.est_delivery_days)) {{
+                if(d.est_delivery_days <= 20) c3_fast++; else c3_slow++;
+            }}
+        }});
+
+        GI.c1_top10.data.labels = ['0%', '1 - 50%', '51 - 100%', '> 100%'];
+        GI.c1_top10.data.datasets[0].data = [c1_r0, c1_r50, c1_r100, c1_ro];
+        GI.c1_top10.update();
+
+        GI.c2_top10.data.labels = ['Gắn Prime', 'Không Prime'];
+        GI.c2_top10.data.datasets[0].data = [c2_p, c2_np];
+        GI.c2_top10.update();
+
+        GI.c3_top10.data.labels = ['≤ 20 ngày', '> 20 ngày'];
+        GI.c3_top10.data.datasets[0].data = [c3_fast, c3_slow];
+        GI.c3_top10.update();
+
     }}
 
     function initCharts() {{
-        const tbOpts = {{ responsive:true, maintainAspectRatio:false, plugins:{{legend:{{position:'bottom'}}}}, scales:{{y:{{grid:{{color:'rgba(0,0,0,0.05)'}}, ticks:{{callback:fmtN}}}}}}, animation: {{ duration: 1000 }} }};
-        const tdOpts = {{ responsive:true, maintainAspectRatio:false, cutout:'60%', plugins:{{legend:{{position:'bottom'}}}}, animation: {{ duration: 1000, animateScale: true }} }};
+        const legOpts = {{ position:'bottom', labels:{{boxWidth:10, padding:5, font:{{size:9}}}} }};
+        const baseOpts = {{ responsive:true, maintainAspectRatio:false, layout:{{padding:0}}, animation: {{ duration: 1000 }} }};
 
-        GI.c1_bar = new Chart(document.getElementById('c1_bar').getContext('2d'), {{
-            type:'bar', data: {{ labels:[], datasets:[{{label:'Miễn Phí Ship', data:[], backgroundColor:'#3b82f6', borderRadius:4}},{{label:'Có Phí Ship', data:[], backgroundColor:'#f97316', borderRadius:4}}] }}, options: tbOpts
-        }});
-        
-        GI.c1_donut = new Chart(document.getElementById('c1_donut').getContext('2d'), {{
-            type:'doughnut', data: {{ labels:['Miễn Phí Ship','Có Phí Ship'], datasets:[{{data:[], backgroundColor:['#3b82f6','#f97316'], borderWidth:0}}] }},
-            options: tdOpts
+        GI.c1_ratio = new Chart(document.getElementById('c1_ratio').getContext('2d'), {{
+            type:'bar', data: {{ labels:[], datasets:[{{label:'Doanh Số Trung Bình', data:[], backgroundColor:'#f97316', borderRadius:4}}] }}, 
+            options: {{ ...baseOpts, plugins:{{
+                legend:{{display:false}}, 
+                datalabels: {{
+                    display: true, align: 'end', anchor: 'end', color: '#f97316', font: {{weight: 'bold', size: 10}},
+                    formatter: function(value) {{ return fmtN(value) + '\\nLượt bán/tháng'; }},
+                    textAlign: 'center'
+                }},
+                tooltip:{{callbacks:{{label: function(c){{ 
+                    if(!window.rAggData) return '';
+                    let labelStr = c.label;
+                    let count = window.rAggData[labelStr] ? window.rAggData[labelStr].c : 0;
+                    return fmtN(count) + ' số sản phẩm được bán'; 
+                }}}}}}
+            }}, scales:{{x: {{grid: {{display:false}}, ticks:{{font:{{size:10, weight:'bold'}}}}}}, y:{{grace:'30%', grid:{{color:'rgba(0,0,0,0.05)'}}, ticks:{{callback:function(v){{return fmtN(v);}}, font:{{size:9}}}}}}}} }}
         }});
         
         GI.c2_donut = new Chart(document.getElementById('c2_donut').getContext('2d'), {{
-            type:'doughnut', data: {{ labels:['Có Prime','Không Prime'], datasets:[{{data:[], backgroundColor:['#10b981','#cbd5e1'], borderWidth:0}}] }},
-            options: tdOpts
+            type:'doughnut', data: {{ labels:['Có Prime','Không Nhãn Prime'], datasets:[{{data:[], backgroundColor:['#10b981','#cbd5e1'], borderWidth:0}}] }},
+            options: {{ ...baseOpts, cutout:'60%', plugins:{{legend:legOpts, tooltip:{{callbacks:{{label: function(c){{ return c.label + ': ' + fmtN(c.raw) + ' Lượt Tương Tác/Bán'; }}}}}}}}, animation: {{ duration: 1000, animateScale: true }} }}
         }});
 
         GI.c2_bar = new Chart(document.getElementById('c2_bar').getContext('2d'), {{
-            type:'bar', data: {{ labels:['Có Prime','Không Prime'], datasets:[{{label:'Doanh Số TB', data:[], backgroundColor:['#10b981','#cbd5e1'], borderRadius:4}}] }},
-            options: {{ responsive:true, maintainAspectRatio:false, plugins:{{legend:{{display:false}}}}, scales:{{x: {{grid: {{display:false}}}}, y:{{grid:{{color:'rgba(0,0,0,0.05)'}}, ticks:{{callback:fmtN}}}}}}, animation: {{ duration: 1000 }} }}
+            type:'bar', data: {{ labels:['Được gắn Prime','Chưa Gắn Prime'], datasets:[{{label:'Giá Trung Bình', data:[], backgroundColor:['#10b981','#cbd5e1'], borderRadius:4}}] }},
+            options: {{ ...baseOpts, plugins:{{legend:{{display:false}}, tooltip:{{callbacks:{{label: function(c){{ return 'Trung Bình: $' + fmtR(c.raw); }}}}}}}}, scales:{{x: {{grid: {{display:false}}, ticks:{{font:{{size:9}}}}}}, y:{{grid:{{color:'rgba(0,0,0,0.05)'}}, ticks:{{callback:function(v){{return '$' + fmtN(v);}}, font:{{size:9}}}}}}}} }}
         }});
 
         GI.c3_combo = new Chart(document.getElementById('c3_combo').getContext('2d'), {{
-            type:'bar', data: {{ labels:[], datasets:[{{type:'bar',label:'Doanh Số',data:[],backgroundColor:'#facc15',yAxisID:'yl', borderRadius:4}},{{type:'line',label:'Đánh Giá',data:[],borderColor:'#ef4444',backgroundColor:'#ef4444',tension:0.3,yAxisID:'yr',borderWidth:3,pointRadius:4}}] }},
-            options: {{ responsive:true, maintainAspectRatio:false, plugins:{{legend:{{position:'bottom'}}}}, scales:{{x:{{grid:{{display:false}}}}, yl:{{position:'left',grid:{{color:'rgba(0,0,0,0.05)'}},ticks:{{callback:fmtN}}}}, yr:{{position:'right',grid:{{display:false}},min:3.0,max:5.0}} }}, animation: {{ duration: 1000 }} }}
+            type:'bar', data: {{ labels:[], datasets:[{{type:'bar',label:'Doanh Số Trung Bình',data:[],backgroundColor:'#facc15', borderRadius:4}}] }},
+            options: {{ ...baseOpts, plugins:{{legend:legOpts, tooltip:{{callbacks:{{label: function(c){{ return 'Doanh Số: ' + fmtN(c.raw) + ' Lượt Bán Mỗi Tháng'; }}}}}}}}, scales:{{x:{{grid:{{display:false}}, ticks:{{font:{{size:9}}}}}}, y:{{grid:{{color:'rgba(0,0,0,0.05)'}},ticks:{{callback:function(v){{return fmtN(v) + ' Lượt Bán';}}, font:{{size:9}}}}}} }} }}
         }});
 
         GI.c3_donut = new Chart(document.getElementById('c3_donut').getContext('2d'), {{
-            type:'doughnut', data: {{ labels:['Giao Nhanh (<=7 ng)','Giao Chậm'], datasets:[{{data:[], backgroundColor:['#facc15','#cbd5e1'], borderWidth:0}}] }},
-            options: tdOpts
+            type:'doughnut', data: {{ labels:[], datasets:[{{data:[], backgroundColor:['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'], borderWidth:0}}] }},
+            options: {{ ...baseOpts, cutout:'60%', plugins:{{legend:legOpts, tooltip:{{callbacks:{{label: function(c){{ return c.label + ': ' + fmtN(c.raw) + ' Sản Phẩm'; }}}}}}}}, animation: {{ duration: 1000, animateScale: true }} }}
+        }});
+
+        GI.c1_top10 = new Chart(document.getElementById('c1_top10').getContext('2d'), {{
+            type:'doughnut', data: {{ labels:[], datasets:[{{data:[], backgroundColor:['#3b82f6', '#10b981', '#f59e0b', '#ef4444'], borderWidth:0}}] }},
+            options: {{ ...baseOpts, cutout:'65%', plugins:{{legend:legOpts, tooltip:{{callbacks:{{label: function(c){{ return c.label + ': ' + fmtN(c.raw) + ' SP'; }}}}}}}}, animation: {{ duration: 1000, animateScale: true }} }}
+        }});
+
+        GI.c2_top10 = new Chart(document.getElementById('c2_top10').getContext('2d'), {{
+            type:'doughnut', data: {{ labels:[], datasets:[{{data:[], backgroundColor:['#10b981','#cbd5e1'], borderWidth:0}}] }},
+            options: {{ ...baseOpts, cutout:'65%', plugins:{{legend:legOpts, tooltip:{{callbacks:{{label: function(c){{ return c.label + ': ' + fmtN(c.raw) + ' SP'; }}}}}}}}, animation: {{ duration: 1000, animateScale: true }} }}
+        }});
+
+        GI.c3_top10 = new Chart(document.getElementById('c3_top10').getContext('2d'), {{
+            type:'doughnut', data: {{ labels:[], datasets:[{{data:[], backgroundColor:['#facc15','#cbd5e1'], borderWidth:0}}] }},
+            options: {{ ...baseOpts, cutout:'65%', plugins:{{legend:legOpts, tooltip:{{callbacks:{{label: function(c){{ return c.label + ': ' + fmtN(c.raw) + ' SP'; }}}}}}}}, animation: {{ duration: 1000, animateScale: true }} }}
         }});
     }}
 
@@ -312,4 +429,4 @@ def render(df_raw):
 </html>
     """
     
-    components.html(html_code, height=860, scrolling=False)
+    components.html(html_code, height=900, scrolling=False)
