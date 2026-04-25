@@ -39,11 +39,25 @@ def render(df: pd.DataFrame):
         "tools_home_improvement": "Dụng Cụ Sửa Nhà",
     }
 
-    data["current_price"]    = pd.to_numeric(data.get("price", data.get("current_price", 0)), errors="coerce").fillna(0.0)
-    data["original_price"]   = pd.to_numeric(data.get("original_price", 0), errors="coerce").fillna(0.0)
-    data["rating"]           = pd.to_numeric(data.get("rating", 0), errors="coerce").fillna(0.0)
-    data["reviews"]          = pd.to_numeric(data.get("reviews", 0), errors="coerce").fillna(0)
-    data["sales_volume_num"] = pd.to_numeric(data.get("sales_volume_num", 0), errors="coerce").fillna(0)
+    # Đảm bảo các cột cần thiết tồn tại và có kiểu dữ liệu số
+    for col, fallback in [
+        ("current_price", 0.0),
+        ("original_price", 0.0),
+        ("rating", 0.0),
+        ("reviews", 0),
+        ("sales_volume_num", 0)
+    ]:
+        if col == "current_price":
+            # Ưu tiên lấy từ cột "price" nếu có
+            src_col = "price" if "price" in data.columns else "current_price"
+            if src_col in data.columns:
+                data[col] = data[src_col]
+            else:
+                data[col] = fallback
+        elif col not in data.columns:
+            data[col] = fallback
+            
+        data[col] = pd.to_numeric(data[col], errors="coerce").fillna(fallback)
 
     if "crawl_category" not in data.columns:
         data["crawl_category"] = "Không rõ"

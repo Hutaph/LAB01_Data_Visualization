@@ -18,7 +18,6 @@ if best_model.exists():
         # keep dump as empty list; print warning to stdout for debugging
         print("Warning: failed to load model for features dump:", e)
 
-from components.footer import render_footer
 from components.header import render_header
 from components.navigation import render_navigation
 from services.data_loader import COLOR_SEQUENCE, load_data
@@ -108,6 +107,3 @@ with col_content:
     active_tab = st.session_state.get("active_tab", "Tổng quan Thị trường")
     route_tab(active_tab, STATE, DF)
 
-_, col_footer = st.columns([1, 15], gap="small")
-with col_footer:
-    render_footer()

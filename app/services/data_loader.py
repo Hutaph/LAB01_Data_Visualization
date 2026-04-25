@@ -32,6 +32,9 @@ def _parse_delivery_fee(series: pd.Series) -> pd.Series:
     fee = text.str.extract(r"\$(\d+(?:\.\d+)?)\s*delivery", expand=False)
     return pd.to_numeric(fee, errors="coerce")
 
+# Các từ khóa xác định file KHÔNG phải visualization (cần loại trừ)
+_EXCLUDE_KEYWORDS = ["modeling", "train", "test", "val", "pipeline"]
+
 def _resolve_latest_csv() -> Path:
     app_dir = Path(__file__).resolve().parents[1]
     root_dir = app_dir.parent
@@ -51,13 +54,25 @@ def _resolve_latest_csv() -> Path:
             "Không tìm thấy file CSV trong data/Processed hoặc data/processed."
         )
 
-    preferred = [p for p in csv_files if p.stem.lower() == "amazon_products_viz"]
+    # Ưu tiên file viz, loại bỏ file modeling/train/test/val
+    preferred = [
+        p for p in csv_files
+        if "amazon_products_viz" in p.stem.lower()
+        and not any(kw in p.stem.lower() for kw in _EXCLUDE_KEYWORDS)
+    ]
     if preferred:
-        return preferred[-1]
+        chosen = max(preferred, key=lambda p: p.stat().st_mtime)
+        return chosen
 
-    return max(csv_files, key=lambda p: p.stat().st_mtime)
+    # Fallback: loại bỏ file modeling/train/test/val
+    fallback = [
+        p for p in csv_files
+        if not any(kw in p.stem.lower() for kw in _EXCLUDE_KEYWORDS)
+    ]
+    chosen = max(fallback or csv_files, key=lambda p: p.stat().st_mtime)
+    return chosen
 
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=None)
 def load_data() -> tuple[pd.DataFrame, dict]:
     # Force cache invalidation to re-read amazon_products_viz.csv
     csv_path = _resolve_latest_csv()
