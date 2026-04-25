@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 def render(df_raw):
     df = df_raw.copy()
 
-    # 1. Robust Feature Engineering & Type Conversion
+    # 1. Feature Engineering
     if "price" in df.columns:
         df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0.0)
     else:
@@ -39,7 +39,14 @@ def render(df_raw):
             df["crawl_category"] = "Không rõ"
     df["crawl_category"] = df["crawl_category"].fillna("Không rõ")
 
-    # 2. Export clean JSON data
+    # 2. Data for Category Analysis
+    cat_stats = df.groupby("crawl_category")["discount_rate"].mean().sort_values(ascending=False).head(5)
+    cat_data = {
+        "labels": cat_stats.index.tolist(),
+        "values": cat_stats.values.tolist()
+    }
+
+    # 3. Export clean JSON data
     select_cols = ["crawl_category", "price", "original_price", "discount_rate", "sales_volume_num", "is_prime"]
     existing_cols = [c for c in select_cols if c in df.columns]
     data_json_str = df[existing_cols].to_json(orient="records")
@@ -57,101 +64,32 @@ def render(df_raw):
             --bg: #FEF3E2;
             --card-bg: #FFFFFF;
             --text-primary: #1C1917;
-            --text-secondary: #78716C;
             --border-radius: 12px;
             --font-family: 'Inter', sans-serif;
         }}
-        
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+        body {{ background-color: var(--bg); font-family: var(--font-family); color: var(--text-primary); padding: 8px; overflow: hidden; }}
         
-        body {{ 
-            background-color: var(--bg); 
-            font-family: var(--font-family); 
-            color: var(--text-primary); 
-            padding: 10px 15px; 
-            overflow-x: hidden; 
-        }}
-        
-        .kpi-row {{ 
-            display: grid; 
-            grid-template-columns: repeat(4, 1fr); 
-            gap: 15px; 
-            margin-bottom: 15px; 
-        }}
-        
-        .kpi-card {{ 
-            background: var(--card-bg); 
-            padding: 15px; 
-            border-radius: var(--border-radius); 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); 
-            border-left: 5px solid var(--primary); 
-        }}
-        
-        .kpi-title {{ 
-            font-size: 10px; 
-            font-weight: 700; 
-            color: var(--text-secondary); 
-            text-transform: uppercase; 
-            margin-bottom: 5px; 
-            letter-spacing: 0.05em;
-        }}
-        
-        .kpi-value {{ 
-            font-size: 22px; 
-            font-weight: 700; 
-            color: var(--text-primary); 
-        }}
+        .kpi-row {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }}
+        .kpi-card {{ background: var(--card-bg); padding: 10px 15px; border-radius: var(--border-radius); border-left: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
+        .kpi-title {{ font-size: 9px; color: #78716C; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }}
+        .kpi-value {{ font-size: 20px; font-weight: 700; }}
 
-        .chart-grid {{ 
-            display: grid; 
-            grid-template-columns: 1fr 1.2fr; 
-            gap: 15px; 
-            margin-bottom: 15px; 
-        }}
+        .chart-grid {{ display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }}
+        .bottom-grid {{ display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 10px; }}
         
-        .chart-card {{ 
-            background: var(--card-bg); 
-            padding: 15px; 
-            border-radius: var(--border-radius); 
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); 
-        }}
-        
-        .chart-title {{ 
-            font-size: 14px; 
-            font-weight: 600; 
-            margin-bottom: 15px; 
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }}
-        
-        .chart-container {{ 
-            position: relative; 
-            height: 240px; 
-            width: 100%;
-        }}
-        
-        .full-row {{ grid-column: span 2; }}
+        .chart-card {{ background: var(--card-bg); padding: 12px; border-radius: var(--border-radius); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
+        .chart-title {{ font-size: 13px; font-weight: 600; margin-bottom: 10px; color: #444; }}
+        .chart-container {{ position: relative; height: 180px; width: 100%; }}
+        .chart-container-large {{ height: 210px; }}
     </style>
 </head>
 <body>
     <div class="kpi-row">
-        <div class="kpi-card">
-            <div class="kpi-title">Mức giảm giá TB</div>
-            <div class="kpi-value" id="kpi_avg_discount">0%</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-title">SP đang khuyến mãi</div>
-            <div class="kpi-value" id="kpi_sale_count">0%</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Giá bán trung bình</div>
-            <div class="kpi-value" id="kpi_avg_price">$0</div>
-        </div>
-        <div class="kpi-card">
-            <div class="kpi-title">Tổng doanh số (ước tính)</div>
-            <div class="kpi-value" id="kpi_sales_impact">0</div>
-        </div>
+        <div class="kpi-card"><div class="kpi-title">Mức giảm giá TB</div><div class="kpi-value" id="kpi_avg_discount">0%</div></div>
+        <div class="kpi-card"><div class="kpi-title">SP đang khuyến mãi</div><div class="kpi-value" id="kpi_sale_count">0%</div></div>
+        <div class="kpi-card"><div class="kpi-title">Giá bán trung bình</div><div class="kpi-value" id="kpi_avg_price">$0</div></div>
+        <div class="kpi-card"><div class="kpi-title">Tổng doanh số</div><div class="kpi-value" id="kpi_sales_impact">0</div></div>
     </div>
 
     <div class="chart-grid">
@@ -160,29 +98,40 @@ def render(df_raw):
             <div class="chart-container"><canvas id="histChart"></canvas></div>
         </div>
         <div class="chart-card">
-            <div class="chart-title">Hiệu quả doanh số theo mức giảm</div>
+            <div class="chart-title">Hiệu quả theo mức giảm</div>
             <div class="chart-container"><canvas id="salesBarChart"></canvas></div>
         </div>
-        <div class="chart-card full-row">
-            <div class="chart-title">Chiến lược Giá & Hiệu quả: Amazon Prime</div>
-            <div class="chart-container" style="height: 180px;"><canvas id="primeChart"></canvas></div>
+        <div class="chart-card">
+            <div class="chart-title">Phân khúc Ưu đãi thị trường</div>
+            <div class="chart-container"><canvas id="discountPieChart"></canvas></div>
+        </div>
+    </div>
+
+    <div class="bottom-grid">
+        <div class="chart-card">
+            <div class="chart-title">Top 5 Ngành hàng giảm giá sâu nhất (%)</div>
+            <div class="chart-container-large"><canvas id="catChart"></canvas></div>
+        </div>
+        <div class="chart-card">
+            <div class="chart-title">Chiến lược Giá & Hiệu quả: Prime</div>
+            <div class="chart-container-large"><canvas id="primeChart"></canvas></div>
         </div>
     </div>
 
     <script>
         const rawData = {data_json_str};
+        const catData = {json.dumps(cat_data)};
 
         function formatN(n) {{ return n.toLocaleString(); }}
 
         function init() {{
             const withDiscount = rawData.filter(d => d.discount_rate > 0);
             const avgDiscount = rawData.length ? rawData.reduce((a, b) => a + b.discount_rate, 0) / rawData.length : 0;
-            const salePct = rawData.length ? (withDiscount.length / rawData.length) * 100 : 0;
             const avgPrice = rawData.length ? rawData.reduce((a, b) => a + b.price, 0) / rawData.length : 0;
             const totalSales = rawData.reduce((a, b) => a + (b.sales_volume_num || 0), 0);
 
             document.getElementById('kpi_avg_discount').innerText = avgDiscount.toFixed(1) + "%";
-            document.getElementById('kpi_sale_count').innerText = salePct.toFixed(1) + "%";
+            document.getElementById('kpi_sale_count').innerText = ((withDiscount.length / rawData.length) * 100).toFixed(1) + "%";
             document.getElementById('kpi_avg_price').innerText = "$" + avgPrice.toFixed(2);
             document.getElementById('kpi_sales_impact').innerText = formatN(totalSales);
 
@@ -190,99 +139,61 @@ def render(df_raw):
         }}
 
         function renderCharts() {{
-            const bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 101];
             const labels = ['0-10%', '10-20%', '20-30%', '30-40%', '40-50%', '50-60%', '60-70%', '70-80%', '80-90%', '>90%'];
-            
-            const counts = new Array(labels.length).fill(0);
-            const sumSales = new Array(labels.length).fill(0);
-            const countSales = new Array(labels.length).fill(0);
+            const bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 101];
+            const counts = new Array(10).fill(0), sumS = new Array(10).fill(0), cntS = new Array(10).fill(0);
             
             rawData.forEach(d => {{
-                for(let i=0; i<bins.length-1; i++) {{
+                for(let i=0; i<10; i++) {{
                     if(d.discount_rate >= bins[i] && d.discount_rate < bins[i+1]) {{
                         counts[i]++;
-                        if(d.sales_volume_num > 0) {{
-                            sumSales[i] += d.sales_volume_num;
-                            countSales[i]++;
-                        }}
+                        if(d.sales_volume_num > 0) {{ sumS[i] += d.sales_volume_num; cntS[i]++; }}
                         break;
                     }}
                 }}
             }});
-
-            const avgSalesByBin = sumSales.map((sum, i) => countSales[i] ? Math.round(sum / countSales[i]) : 0);
+            const avgS = sumS.map((s, i) => cntS[i] ? Math.round(s/cntS[i]) : 0);
 
             // 1. Histogram
-            new Chart(document.getElementById('histChart').getContext('2d'), {{
+            new Chart(document.getElementById('histChart'), {{
                 type: 'bar',
-                data: {{
-                    labels: labels,
-                    datasets: [{{ label: 'Số lượng SP', data: counts, backgroundColor: '#F97316', borderRadius: 6 }}]
-                }},
-                options: {{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: {{ legend: {{ display: false }} }},
-                    scales: {{ 
-                        y: {{ beginAtZero: true, title: {{ display: true, text: 'Số lượng sản phẩm' }} }}, 
-                        x: {{ grid: {{ display: false }} }} 
-                    }}
-                }}
+                data: {{ labels, datasets: [{{ label: 'SP', data: counts, backgroundColor: '#F97316', borderRadius: 4 }}] }},
+                options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }}, x: {{ grid: {{ display: false }} }} }} }}
             }});
 
             // 2. Sales Bar
-            new Chart(document.getElementById('salesBarChart').getContext('2d'), {{
+            new Chart(document.getElementById('salesBarChart'), {{
                 type: 'bar',
-                data: {{
-                    labels: labels,
-                    datasets: [{{ label: 'Doanh số TB', data: avgSalesByBin, backgroundColor: '#9A3412', borderRadius: 6 }}]
-                }},
-                options: {{
-                    responsive: true, maintainAspectRatio: false,
-                    plugins: {{ legend: {{ display: false }} }},
-                    scales: {{ 
-                        y: {{ beginAtZero: true, title: {{ display: true, text: 'Lượt bán trung bình' }} }},
-                        x: {{ grid: {{ display: false }} }}
-                    }}
-                }}
+                data: {{ labels, datasets: [{{ label: 'Sales', data: avgS, backgroundColor: '#9A3412', borderRadius: 4 }}] }},
+                options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ display: false }} }}, scales: {{ y: {{ beginAtZero: true }}, x: {{ grid: {{ display: false }} }} }} }}
             }});
 
-            // 3. Original Merged Prime Chart
-            renderPrimeChart();
-        }}
+            // 3. Market Pie
+            const d = rawData;
+            const seg = [d.filter(x=>x.discount_rate<=0).length, d.filter(x=>x.discount_rate>0&&x.discount_rate<=20).length, d.filter(x=>x.discount_rate>20&&x.discount_rate<=50).length, d.filter(x=>x.discount_rate>50).length];
+            new Chart(document.getElementById('discountPieChart'), {{
+                type: 'doughnut',
+                data: {{ labels: ['Gốc', '<20%', '20-50%', '>50%'], datasets: [{{ data: seg, backgroundColor: ['#78716C', '#FED7AA', '#F97316', '#9A3412'], borderWidth: 0 }}] }},
+                options: {{ responsive: true, maintainAspectRatio: false, plugins: {{ legend: {{ position: 'bottom', labels: {{ boxWidth: 10, font: {{ size: 9 }} }} }} }} }}
+            }});
 
-        function renderPrimeChart() {{
-            const prime = rawData.filter(d => d.is_prime);
-            const nonPrime = rawData.filter(d => !d.is_prime);
-            const avgP = [
-                prime.length ? prime.reduce((a,b)=>a+b.price,0)/prime.length : 0,
-                nonPrime.length ? nonPrime.reduce((a,b)=>a+b.price,0)/nonPrime.length : 0
-            ];
-            const avgS = [
-                prime.length ? prime.reduce((a,b)=>a+(b.sales_volume_num||0),0)/prime.length : 0,
-                nonPrime.length ? nonPrime.reduce((a,b)=>a+(b.sales_volume_num||0),0)/nonPrime.length : 0
-            ];
-
-            new Chart(document.getElementById('primeChart').getContext('2d'), {{
+            // 4. Category Analysis (Horizontal)
+            new Chart(document.getElementById('catChart'), {{
                 type: 'bar',
-                data: {{
-                    labels: ['Amazon Prime', 'Thường'],
-                    datasets: [
-                        {{ label: 'Giá bán TB ($)', data: avgP, backgroundColor: '#F97316', borderRadius: 6 }},
-                        {{ label: 'Lượt bán TB', data: avgS, backgroundColor: '#9A3412', borderRadius: 6 }}
-                    ]
-                }},
-                options: {{
-                    indexAxis: 'y',
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {{
-                        x: {{ beginAtZero: true, grid: {{ display: false }} }},
-                        y: {{ grid: {{ display: false }} }}
-                    }}
-                }}
+                data: {{ labels: catData.labels, datasets: [{{ label: 'Giảm giá TB (%)', data: catData.values, backgroundColor: '#EA580C', borderRadius: 6 }}] }},
+                options: {{ indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: {{ x: {{ beginAtZero: true }} }} }}
+            }});
+
+            // 5. Prime Comparison
+            const p = rawData.filter(x=>x.is_prime), n = rawData.filter(x=>!x.is_prime);
+            const pS = [p.length?p.reduce((a,b)=>a+b.price,0)/p.length:0, n.length?n.reduce((a,b)=>a+b.price,0)/n.length:0];
+            const sS = [p.length?p.reduce((a,b)=>a+(b.sales_volume_num||0),0)/p.length:0, n.length?n.reduce((a,b)=>a+(b.sales_volume_num||0),0)/n.length:0];
+            new Chart(document.getElementById('primeChart'), {{
+                type: 'bar',
+                data: {{ labels: ['Prime', 'Thường'], datasets: [{{ label: 'Giá ($)', data: pS, backgroundColor: '#F97316' }}, {{ label: 'Sales', data: sS, backgroundColor: '#9A3412' }}] }},
+                options: {{ indexAxis: 'y', responsive: true, maintainAspectRatio: false, scales: {{ x: {{ beginAtZero: true }} }} }}
             }});
         }}
-
         init();
     </script>
 </body>
