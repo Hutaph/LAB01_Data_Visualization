@@ -31,6 +31,7 @@ def render_header(state):
             <div class="az-header-logo-wrap">{logo_html}</div>
             <div class="az-header-left">
                 <div class="az-title-line">Phân tích Dữ liệu Thương mại Điện tử Amazon</div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,

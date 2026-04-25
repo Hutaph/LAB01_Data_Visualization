@@ -165,7 +165,6 @@ def render_navigation() -> str:
   .hover-sidebar:hover .nav-text {{
     opacity: 1;
     max-width: 160px;
-    margin-left: 12px;
   }}
 </style>
 </head>
