@@ -73,23 +73,36 @@ def render(df_raw):
 
         /* ── FILTER BAR ── */
         .fb{
-          display:grid;grid-template-columns:1fr;gap:14px;
+          display:flex;align-items:flex-end;gap:24px;
           background:#fff;border:1px solid var(--bd);border-radius:10px;
-          padding:12px 16px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;
+          padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;flex-wrap:wrap;
         }
         .fb-item label{
           display:block;font-size:10px;font-weight:700;color:var(--t2);
-          text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;
+          text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;
         }
         .fb-item select{
-          width:100%;padding:7px 30px 7px 10px;
-          border:1px solid var(--bd);border-radius:6px;
-          font-size:13px;font-family:var(--fn);color:var(--t1);
+          padding:7px 30px 7px 10px;border:1px solid var(--bd);border-radius:6px;
+          font-size:13px;font-family:var(--fn);color:var(--t1);min-width:180px;
           background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
-          appearance:none;cursor:pointer;outline:none;transition:border-color .15s;
+          appearance:none;cursor:pointer;outline:none;
         }
-        .fb-item select:hover{border-color:var(--pr);}
-        .fb-item select:focus{border-color:var(--pr);box-shadow:0 0 0 3px rgba(249,115,22,.12);}
+        
+        /* Slider */
+        .sl-wrap{display:flex;flex-direction:column;min-width:220px}
+        .sl-cont{position:relative;height:20px;display:flex;align-items:center}
+        .sl-track{position:absolute;left:0;right:0;height:4px;border-radius:2px;background:#E5E7EB}
+        .sl-input{position:absolute;width:100%;pointer-events:none;background:none;appearance:none;-webkit-appearance:none;margin:0}
+        .sl-input::-webkit-slider-thumb{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:#FFF;border:2px solid var(--pr);cursor:pointer;-webkit-appearance:none;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+        .sl-vals{display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin-top:4px;color:var(--t2)}
+
+        /* Toggle */
+        .tg-grp{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding-bottom:5px}
+        .tg-trk{position:relative;width:40px;height:22px;background:#E5E7EB;border-radius:11px;transition:.3s}
+        .tg-trk.on{background:var(--pr)}
+        .tg-thb{position:absolute;top:2px;left:2px;width:18px;height:18px;background:#FFF;border-radius:50%;transition:.3s;box-shadow:0 1px 2px rgba(0,0,0,0.1)}
+        .tg-trk.on .tg-thb{transform:translateX(18px)}
+        .tg-lbl{font-size:13px;font-weight:600;color:var(--t1)}
 
         /* ── KPI ── */
         .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
@@ -120,6 +133,25 @@ def render(df_raw):
     <select id="selCategory" onchange="applyFilters()">
       <option value="ALL">Tất cả Danh mục</option>
     </select>
+  </div>
+
+  <div class="fb-item">
+    <div class="sl-wrap">
+      <label>Khoảng giá ($)</label>
+      <div class="sl-cont">
+        <div id="slTrack" class="sl-track"></div>
+        <input type="range" id="pMin" class="sl-input" value="0" step="1" oninput="updateSliderUI(this); applyFilters()">
+        <input type="range" id="pMax" class="sl-input" value="1000" step="1" oninput="updateSliderUI(this); applyFilters()">
+      </div>
+      <div class="sl-vals">
+        <span id="vMin">$0</span><span id="vMax">$1,000</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="tg-grp" onclick="togglePrime()">
+    <div class="tg-trk" id="tgPrime"><div class="tg-thb"></div></div>
+    <span class="tg-lbl">Prime Only</span>
   </div>
 </div>
 
@@ -157,6 +189,7 @@ def render(df_raw):
     let charts = {};
     const COLORS = { choice: '#F97316', non: '#9A3412' };
     const SC = {"Amazon's Choice": '#F97316', "Thường": '#9A3412'};
+    let primeOnly = false;
     
     Chart.defaults.font.family="'Inter',sans-serif"; Chart.defaults.color='#78716C';
     const fN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
@@ -167,25 +200,71 @@ def render(df_raw):
 
     function setup() {
         let cats = new Set();
-        RAW.forEach(d => { if(d.crawl_category && d.crawl_category !== 'Không rõ' && d.crawl_category !== 'Khác') cats.add(d.crawl_category); });
+        let maxPrice = 0;
+        RAW.forEach(d => { 
+            if(d.crawl_category && d.crawl_category !== 'Không rõ' && d.crawl_category !== 'Khác') cats.add(d.crawl_category); 
+            if(d.current_price > maxPrice) maxPrice = d.current_price;
+        });
+
+        // Setup Category
         let sel = document.getElementById('selCategory');
         Array.from(cats).sort().forEach(c => {
             let opt = document.createElement('option');
             opt.value = c; opt.innerText = c;
             sel.appendChild(opt);
         });
+
+        // Setup Slider
+        let roundedMax = Math.ceil(maxPrice/50)*50;
+        if(roundedMax < 100) roundedMax = 1000;
+        let pMinE = document.getElementById('pMin'), pMaxE = document.getElementById('pMax');
+        pMinE.max = roundedMax; pMaxE.max = roundedMax; pMaxE.value = roundedMax;
+        updateSliderUI(null);
+
+        applyFilters();
+    }
+
+    function updateSliderUI(el) {
+        let minE = document.getElementById('pMin'), maxE = document.getElementById('pMax');
+        let vMin = parseInt(minE.value), vMax = parseInt(maxE.value);
+        if(vMin > vMax - 5) {
+            if(el && el.id==='pMin') minE.value = vMax - 5;
+            else maxE.value = vMin + 5;
+        }
+        vMin = parseInt(minE.value); vMax = parseInt(maxE.value);
+        
+        let p1 = (vMin / minE.max) * 100, p2 = (vMax / maxE.max) * 100;
+        document.getElementById('slTrack').style.background = `linear-gradient(to right, #E5E7EB ${p1}%, var(--pr) ${p1}%, var(--pr) ${p2}%, #E5E7EB ${p2}%)`;
+        document.getElementById('vMin').innerText = '$' + vMin.toLocaleString();
+        document.getElementById('vMax').innerText = '$' + vMax.toLocaleString();
+    }
+
+    function togglePrime() {
+        primeOnly = !primeOnly;
+        document.getElementById('tgPrime').classList.toggle('on', primeOnly);
         applyFilters();
     }
 
     function applyFilters() {
         let cat = document.getElementById('selCategory').value;
-        let data = RAW.filter(d => cat === 'ALL' || d.crawl_category === cat);
+        let vMin = parseInt(document.getElementById('pMin').value);
+        let vMax = parseInt(document.getElementById('pMax').value);
+
+        let data = RAW.filter(d => {
+            if(cat !== 'ALL' && d.crawl_category !== cat) return false;
+            if(d.current_price < vMin || d.current_price > vMax) return false;
+            if(primeOnly && !d.is_prime) return false;
+            return true;
+        });
         updateDashboard(data);
     }
 
     function updateDashboard(data) {
         destroy();
-        if(data.length === 0) return;
+        if(data.length === 0) {
+            document.getElementById('kpiRow').innerHTML = '<div style="grid-column:span 4;text-align:center;padding:20px;color:var(--t2)">Không có dữ liệu phù hợp bộ lọc</div>';
+            return;
+        }
         
         let G_choice = data.filter(d => d.is_amazon_choice);
         let G_non = data.filter(d => !d.is_amazon_choice);
@@ -267,13 +346,13 @@ def render(df_raw):
 """
     st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
     html_final = _HTML.replace("__DATA_JSON__", data_json_str)
-    components.html(html_final, height=650, scrolling=False)
+    components.html(html_final, height=720, scrolling=False)
     
     # Auto-commit and push as requested
     import subprocess
     try:
         subprocess.run(["git", "add", "app/tabs/tab_nhan_uy_tin.py"], check=True)
-        subprocess.run(["git", "commit", "-m", "Restore 2x2 layout and remove bubble chart"], check=True)
+        subprocess.run(["git", "commit", "-m", "UI: update filter bar with Price Range and Prime toggle"], check=True)
         subprocess.run(["git", "push", "origin", "feature/outstanding_label"], check=True)
     except Exception as e:
         st.sidebar.error(f"Auto-push failed: {e}")
