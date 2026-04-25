@@ -591,7 +591,7 @@ def render(df):
                         imp = pd.DataFrame({"f": feature_names, "v": model.feature_importances_}).sort_values("v", ascending=False).head(8)
                         fig = go.Figure(go.Bar(x=imp["v"], y=imp["f"], orientation='h', marker_color='#F97316'))
                         fig.update_layout(height=320, margin=dict(t=20, b=20, l=40, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width='stretch')
                 with col_side:
                     with st.expander("🛠️ DEBUG DỮ LIỆU", expanded=False):
                         st.write("RAW INPUT")
