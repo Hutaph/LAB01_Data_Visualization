@@ -198,33 +198,6 @@ select:focus {{ border-color: var(--primary); }}
     margin-top: 5px;
 }}
 
-.toggle-group {{
-    display: flex;
-    gap: 8px;
-    align-items: center;
-    cursor: pointer;
-    padding-bottom: 2px;
-}}
-.toggle-switch {{
-    position: relative;
-    width: 36px; height: 20px;
-    background: #E5E7EB;
-    border-radius: 20px;
-    transition: background .25s;
-    flex-shrink: 0;
-}}
-.toggle-knob {{
-    position: absolute;
-    top: 2px; left: 2px;
-    width: 16px; height: 16px;
-    background: #fff;
-    border-radius: 50%;
-    transition: transform .25s;
-}}
-.toggle-checkbox {{ display: none; }}
-.toggle-checkbox:checked + .toggle-switch {{ background: var(--primary); }}
-.toggle-checkbox:checked + .toggle-switch .toggle-knob {{ transform: translateX(16px); }}
-.toggle-lbl {{ font-size: 13px; font-weight: 500; white-space: nowrap; }}
 
 .mode-divider {{
     width: 1px;
@@ -400,14 +373,6 @@ select:focus {{ border-color: var(--primary); }}
         </div>
     </div>
 
-    <div class="f-item">
-        <span class="f-label">&nbsp;</span>
-        <label class="toggle-group">
-            <input type="checkbox" id="chkSales" class="toggle-checkbox" onchange="applyFilters()">
-            <div class="toggle-switch"><div class="toggle-knob"></div></div>
-            <span class="toggle-lbl">Có dữ liệu doanh số</span>
-        </label>
-    </div>
 
 </div>
 
@@ -590,14 +555,12 @@ function getFiltered() {{
     const revHi     = parseFloat(document.getElementById('reviews_max').value);
     const pLo       = parseFloat(document.getElementById('price_min').value);
     const pHi       = parseFloat(document.getElementById('price_max').value);
-    const salesOnly = document.getElementById('chkSales').checked;
 
     return RAW_DATA.filter(d => {{
         if (cat !== 'ALL' && d.crawl_category !== cat) return false;
         if (d.rating        < rLo  || d.rating        > rHi)  return false;
         if (d.reviews       < revLo|| d.reviews       > revHi) return false;
         if (d.current_price < pLo  || d.current_price > pHi)  return false;
-        if (salesOnly && d.sales_volume_num <= 0)               return false;
         return true;
     }});
 }}
@@ -924,7 +887,8 @@ function drawScatterPlot(data) {{
     const h = cH - pad.t - pad.b;
 
     const minX = 2.5, maxX = 5.0;
-    const getX = r => pad.l + ((Math.max(minX, Math.min(maxX, r)) - minX) / (maxX - minX)) * w;
+    const xPlotW = w - 20;
+    const getX = r => pad.l + ((Math.max(minX, Math.min(maxX, r)) - minX) / (maxX - minX)) * xPlotW;
 
     const revs = valid.map(d => d.reviews);
     const minRev = Math.min(...revs);
