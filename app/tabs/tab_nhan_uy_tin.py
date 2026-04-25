@@ -137,8 +137,14 @@ def render(df_raw):
         <select id="selCategory" onchange="applyFilters()"><option value="ALL">Tất cả Danh mục</option></select>
     </div>
     <div class="q-grid">
-        <div class="q-cell"><span class="q-tag">MỤC TIÊU 1: HIỆU ỨNG NHÃN</span><div class="q-text">Nhãn Amazon's Choice có thực sự giúp sản phẩm bán chạy hơn đáng kể so với các sản phẩm Best Seller thông thường không?</div></div>
-        <div class="q-cell"><span class="q-tag">MỤC TIÊU 2: CHIẾN LƯỢC ĐỊNH GIÁ</span><div class="q-text">Amazon's Choice thường ưu tiên các sản phẩm giá rẻ ("Sweet Spot") hay các sản phẩm cao cấp?</div></div>
+        <div class="q-cell">
+            <span class="q-tag">MỤC TIÊU 1: ĐÁNH GIÁ HIỆU NĂNG CỦA NHÃN UY TÍN (SMART)</span>
+            <div class="q-text">Thực hiện so sánh doanh số đơn hàng trung bình giữa nhóm sản phẩm có nhãn Amazon's Choice và nhóm thông thường để kiểm chứng liệu nhãn uy tín có thúc đẩy doanh số tăng trưởng ít nhất 15% trong tập dữ liệu mẫu hay không.</div>
+        </div>
+        <div class="q-cell">
+            <span class="q-tag">MỤC TIÊU 2: PHÂN TÍCH CHIẾN LƯỢC ĐỊNH GIÁ TỐI ƯU (SMART)</span>
+            <div class="q-text">Phân tích sự phân bổ tỷ lệ gắn nhãn Amazon’s Choice trên 4 phân khúc giá để xác định liệu Amazon có ưu tiên các sản phẩm thuộc "Sweet Spot" ($25-$50) nhằm tối ưu hóa khả năng tiếp cận khách hàng hay không.</div>
+        </div>
     </div>
     <div class="display-grid">
         <!-- Panel 1: Hiệu ứng nhãn -->
