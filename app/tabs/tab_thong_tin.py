@@ -332,10 +332,10 @@ def render(df_raw):
 
         <div class="chart-card">
             <div class="chart-header">
-                <div class="chart-title">Phân Bố Độ Đầy Đủ Ở Top 10% Bán Chạy</div>
-                <div class="chart-subtitle">Tỷ trọng các nhóm "Số thông tin thiếu" trong Top 10% Doanh Số</div>
+                <div class="chart-title">Mức Độ Tập Trung Theo Nhóm Thông Tin Thiếu</div>
+                <div class="chart-subtitle">Đường đỏ (10%): Tỷ lệ kỳ vọng ngẫu nhiên (Baseline)</div>
             </div>
-            <div class="chart-container" style="display:flex; justify-content:center; align-items:center;">
+            <div class="chart-container">
                 <canvas id="c_top_missing_dist"></canvas>
             </div>
         </div>
@@ -563,38 +563,38 @@ def render(df_raw):
 
         updateConcentrationChart(concFeatLabels, topConcData, restConcData, rawCountsList);
 
-        // --- Chart 4: Top 10% Missing Distribution ---
+        // --- Chart 4: Missing Distribution Concentration (Top 10% vs Rest) ---
         let sortedTop10 = [...data].sort((a,b) => b.sales_volume_num - a.sales_volume_num);
         let top10Size = Math.max(1, Math.floor(sortedTop10.length * 0.1));
         let top10Data = sortedTop10.slice(0, top10Size);
         
-        let missDistMap = new Map();
-        sortedBuckets.forEach(b => {{
-             let label = b + '-' + (b + bucketSize - 1) + ' Thiếu';
-             missDistMap.set(label, 0);
-        }});
-
+        let topBucketMap = new Map();
         top10Data.forEach(d => {{
             let bucket = Math.floor(d.missing_count / bucketSize) * bucketSize;
-            let label = bucket + '-' + (bucket + bucketSize - 1) + ' Thiếu';
-            if (missDistMap.has(label)) {{
-                missDistMap.set(label, missDistMap.get(label) + 1);
-            }} else {{
-                missDistMap.set(label, 1);
-            }}
+            topBucketMap.set(bucket, (topBucketMap.get(bucket) || 0) + 1);
         }});
 
         let distLabels = [];
-        let distData = [];
-        missDistMap.forEach((val, key) => {{
-            if (val > 0) {{
-                distLabels.push(key);
-                distData.push(val);
-            }}
+        let distTopData = [];
+        let distRestData = [];
+        let distRawCounts = [];
+
+        sortedBuckets.forEach(b => {{
+            let label = b + '-' + (b + bucketSize - 1) + ' Thiếu';
+            let allC = bucketMap.get(b).count;
+            let topC = topBucketMap.get(b) || 0;
+            let topPct = (topC / allC) * 100;
+
+            distLabels.push(label);
+            distTopData.push(topPct);
+            distRestData.push(100 - topPct);
+            distRawCounts.push({{ t: topC, a: allC }});
         }});
 
+        CHARTS.missingDist._rawCounts = distRawCounts;
         CHARTS.missingDist.data.labels = distLabels;
-        CHARTS.missingDist.data.datasets[0].data = distData;
+        CHARTS.missingDist.data.datasets[0].data = distTopData;
+        CHARTS.missingDist.data.datasets[1].data = distRestData;
         CHARTS.missingDist.update();
     }}
 
@@ -910,50 +910,92 @@ def render(df_raw):
             }}]
         }});
 
-        // --- Chart 4: Top 10% Missing Distribution (Doughnut) ---
+        // --- Chart 4: Missing Distribution Concentration (Stacked Bar) ---
         let ctxMissDist = document.getElementById('c_top_missing_dist').getContext('2d');
         CHARTS.missingDist = new Chart(ctxMissDist, {{
-            type: 'doughnut',
+            type: 'bar',
             data: {{
                 labels: [],
-                datasets: [{{
-                    data: [],
-                    backgroundColor: [
-                        '#F97316', '#F59E0B', '#10B981', '#3B82F6', '#8B5CF6', 
-                        '#EC4899', '#6366F1', '#14B8A6', '#F43F5E', '#A855F7'
-                    ],
-                    borderWidth: 2,
-                    borderColor: '#ffffff'
-                }}]
+                datasets: [
+                    {{
+                        label: 'Thuộc Top 10% Doanh số',
+                        data: [],
+                        backgroundColor: 'rgba(249, 115, 22, 0.85)', // Orange
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    }},
+                    {{
+                        label: 'Phần Còn Lại (90%)',
+                        data: [],
+                        backgroundColor: 'rgba(214, 211, 209, 0.4)', // Light gray
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    }}
+                ]
             }},
             options: {{
                 responsive: true,
                 maintainAspectRatio: false,
-                cutout: '55%',
+                indexAxis: 'y',
+                scales: {{
+                    x: {{
+                        stacked: true,
+                        max: 100,
+                        grid: {{ color: 'rgba(0,0,0,0.04)' }},
+                        ticks: {{ callback: v => v + '%', font: {{ size: 10 }} }},
+                        title: {{ display: true, text: 'Tỷ trọng % Nhóm', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
+                    }},
+                    y: {{
+                        stacked: true,
+                        grid: {{ display: false }},
+                        ticks: {{ font: {{ size: 10, weight: '500' }}, color: '#44403C' }}
+                    }}
+                }},
                 plugins: {{
-                    legend: {{ position: 'right', labels: {{ boxWidth: 12, padding: 15, font: {{size: 11}} }} }},
+                    legend: {{
+                        display: true, position: 'bottom',
+                        labels: {{ boxWidth: 12, boxHeight: 12, useBorderRadius: true, borderRadius: 3, padding: 16, font: {{ size: 11, weight: '500' }} }}
+                    }},
+                    datalabels: {{ display: false }},
                     tooltip: {{
                         backgroundColor: 'rgba(28,25,23,0.92)',
+                        titleFont: {{ size: 12, weight: '600' }},
+                        bodyFont: {{ size: 11 }},
+                        padding: 10, cornerRadius: 6,
                         callbacks: {{
                             label: function(ctx) {{
-                                let val = ctx.parsed || 0;
-                                let total = ctx.dataset.data.reduce((a,b)=>a+b, 0);
-                                let pct = total > 0 ? (val * 100 / total).toFixed(1) : 0;
-                                return `  ${{ctx.label}}: ${{val}} sp (${{pct}}%)`;
+                                let label = ctx.dataset.label;
+                                let pct = ctx.raw.toFixed(1);
+                                let d = CHARTS.missingDist._rawCounts[ctx.dataIndex]; 
+                                let count = ctx.datasetIndex === 0 ? d.t : (d.a - d.t);
+                                return `  ${{label}}: ${{pct}}%  (${{count}} sp)`;
+                            }},
+                            afterBody: function(ctx) {{
+                                let d = CHARTS.missingDist._rawCounts[ctx[0].dataIndex];
+                                let topPct = ctx[0].chart.data.datasets[0].data[ctx[0].dataIndex];
+                                let upliftX = (topPct / 10).toFixed(1);
+                                return `\n  Tổng Sản Phẩm trong nhóm này: ${{d.a}}\n  Độ tập trung gấp ${{upliftX}} lần mức kỳ vọng ngẫu nhiên`;
                             }}
-                        }}
-                    }},
-                    datalabels: {{
-                        color: '#fff',
-                        font: {{ weight: '700', size: 10 }},
-                        formatter: (val, ctx) => {{
-                            let total = ctx.dataset.data.reduce((a,b)=>a+b, 0);
-                            let pct = total > 0 ? Math.round(val * 100 / total) : 0;
-                            return pct > 5 ? pct + '%' : '';
                         }}
                     }}
                 }}
-            }}
+            }},
+            plugins: [{{
+                id: 'baseline10_miss',
+                afterDatasetDraw: (chart) => {{
+                    const {{ctx, chartArea: {{top, bottom}}, scales: {{x}} }} = chart;
+                    let xPos = x.getPixelForValue(10);
+                    ctx.save();
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(xPos, top);
+                    ctx.lineTo(xPos, bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                }}
+            }}]
         }});
     }}
 
