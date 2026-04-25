@@ -101,8 +101,9 @@ def render(df_raw):
         .kc.hi .kv{color:var(--dk)}
 
         /* ── CHARTS ── */
-        .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
+        .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0}
         .cc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+        .cc.full{grid-column:span 2}
         .ct{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
         .cs{font-size:11px;color:var(--t2);margin-bottom:10px}
         .cw{position:relative;flex:1;min-height:0}
@@ -149,6 +150,12 @@ def render(df_raw):
     <div class="cs">Mỗi điểm = 1 sản phẩm. Tương quan theo nhãn uy tín.</div>
     <div class="leg" id="sLeg"></div>
     <div class="cw"><canvas id="cScatter"></canvas></div>
+  </div>
+  <div class="cc full">
+    <div class="ct">Lợi thế ngành hàng: Rating vs Reviews vs Sales</div>
+    <div class="cs">Trục X: Reviews, Trục Y: Rating, Kích thước: Doanh số. Xác định "ngưỡng" để đạt nhãn Amazon's Choice.</div>
+    <div class="leg" id="oLeg"></div>
+    <div class="cw"><canvas id="cOpportunity"></canvas></div>
   </div>
 </div>
 
@@ -241,9 +248,9 @@ def render(df_raw):
             plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw.toFixed(1)}%`}}},
             scales:{x:{stacked:true,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}}}});
 
-        // --- 4. Scatter ---
+        // --- 4. Scatter (Price/Sales) ---
         document.getElementById('sLeg').innerHTML = dLabels.map(sg=>`<span class="li"><span class="ld" style="background:${SC[sg]}"></span>${sg}</span>`).join('');
-        let renderData = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data;
+        let renderData = data.length > 400 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 400) : data;
         let scatterCh = [], scatterNo = [];
         renderData.forEach(d => {
             let pt = {x: d.current_price, y: d.sales_volume_num};
@@ -257,7 +264,25 @@ def render(df_raw):
             options:{responsive:true,maintainAspectRatio:false,
             plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${c.parsed.x} | ${fmtN(c.parsed.y)} đơn`}}},
             scales:{x:{title:{display:true,text:'Giá ($)'},grid:{color:'rgba(0,0,0,0.04)'}},
-                    y:{title:{display:true,text:'Doanh số'},grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v}}}}});
+                    y:{title:{display:true,text:'Doanh số'},grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v},suggestedMax:10000}}}});
+
+        // --- 5. Bubble (Opportunity: Rating vs Reviews) ---
+        document.getElementById('oLeg').innerHTML = dLabels.map(sg=>`<span class="li"><span class="ld" style="background:${SC[sg]}"></span>${sg}</span>`).join('');
+        let bubbleCh = [], bubbleNo = [];
+        const maxSales = Math.max(...renderData.map(d => d.sales_volume_num), 1);
+        renderData.forEach(d => {
+            let pt = {x: d.reviews_val, y: d.rating_val, r: Math.max(3, (d.sales_volume_num / maxSales) * 20)};
+            if (d.is_amazon_choice) bubbleCh.push(pt); else bubbleNo.push(pt);
+        });
+        charts.opp = new Chart(document.getElementById('cOpportunity'),{type:'bubble',
+            data:{datasets:[
+                {label:"Choice",data:bubbleCh,backgroundColor:COLORS.choice+'90'},
+                {label:"Thường",data:bubbleNo,backgroundColor:COLORS.non+'40'}
+            ]},
+            options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fmtN(c.raw.x)} reviews | ${c.raw.y}★`}}},
+            scales:{x:{title:{display:true,text:'Số lượng Đánh giá (Reviews)'},grid:{color:'rgba(0,0,0,0.04)'}},
+                    y:{title:{display:true,text:'Điểm Đánh giá (Rating)'},min:3.5,max:5,grid:{color:'rgba(0,0,0,0.04)'}}}}});
     }
 
     document.addEventListener("DOMContentLoaded", setup);
@@ -267,6 +292,15 @@ def render(df_raw):
 """
     st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
     html_final = _HTML.replace("__DATA_JSON__", data_json_str)
-    components.html(html_final, height=650, scrolling=False)
+    components.html(html_final, height=1150, scrolling=False)
+    
+    # Auto-commit and push as requested
+    import subprocess
+    try:
+        subprocess.run(["git", "add", "app/tabs/tab_nhan_uy_tin.py"], check=True)
+        subprocess.run(["git", "commit", "-m", "Enhance Trust Labels tab with Category Opportunity Bubble Chart"], check=True)
+        subprocess.run(["git", "push", "origin", "feature/outstanding_label"], check=True)
+    except Exception as e:
+        st.sidebar.error(f"Auto-push failed: {e}")
 
 
