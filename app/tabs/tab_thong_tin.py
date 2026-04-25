@@ -120,16 +120,16 @@ def render(df_raw):
             font-family: var(--font-family);
             height: 100vh;
             overflow: hidden;
-            padding: 16px 20px;
+            padding: 10px 14px;
         }}
 
         .filter-bar {{
             display: flex;
             align-items: center;
-            gap: 24px;
-            margin-bottom: 16px;
+            gap: 20px;
+            margin-bottom: 10px;
             background: var(--card-bg);
-            padding: 14px 20px;
+            padding: 8px 16px;
             border-radius: var(--border-radius);
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
             flex-wrap: wrap;
@@ -193,18 +193,18 @@ def render(df_raw):
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 10px;
         }}
 
         .kpi-card {{
             background: var(--card-bg);
             border-radius: var(--border-radius);
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-            padding: 14px 16px;
+            padding: 8px 12px;
             border-left: 4px solid var(--primary);
             display: flex;
             flex-direction: column;
-            gap: 3px;
+            gap: 2px;
         }}
 
         .kpi-title {{ font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
@@ -216,20 +216,20 @@ def render(df_raw):
         .charts-wrapper {{
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            grid-template-rows: calc((100vh - 240px) / 2) calc((100vh - 240px) / 2);
-            gap: 14px;
+            grid-template-rows: calc((100vh - 200px) / 2) calc((100vh - 200px) / 2);
+            gap: 10px;
         }}
 
         .chart-card {{
             background: var(--card-bg);
             border-radius: var(--border-radius);
             box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-            padding: 18px 20px;
+            padding: 12px 16px;
             display: flex;
             flex-direction: column;
         }}
 
-        .chart-header {{ margin-bottom: 10px; }}
+        .chart-header {{ margin-bottom: 6px; }}
         .chart-title {{ font-size: 14px; font-weight: 700; margin-bottom: 3px; color: var(--text-primary); }}
         .chart-subtitle {{ font-size: 11px; color: var(--text-secondary); line-height: 1.4; }}
         .chart-container {{ flex: 1; position: relative; min-height: 0; width: 100%; }}
@@ -963,4 +963,4 @@ def render(df_raw):
 </html>
     """
     
-    components.html(html_code, height=680, scrolling=False)
+    components.html(html_code, height=800, scrolling=False)
