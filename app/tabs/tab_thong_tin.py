@@ -74,8 +74,15 @@ def render(df_raw):
     top_counts_json_str = json.dumps(top_counts_dict)
     all_counts_json_str = json.dumps(all_counts_dict, ensure_ascii=False)
 
-    # Select columns & dump JSON
-    select_cols = ["Danh Mục Sản Phẩm", "sales_volume_num", "missing_count"]
+    # Select columns & dump JSON (include price for segment filtering)
+    df["price_num"] = pd.to_numeric(df["price"], errors="coerce").fillna(0)
+    
+    # Compute tertile thresholds for 3 price segments
+    price_nonzero = df["price_num"][df["price_num"] > 0]
+    p33 = round(float(price_nonzero.quantile(0.33)), 2)
+    p67 = round(float(price_nonzero.quantile(0.67)), 2)
+
+    select_cols = ["Danh Mục Sản Phẩm", "sales_volume_num", "missing_count", "price_num"]
     export_df = df[select_cols].copy()
     data_json = export_df.to_dict(orient="records")
     data_json_str = json.dumps(data_json, ensure_ascii=False)
@@ -234,6 +241,15 @@ def render(df_raw):
             </select>
         </div>
         <div class="f-item">
+            <span class="f-label">Phân Khúc Giá</span>
+            <select id="selPrice" onchange="applyFilters()">
+                <option value="ALL">Tất cả phân khúc</option>
+                <option value="LOW">💲 Bình Dân (≤ ${p33})</option>
+                <option value="MID">💰 Trung Cấp (${p33}–${p67})</option>
+                <option value="HIGH">💎 Cao Cấp (≥ ${p67})</option>
+            </select>
+        </div>
+        <div class="f-item">
             <span class="f-label">Chỉ Số Doanh Số</span>
             <div class="toggle-group">
                 <button class="toggle-btn active" id="btn_mean" onclick="setMetric('mean')">Mean</button>
@@ -249,9 +265,9 @@ def render(df_raw):
     <!-- KPI ROW -->
     <div class="kpi-row">
         <div class="kpi-card">
-            <div class="kpi-title" id="kpi_sales_title">Doanh Số (Ít Thiếu)</div>
+            <div class="kpi-title" id="kpi_sales_title">Doanh Số (50% Ít Thiếu)</div>
             <div class="kpi-val" id="kpi_sales_good">0</div>
-            <div class="kpi-sub">So với SP Thiếu Nhiều: <span id="kpi_sales_diff">-</span></div>
+            <div class="kpi-sub">So với 50% Thiếu Nhiều: <span id="kpi_sales_diff">-</span></div>
         </div>
         <div class="kpi-card" style="border-left-color: #9A3412;">
             <div class="kpi-title">Bỏ Trống TB Toàn Ngành</div>
@@ -309,6 +325,8 @@ def render(df_raw):
     const TOP_COUNTS_DATA = {top_counts_json_str};
     const ALL_COUNTS_DATA = {all_counts_json_str};
     const TOTAL_FEATS = {total_features};
+    const PRICE_T1 = {p33}; // Top of Bình Dân
+    const PRICE_T2 = {p67}; // Top of Trung Cấp
     let CHARTS = {{}};
     let METRIC = 'mean'; // 'mean' or 'median'
 
@@ -324,7 +342,7 @@ def render(df_raw):
         document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
         document.getElementById('btn_median').classList.toggle('active', m === 'median');
         // Update KPI title
-        document.getElementById('kpi_sales_title').innerText = m === 'mean' ? 'Mean Doanh Số (Ít Thiếu)' : 'Median Doanh Số (Ít Thiếu)';
+        document.getElementById('kpi_sales_title').innerText = m === 'mean' ? 'Mean Doanh Số (50% Ít Thiếu)' : 'Median Doanh Số (50% Ít Thiếu)';
         // Update chart 1 y-axis title
         if (CHARTS.trend) {{
             CHARTS.trend.options.scales.y.title.text = m === 'mean' ? 'Doanh Số Mean (lượt bán)' : 'Doanh Số Median (lượt bán)';
@@ -352,39 +370,70 @@ def render(df_raw):
 
     function applyFilters() {{
         let cat = document.getElementById('selCategory').value;
-        let data = RAW_DATA.filter(d => (cat === 'ALL' || d['Danh Mục Sản Phẩm'] === cat));
+        let seg = document.getElementById('selPrice').value;
+        
+        let data = RAW_DATA.filter(d => {{
+            let catOk = (cat === 'ALL' || d['Danh Mục Sản Phẩm'] === cat);
+            let price = d.price_num || 0;
+            let segOk = seg === 'ALL'
+                ? true
+                : seg === 'LOW' ? price <= PRICE_T1
+                : seg === 'MID' ? (price > PRICE_T1 && price <= PRICE_T2)
+                : price > PRICE_T2; // HIGH
+            return catOk && segOk;
+        }});
         processData(data, cat);
     }}
 
     function processData(data, cat) {{
+        // --- Chart 1: Bucket computation (done FIRST so KPIs can use it) ---
+        let bucketMap = new Map();
+        let bucketSize = 3;
+        
+        data.forEach(d => {{
+            let bucket = Math.floor(d.missing_count / bucketSize) * bucketSize;
+            if (!bucketMap.has(bucket)) bucketMap.set(bucket, {{ salesArr: [], count: 0 }});
+            let b = bucketMap.get(bucket);
+            b.salesArr.push(d.sales_volume_num);
+            b.count++;
+        }});
+
+        let sortedBuckets = Array.from(bucketMap.keys()).sort((a,b) => a - b);
+        let trendLabels = sortedBuckets.map(b => b + '-' + (b + bucketSize - 1));
+        let trendSales = sortedBuckets.map(b => {{
+            let bk = bucketMap.get(b);
+            if (!bk.count) return 0;
+            if (METRIC === 'median') return Math.round(median(bk.salesArr));
+            return Math.round(bk.salesArr.reduce((s,v) => s+v, 0) / bk.count);
+        }});
+        let trendCounts = sortedBuckets.map(b => bucketMap.get(b).count);
+
         // --- KPIs ---
         let totalMissing = 0;
         data.forEach(d => totalMissing += d.missing_count);
         let avgMissing = data.length ? totalMissing / data.length : 0;
 
-        // Quartile split for KPI comparison
-        let sortedByMissing = [...data].sort((a,b) => a.missing_count - b.missing_count);
-        let q1End = Math.floor(data.length * 0.25);
-        let q4Start = Math.floor(data.length * 0.75);
-        
-        let lowMissing = sortedByMissing.slice(0, Math.max(1, q1End));
-        let highMissing = sortedByMissing.slice(q4Start);
-        
-        let salesLowArr = lowMissing.map(d => d.sales_volume_num);
-        let salesHighArr = highMissing.map(d => d.sales_volume_num);
-        let statLow = METRIC === 'median' ? median(salesLowArr) : salesLowArr.reduce((s,v) => s+v, 0) / (salesLowArr.length || 1);
-        let statHigh = METRIC === 'median' ? median(salesHighArr) : salesHighArr.reduce((s,v) => s+v, 0) / (salesHighArr.length || 1);
+        // Use first bucket (fewest missing) vs last bucket (most missing)
+        // This mirrors exactly what Chart 1 shows at both extremes
+        let statLow = trendSales.length ? trendSales[0] : 0;
+        let statHigh = trendSales.length ? trendSales[trendSales.length - 1] : 0;
+        let labelLow = trendLabels.length ? trendLabels[0] : '?';
+        let labelHigh = trendLabels.length ? trendLabels[trendLabels.length - 1] : '?';
 
         document.getElementById('kpi_missing_avg').innerText = Math.round(avgMissing);
         document.getElementById('kpi_sales_good').innerText = fmtN(statLow);
         document.getElementById('kpi_total_products').innerText = fmtN(data.length);
+
+        // Update title to show which bucket is being compared
+        let metricLabel = METRIC === 'median' ? 'Median' : 'Mean';
+        document.getElementById('kpi_sales_title').innerText = `${{metricLabel}} Bucket '${{labelLow}}' Thiếu`;
         
         let diff_el = document.getElementById('kpi_sales_diff');
         if (statHigh > 0 && statLow > statHigh) {{
             let mult = (statLow / statHigh).toFixed(1);
-            diff_el.innerHTML = `<span class="trend-up">Gấp ${{mult}}x</span>`;
+            diff_el.innerHTML = `So '${{labelHigh}}': <span class="trend-up">Gấp ${{mult}}x</span>`;
         }} else if (statLow <= statHigh) {{
-            diff_el.innerHTML = `<span class="trend-down">Thấp hơn</span>`;
+            diff_el.innerHTML = `So '${{labelHigh}}': <span class="trend-down">Thấp hơn</span>`;
         }} else {{
             diff_el.innerHTML = `<span style="color:#9CA3AF">N/A</span>`;
         }}
@@ -416,28 +465,6 @@ def render(df_raw):
             kpiFeatEl.innerText = Object.keys(topFeatData).length ? Object.keys(topFeatData)[0].toUpperCase() : 'N/A';
             kpiSubEl.innerText = "Xuất hiện nhiều nhất ở SP bán chạy";
         }}
-
-        // --- Chart 1: Trend line (sales transition vs missing count) ---
-        let bucketMap = new Map();
-        let bucketSize = 3; // group every 3 missing counts
-        
-        data.forEach(d => {{
-            let bucket = Math.floor(d.missing_count / bucketSize) * bucketSize;
-            if (!bucketMap.has(bucket)) bucketMap.set(bucket, {{ salesArr: [], count: 0 }});
-            let b = bucketMap.get(bucket);
-            b.salesArr.push(d.sales_volume_num);
-            b.count++;
-        }});
-
-        let sortedBuckets = Array.from(bucketMap.keys()).sort((a,b) => a - b);
-        let trendLabels = sortedBuckets.map(b => b + '-' + (b + bucketSize - 1));
-        let trendSales = sortedBuckets.map(b => {{
-            let bk = bucketMap.get(b);
-            if (!bk.count) return 0;
-            if (METRIC === 'median') return Math.round(median(bk.salesArr));
-            return Math.round(bk.salesArr.reduce((s,v) => s+v, 0) / bk.count);
-        }});
-        let trendCounts = sortedBuckets.map(b => bucketMap.get(b).count);
 
         updateTrendChart(trendLabels, trendSales, trendCounts);
 

@@ -5,9 +5,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 # Import category mapping from utility script
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from utils.category_mapping import CATEGORY_MAP, add_display_column
+from utils.constants import CATEGORY_MAP
+
+def add_display_column(df, source_col="crawl_category", target_col="display_category"):
+    df[target_col] = df[source_col].map(CATEGORY_MAP).fillna(df[source_col])
+    return df
 
 def render(df_raw):
     df = df_raw.copy()
