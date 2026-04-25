@@ -268,12 +268,17 @@ def render(df_raw):
         let p_choice = G_choice.length > 0 ? (G_choice.filter(d=>d.is_prime).length / G_choice.length) * 100 : 0;
         
         const kpis = [
-            {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), hi:1},
+            {t:'Tổng Sản Phẩm', v:fmtN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'},
             {t:'Rating TB (Choice)', v:r_c.toFixed(1)+' ⭐'},
             {t:'Tỷ lệ Prime trong Choice', v:fP(p_choice)},
-            {t:'Tổng Sản Phẩm', v:fmtN(data.length)}
+            {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'TB: '+fN(s_c)+' (Choice) vs '+fN(s_n)+' (Thường)', hi:1}
         ];
-        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div></div>`).join('');
+        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`
+            <div class="kc${x.hi?' hi':''}">
+                <div class="kt">${x.t}</div>
+                <div class="kv">${x.v}</div>
+                <div class="ks">${x.s||''}</div>
+            </div>`).join('');
         
         const dCounts = [G_choice.length, G_non.length], dLabels = ["Amazon's Choice", "Thường"], dColors = [COLORS.choice, COLORS.non], dTotal = data.length;
         document.getElementById('dLeg').innerHTML = dLabels.map((lb,i)=>`<span class="li"><span class="ld" style="background:${dColors[i]}"></span>${lb} (${dTotal?(dCounts[i]/dTotal*100).toFixed(1):0}%)</span>`).join('');
