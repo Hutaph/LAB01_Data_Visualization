@@ -367,13 +367,13 @@ def render(df_raw):
 """
     st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
     html_final = _HTML.replace("__DATA_JSON__", data_json_str)
-    components.html(html_final, height=720, scrolling=False)
+    components.html(html_final, height=750, scrolling=False)
     
     # Auto-commit and push as requested
     import subprocess
     try:
         subprocess.run(["git", "add", "app/tabs/tab_nhan_uy_tin.py"], check=True)
-        subprocess.run(["git", "commit", "-m", "UI: update filter bar with Price Range and Prime toggle"], check=True)
+        subprocess.run(["git", "commit", "-m", "UI: enhance KPI cards with icons and compact formatting"], check=True)
         subprocess.run(["git", "push", "origin", "feature/outstanding_label"], check=True)
     except Exception as e:
         st.sidebar.error(f"Auto-push failed: {e}")
