@@ -87,20 +87,36 @@ def render(df_raw):
         }}
         select:focus {{ border-color: var(--primary); }}
 
-        .toggle-group {{ display: flex; gap: 10px; align-items: center; cursor: pointer; user-select: none; padding-bottom: 2px; }}
+        .toggle-lbl {{ font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }}
+
+        .toggle-group {{ display: flex; gap: 10px; align-items: center; cursor: pointer; user-select: none; }}
         .toggle-track {{
-            position: relative; width: 50px; height: 28px;
+            position: relative; width: 44px; height: 24px;
             background-color: #E5E7EB; border-radius: 20px; transition: background-color 0.3s;
         }}
         .toggle-track.active {{ background-color: var(--primary); }}
         .toggle-thumb {{
             position: absolute; top: 2px; left: 2px;
-            width: 24px; height: 24px; background: white;
+            width: 20px; height: 20px; background: white;
             border-radius: 50%; transition: transform 0.3s;
             box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }}
-        .toggle-track.active .toggle-thumb {{ transform: translateX(22px); }}
-        .toggle-lbl {{ font-size: 15px; font-weight: 600; }}
+        .toggle-track.active .toggle-thumb {{ transform: translateX(20px); }}
+
+        /* Mean/Median Toggle Group */
+        .toggle-group-metric {{
+            display: flex; background: #F3F4F6; border-radius: 6px; padding: 3px; gap: 2px;
+            height: 32px; align-items: center;
+        }}
+        .metric-btn {{
+            border: none; background: transparent; font-family: inherit; font-size: 12px;
+            font-weight: 600; color: var(--text-secondary); padding: 4px 12px;
+            border-radius: 4px; cursor: pointer; transition: all 0.2s;
+            height: 26px;
+        }}
+        .metric-btn.active {{
+            background: #FFFFFF; color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }}
 
         .kpi-row {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 10px; }}
         .kpi-card {{ background: var(--card-bg); padding: 10px 15px; border-radius: var(--border-radius); border-left: 4px solid var(--primary); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }}
@@ -121,19 +137,29 @@ def render(df_raw):
         <div class="f-item">
             <span class="f-label">Danh mục</span>
             <select id="selCategory" onchange="applyFilters()">
-                <option value="ALL">Tất cả</option>
+                <option value="ALL">Tất cả danh mục</option>
             </select>
         </div>
-        <div class="toggle-group" onclick="togglePrime()">
-            <div class="toggle-track" id="primeTrack"><div class="toggle-thumb"></div></div>
-            <span class="toggle-lbl">Prime</span>
+        <div class="f-item">
+            <span class="f-label">Chỉ số Doanh số</span>
+            <div class="toggle-group-metric">
+                <button class="metric-btn active" id="btn_mean" onclick="setMetric('mean')">Mean</button>
+                <button class="metric-btn" id="btn_median" onclick="setMetric('median')">Median</button>
+            </div>
+        </div>
+        <div class="f-item">
+            <span class="f-label">Bộ lọc Prime</span>
+            <div class="toggle-group" onclick="togglePrime()" style="height: 32px;">
+                <div class="toggle-track" id="primeTrack"><div class="toggle-thumb"></div></div>
+                <span class="toggle-lbl">Chỉ Prime</span>
+            </div>
         </div>
     </div>
 
     <div class="kpi-row">
         <div class="kpi-card"><div class="kpi-title">Mức giảm giá TB</div><div class="kpi-value" id="kpi_avg_discount">0%</div></div>
         <div class="kpi-card"><div class="kpi-title">SP đang khuyến mãi</div><div class="kpi-value" id="kpi_sale_count">0%</div></div>
-        <div class="kpi-card"><div class="kpi-title">Giá bán trung bình</div><div class="kpi-value" id="kpi_avg_price">$0</div></div>
+        <div class="kpi-card"><div class="kpi-title" id="kpi_price_title">Giá bán trung bình</div><div class="kpi-value" id="kpi_avg_price">$0</div></div>
         <div class="kpi-card"><div class="kpi-title">Tổng doanh số</div><div class="kpi-value" id="kpi_sales_impact">0</div></div>
     </div>
 
@@ -167,12 +193,27 @@ def render(df_raw):
         const RAW_DATA = {data_json_str};
         let charts = {{}};
         let primeOn = false;
+        let METRIC = 'mean';
 
         // Compact number: 1500 -> 1.5K
         function fmtK(val) {{
             if (val >= 1e6) return (val / 1e6).toFixed(1) + 'M';
             if (val >= 1e3) return (val / 1e3).toFixed(1) + 'K';
             return val.toString();
+        }}
+
+        const getMedian = (arr) => {{
+            if (!arr.length) return 0;
+            const s = [...arr].sort((a,b) => a - b);
+            const mid = Math.floor(s.length / 2);
+            return s.length % 2 !== 0 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+        }};
+
+        function setMetric(m) {{
+            METRIC = m;
+            document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
+            document.getElementById('btn_median').classList.toggle('active', m === 'median');
+            applyFilters();
         }}
 
         // Prime toggle via JS (avoids checkbox click issues in Streamlit iframe)
@@ -195,29 +236,51 @@ def render(df_raw):
             // KPIs
             const withD = data.filter(x => x.discount_rate > 0);
             const avgD = data.length ? data.reduce((a, b) => a + b.discount_rate, 0) / data.length : 0;
-            const avgP = data.length ? data.reduce((a, b) => a + b.price, 0) / data.length : 0;
             const totalS = data.reduce((a, b) => a + (b.sales_volume_num || 0), 0);
+
+            let displayPrice;
+            if (METRIC === 'mean') {{
+                displayPrice = data.length ? data.reduce((a, b) => a + b.price, 0) / data.length : 0;
+                document.getElementById('kpi_price_title').innerText = 'Giá bán trung bình';
+            }} else {{
+                displayPrice = getMedian(data.map(d => d.price));
+                document.getElementById('kpi_price_title').innerText = 'Giá bán trung vị';
+            }}
 
             document.getElementById('kpi_avg_discount').innerText = avgD.toFixed(1) + "%";
             document.getElementById('kpi_sale_count').innerText = (data.length ? (withD.length / data.length * 100) : 0).toFixed(1) + "%";
-            document.getElementById('kpi_avg_price').innerText = "$" + avgP.toFixed(2);
+            document.getElementById('kpi_avg_price').innerText = "$" + displayPrice.toFixed(2);
             document.getElementById('kpi_sales_impact').innerText = "$" + totalS.toLocaleString();
 
             // Histogram + Sales Effectiveness
             const bins = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 101];
-            const counts = new Array(10).fill(0), sumS = new Array(10).fill(0), cntS = new Array(10).fill(0);
+            const counts = new Array(10).fill(0), salesData = new Array(10).fill(0).map(() => []);
+            
             data.forEach(d => {{
                 for (let i = 0; i < 10; i++) {{
                     if (d.discount_rate >= bins[i] && d.discount_rate < bins[i + 1]) {{
                         counts[i]++;
-                        if (d.sales_volume_num > 0) {{ sumS[i] += d.sales_volume_num; cntS[i]++; }}
+                        if (d.sales_volume_num > 0) {{ 
+                            salesData[i].push(d.sales_volume_num); 
+                        }}
                         break;
                     }}
                 }}
             }});
+
             charts.hist.data.datasets[0].data = counts;
             charts.hist.update();
-            charts.sales.data.datasets[0].data = sumS.map((s, i) => cntS[i] ? Math.round(s / cntS[i]) : 0);
+
+            let plotData;
+            if (METRIC === 'mean') {{
+                plotData = salesData.map(arr => arr.length ? Math.round(arr.reduce((a,b) => a+b,0) / arr.length) : 0);
+                charts.sales.options.scales.y.title.text = 'Doanh số Trung bình (lượt)';
+            }} else {{
+                plotData = salesData.map(arr => Math.round(getMedian(arr)));
+                charts.sales.options.scales.y.title.text = 'Doanh số Trung vị (lượt)';
+            }}
+            
+            charts.sales.data.datasets[0].data = plotData;
             charts.sales.update();
 
             // Pie
@@ -292,7 +355,7 @@ def render(df_raw):
             charts.sales = new Chart(document.getElementById('salesBarChart'), {{
                 type: 'line',
                 data: {{ labels, datasets: [{{ data: [], borderColor: '#9A3412', backgroundColor: 'rgba(154,52,18,0.1)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#9A3412', pointBorderColor: '#fff', pointBorderWidth: 2 }}] }},
-                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true, title: {{ display: true, text: 'Doanh số TB/SP', font: {{ size: 11 }} }} }}, x: {{ grid: {{ display: false }} }} }} }}
+                options: {{ ...opt, scales: {{ y: {{ beginAtZero: true, title: {{ display: true, text: 'Doanh số Trung bình (lượt)', font: {{ size: 11, weight: '600' }} }} }}, x: {{ grid: {{ display: false }} }} }} }}
             }});
             charts.pie = new Chart(document.getElementById('discountPieChart'), {{
                 type: 'doughnut',
