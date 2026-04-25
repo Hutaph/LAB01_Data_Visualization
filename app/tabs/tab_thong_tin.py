@@ -34,32 +34,45 @@ def render(df_raw):
     # We calculate both for top 10% AND for ALL products, to enable comparison
     top_features_dict = {}
     all_features_dict = {}
+    top_counts_dict = {}
+    all_counts_dict = {}
 
-    def calc_provided_features(sub_df, prov_mask):
-        if len(sub_df) == 0: return {}
+    def calc_provided_features_with_count(sub_df, prov_mask):
+        if len(sub_df) == 0: return {}, {}
         prov_counts = prov_mask.loc[sub_df.index].sum()
         prov_pct = (prov_counts / len(sub_df) * 100).round(1)
-        return prov_pct.sort_values(ascending=False).to_dict()
+        return prov_pct.to_dict(), prov_counts.to_dict()
 
-    def calc_top_provided_features(sub_df, prov_mask):
-        if len(sub_df) == 0: return {}
+    def calc_top_provided_features_with_count(sub_df, prov_mask):
+        if len(sub_df) == 0: return {}, {}
         top_n = max(1, int(len(sub_df) * 0.1))
         top_indices = sub_df.nlargest(top_n, "sales_volume_num").index
-        if len(top_indices) == 0: return {}
+        if len(top_indices) == 0: return {}, {}
         prov_counts = prov_mask.loc[top_indices].sum()
         prov_pct = (prov_counts / len(top_indices) * 100).round(1)
-        return prov_pct.sort_values(ascending=False).to_dict()
+        return prov_pct.to_dict(), prov_counts.to_dict()
 
-    top_features_dict["ALL"] = calc_top_provided_features(df, provided_df)
-    all_features_dict["ALL"] = calc_provided_features(df, provided_df)
+    t_pct, t_cnt = calc_top_provided_features_with_count(df, provided_df)
+    top_features_dict["ALL"] = t_pct
+    top_counts_dict["ALL"] = t_cnt
+
+    a_pct, a_cnt = calc_provided_features_with_count(df, provided_df)
+    all_features_dict["ALL"] = a_pct
+    all_counts_dict["ALL"] = a_cnt
     
     for cat in df["Danh Mục Sản Phẩm"].unique():
         cat_df = df[df["Danh Mục Sản Phẩm"] == cat]
-        top_features_dict[cat] = calc_top_provided_features(cat_df, provided_df)
-        all_features_dict[cat] = calc_provided_features(cat_df, provided_df)
+        t_p, t_c = calc_top_provided_features_with_count(cat_df, provided_df)
+        a_p, a_c = calc_provided_features_with_count(cat_df, provided_df)
+        top_features_dict[cat] = t_p
+        top_counts_dict[cat] = t_c
+        all_features_dict[cat] = a_p
+        all_counts_dict[cat] = a_c
 
-    top_feats_json_str = json.dumps(top_features_dict, ensure_ascii=False)
-    all_feats_json_str = json.dumps(all_features_dict, ensure_ascii=False)
+    top_feats_json_str = json.dumps(top_features_dict)
+    all_feats_json_str = json.dumps(all_features_dict)
+    top_counts_json_str = json.dumps(top_counts_dict)
+    all_counts_json_str = json.dumps(all_counts_dict, ensure_ascii=False)
 
     # Select columns & dump JSON
     select_cols = ["Danh Mục Sản Phẩm", "sales_volume_num", "missing_count"]
@@ -170,7 +183,7 @@ def render(df_raw):
 
         .charts-wrapper {{
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(3, 1fr);
             grid-template-rows: calc(100vh - 230px);
             gap: 14px;
         }}
@@ -220,6 +233,13 @@ def render(df_raw):
                 <option value="ALL">Tất cả danh mục sản phẩm</option>
             </select>
         </div>
+        <div class="f-item">
+            <span class="f-label">Chỉ Số Doanh Số</span>
+            <div class="toggle-group">
+                <button class="toggle-btn active" id="btn_mean" onclick="setMetric('mean')">Mean</button>
+                <button class="toggle-btn" id="btn_median" onclick="setMetric('median')">Median</button>
+            </div>
+        </div>
         <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end;">
             <div style="font-size:15px; font-weight:700; color:var(--text-primary);">Phân Tích Thông Tin Sản Phẩm & Doanh Số</div>
             <div style="font-size:11px; color:var(--text-secondary);">Mối liên hệ giữa mức độ thiếu thông tin và hiệu quả bán hàng</div>
@@ -229,7 +249,7 @@ def render(df_raw):
     <!-- KPI ROW -->
     <div class="kpi-row">
         <div class="kpi-card">
-            <div class="kpi-title">Doanh Số TB (Ít Thiếu)</div>
+            <div class="kpi-title" id="kpi_sales_title">Doanh Số (Ít Thiếu)</div>
             <div class="kpi-val" id="kpi_sales_good">0</div>
             <div class="kpi-sub">So với SP Thiếu Nhiều: <span id="kpi_sales_diff">-</span></div>
         </div>
@@ -255,13 +275,13 @@ def render(df_raw):
         
         <div class="chart-card">
             <div class="chart-header">
-                <div class="chart-title">📉 Sự Chuyển Biến Doanh Số Theo Mức Thiếu Thông Tin</div>
-                <div class="chart-subtitle">Trục X: Số Features Thiếu &nbsp;|&nbsp; Trục Y: Doanh Số TB (lượt bán) &nbsp;|&nbsp; Cột: Số lượng SP</div>
+                <div class="chart-title">📉 Sự Chuyển Biến Doanh Số</div>
+                <div class="chart-subtitle">Trục X: Số Features Thiếu | Y: Doanh Số & Số SP</div>
             </div>
             <div class="chart-container"><canvas id="c_trend"></canvas></div>
             <div class="legend-row">
-                <div class="legend-item"><div class="legend-dot" style="background: rgba(249,115,22,0.85);"></div>Doanh số TB (Line)</div>
-                <div class="legend-item"><div class="legend-dot" style="background: rgba(251,146,60,0.35);"></div>Số lượng SP (Bar)</div>
+                <div class="legend-item"><div class="legend-dot" style="background: rgba(249,115,22,0.85);"></div>Doanh số TB</div>
+                <div class="legend-item"><div class="legend-dot" style="background: rgba(251,146,60,0.35);"></div>Số lượng SP</div>
             </div>
         </div>
 
@@ -273,14 +293,44 @@ def render(df_raw):
             <div class="chart-container"><canvas id="c_features"></canvas></div>
         </div>
 
+        <div class="chart-card">
+            <div class="chart-header">
+                <div class="chart-title">⭐ Mức Độ Tập Trung Ở Top 10%</div>
+                <div class="chart-subtitle">Đường đỏ (10%): Tỷ lệ kỳ vọng ngẫu nhiên (Baseline)</div>
+            </div>
+            <div class="chart-container"><canvas id="c_concentration"></canvas></div>
+        </div>
     </div>
 
 <script>
     const RAW_DATA = {data_json_str};
     const TOP_FEATS_DATA = {top_feats_json_str};
     const ALL_FEATS_DATA = {all_feats_json_str};
+    const TOP_COUNTS_DATA = {top_counts_json_str};
+    const ALL_COUNTS_DATA = {all_counts_json_str};
     const TOTAL_FEATS = {total_features};
     let CHARTS = {{}};
+    let METRIC = 'mean'; // 'mean' or 'median'
+
+    function median(arr) {{
+        if (!arr.length) return 0;
+        let sorted = [...arr].sort((a,b) => a - b);
+        let mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid-1] + sorted[mid]) / 2;
+    }}
+
+    function setMetric(m) {{
+        METRIC = m;
+        document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
+        document.getElementById('btn_median').classList.toggle('active', m === 'median');
+        // Update KPI title
+        document.getElementById('kpi_sales_title').innerText = m === 'mean' ? 'Mean Doanh Số (Ít Thiếu)' : 'Median Doanh Số (Ít Thiếu)';
+        // Update chart 1 y-axis title
+        if (CHARTS.trend) {{
+            CHARTS.trend.options.scales.y.title.text = m === 'mean' ? 'Doanh Số Mean (lượt bán)' : 'Doanh Số Median (lượt bán)';
+        }}
+        applyFilters();
+    }}
 
     const fmtN = (n) => new Intl.NumberFormat('en-US').format(Math.round(n));
 
@@ -320,18 +370,20 @@ def render(df_raw):
         let lowMissing = sortedByMissing.slice(0, Math.max(1, q1End));
         let highMissing = sortedByMissing.slice(q4Start);
         
-        let avgSalesLow = lowMissing.reduce((s,d) => s + d.sales_volume_num, 0) / (lowMissing.length || 1);
-        let avgSalesHigh = highMissing.reduce((s,d) => s + d.sales_volume_num, 0) / (highMissing.length || 1);
+        let salesLowArr = lowMissing.map(d => d.sales_volume_num);
+        let salesHighArr = highMissing.map(d => d.sales_volume_num);
+        let statLow = METRIC === 'median' ? median(salesLowArr) : salesLowArr.reduce((s,v) => s+v, 0) / (salesLowArr.length || 1);
+        let statHigh = METRIC === 'median' ? median(salesHighArr) : salesHighArr.reduce((s,v) => s+v, 0) / (salesHighArr.length || 1);
 
         document.getElementById('kpi_missing_avg').innerText = Math.round(avgMissing);
-        document.getElementById('kpi_sales_good').innerText = fmtN(avgSalesLow);
+        document.getElementById('kpi_sales_good').innerText = fmtN(statLow);
         document.getElementById('kpi_total_products').innerText = fmtN(data.length);
         
         let diff_el = document.getElementById('kpi_sales_diff');
-        if (avgSalesHigh > 0 && avgSalesLow > avgSalesHigh) {{
-            let mult = (avgSalesLow / avgSalesHigh).toFixed(1);
+        if (statHigh > 0 && statLow > statHigh) {{
+            let mult = (statLow / statHigh).toFixed(1);
             diff_el.innerHTML = `<span class="trend-up">Gấp ${{mult}}x</span>`;
-        }} else if (avgSalesLow <= avgSalesHigh) {{
+        }} else if (statLow <= statHigh) {{
             diff_el.innerHTML = `<span class="trend-down">Thấp hơn</span>`;
         }} else {{
             diff_el.innerHTML = `<span style="color:#9CA3AF">N/A</span>`;
@@ -368,11 +420,12 @@ def render(df_raw):
         // --- Chart 1: Trend line (sales transition vs missing count) ---
         let bucketMap = new Map();
         let bucketSize = 3; // group every 3 missing counts
+        
         data.forEach(d => {{
             let bucket = Math.floor(d.missing_count / bucketSize) * bucketSize;
-            if (!bucketMap.has(bucket)) bucketMap.set(bucket, {{ totalSales: 0, count: 0 }});
+            if (!bucketMap.has(bucket)) bucketMap.set(bucket, {{ salesArr: [], count: 0 }});
             let b = bucketMap.get(bucket);
-            b.totalSales += d.sales_volume_num;
+            b.salesArr.push(d.sales_volume_num);
             b.count++;
         }});
 
@@ -380,7 +433,9 @@ def render(df_raw):
         let trendLabels = sortedBuckets.map(b => b + '-' + (b + bucketSize - 1));
         let trendSales = sortedBuckets.map(b => {{
             let bk = bucketMap.get(b);
-            return bk.count > 0 ? Math.round(bk.totalSales / bk.count) : 0;
+            if (!bk.count) return 0;
+            if (METRIC === 'median') return Math.round(median(bk.salesArr));
+            return Math.round(bk.salesArr.reduce((s,v) => s+v, 0) / bk.count);
         }});
         let trendCounts = sortedBuckets.map(b => bucketMap.get(b).count);
 
@@ -411,6 +466,36 @@ def render(df_raw):
         let allValues = topDiffs.map(d => d.a);
 
         updateFeaturesChart(featLabels, topValues, allValues);
+
+        // --- Chart 3: Feature Concentration (Top 10% vs Rest) ---
+        let topCounts = TOP_COUNTS_DATA[cat] || {{}};
+        let allCounts = ALL_COUNTS_DATA[cat] || {{}};
+        
+        // Only consider features where at least a meaningful number of products have it
+        let MIN_COUNT = Math.max(10, data.length * 0.01);
+        
+        let concList = Object.keys(allCounts).map(f => {{
+            let a = allCounts[f] || 0;
+            let t = topCounts[f] || 0;
+            
+            // Skip features with very low global presence to avoid 100% false positives
+            if (a < MIN_COUNT) return null;
+            
+            let topPct = (t / a) * 100;
+            return {{ f: f, a: a, t: t, topPct: topPct }};
+        }}).filter(item => item !== null);
+        
+        // Sort by highest concentration in Top 10%
+        concList.sort((a,b) => b.topPct - a.topPct);
+        
+        let topConcFeatures = concList.slice(0, 14);
+        
+        let concFeatLabels = topConcFeatures.map(d => d.f);
+        let topConcData = topConcFeatures.map(d => d.topPct); // Top 10% percentage
+        let restConcData = topConcFeatures.map(d => 100 - d.topPct); // Rest percentage
+        let rawCountsList = topConcFeatures.map(d => ({{ t: d.t, a: d.a }}));
+
+        updateConcentrationChart(concFeatLabels, topConcData, restConcData, rawCountsList);
     }}
 
     function updateTrendChart(labels, salesData, countData) {{
@@ -429,6 +514,14 @@ def render(df_raw):
         CHARTS.features.data.datasets[0].data = topData;
         CHARTS.features.data.datasets[1].data = allData;
         CHARTS.features.update();
+    }}
+
+    function updateConcentrationChart(labels, topData, restData, countsData) {{
+        CHARTS.concentration.data.labels = labels;
+        CHARTS.concentration.data.datasets[0].data = topData;
+        CHARTS.concentration.data.datasets[1].data = restData;
+        CHARTS.concentration._rawCounts = countsData; // For tooltips
+        CHARTS.concentration.update();
     }}
 
     function initCharts() {{
@@ -510,7 +603,7 @@ def render(df_raw):
                         position: 'left',
                         grid: {{ color: 'rgba(0,0,0,0.04)' }},
                         ticks: {{ callback: (v) => fmtN(v), font: {{ size: 10 }} }},
-                        title: {{ display: true, text: 'Doanh Số TB (lượt bán)', color: '#ea580c', font: {{ size: 11, weight: '600' }} }}
+                        title: {{ display: true, text: 'Doanh Số Mean (lượt bán)', color: '#ea580c', font: {{ size: 11, weight: '600' }} }}
                     }},
                     y1: {{
                         position: 'right',
@@ -521,7 +614,11 @@ def render(df_raw):
                     }}
                 }},
                 plugins: {{
-                    legend: {{ display: false }},
+                    legend: {{ 
+                        display: true,
+                        position: 'top',
+                        labels: {{ boxWidth: 10, boxHeight: 10, font: {{ size: 10 }}, useBorderRadius: true, borderRadius: 2 }}
+                    }},
                     tooltip: {{
                         backgroundColor: 'rgba(28,25,23,0.92)',
                         titleFont: {{ size: 12, weight: '600' }},
@@ -541,7 +638,7 @@ def render(df_raw):
                 }}
             }}
         }});
-
+        
         // --- Chart 2: Grouped Horizontal Bar (Feature comparison) ---
         let ctxFeats = document.getElementById('c_features').getContext('2d');
         CHARTS.features = new Chart(ctxFeats, {{
@@ -627,6 +724,94 @@ def render(df_raw):
                     }}
                 }}
             }}
+        }});
+        
+        // --- Chart 3: Concentration 100% Stacked Bar ---
+        let ctxConc = document.getElementById('c_concentration').getContext('2d');
+        CHARTS.concentration = new Chart(ctxConc, {{
+            type: 'bar',
+            data: {{
+                labels: [],
+                datasets: [
+                    {{
+                        label: 'Thuộc Top 10% Doanh số',
+                        data: [],
+                        backgroundColor: 'rgba(234, 179, 8, 0.85)', // Amber/Yellow
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    }},
+                    {{
+                        label: 'Phần Còn Lại (90%)',
+                        data: [],
+                        backgroundColor: 'rgba(214, 211, 209, 0.4)', // Light gray
+                        barPercentage: 0.7,
+                        categoryPercentage: 0.8
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {{
+                    x: {{
+                        stacked: true,
+                        max: 100,
+                        grid: {{ color: 'rgba(0,0,0,0.04)' }},
+                        ticks: {{ callback: v => v + '%', font: {{ size: 10 }} }},
+                        title: {{ display: true, text: 'Tỷ trọng % Đặc tính', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
+                    }},
+                    y: {{
+                        stacked: true,
+                        grid: {{ display: false }},
+                        ticks: {{ font: {{ size: 10, weight: '500' }}, color: '#44403C' }}
+                    }}
+                }},
+                plugins: {{
+                    legend: {{
+                        display: true, position: 'bottom',
+                        labels: {{ boxWidth: 12, boxHeight: 12, useBorderRadius: true, borderRadius: 3, padding: 16, font: {{ size: 11, weight: '500' }} }}
+                    }},
+                    datalabels: {{ display: false }},
+                    tooltip: {{
+                        backgroundColor: 'rgba(28,25,23,0.92)',
+                        titleFont: {{ size: 12, weight: '600' }},
+                        bodyFont: {{ size: 11 }},
+                        padding: 10, cornerRadius: 6,
+                        callbacks: {{
+                            label: function(ctx) {{
+                                let label = ctx.dataset.label;
+                                let pct = ctx.raw.toFixed(1);
+                                let d = CHARTS.concentration._rawCounts[ctx.dataIndex]; 
+                                let count = ctx.datasetIndex === 0 ? d.t : (d.a - d.t);
+                                return `  ${{label}}: ${{pct}}%  (${{count}} sp)`;
+                            }},
+                            afterBody: function(ctx) {{
+                                let d = CHARTS.concentration._rawCounts[ctx[0].dataIndex];
+                                let topPct = ctx[0].chart.data.datasets[0].data[ctx[0].dataIndex];
+                                let upliftX = (topPct / 10).toFixed(1);
+                                return `\n  Tổng SP có thông tin này: ${{d.a}} sản phẩm\n  Độ tập trung gấp ${{upliftX}} lần mức kỳ vọng ngẫu nhiên`;
+                            }}
+                        }}
+                    }}
+                }}
+            }},
+            plugins: [{{
+                id: 'baseline10',
+                afterDatasetDraw: (chart) => {{
+                    const {{ctx, chartArea: {{top, bottom}}, scales: {{x}} }} = chart;
+                    let xPos = x.getPixelForValue(10);
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.lineWidth = 1.5;
+                    ctx.strokeStyle = '#ef4444'; // red-500
+                    ctx.setLineDash([4, 4]);
+                    ctx.moveTo(xPos, top);
+                    ctx.lineTo(xPos, bottom);
+                    ctx.stroke();
+                    ctx.restore();
+                }}
+            }}]
         }});
     }}
 
