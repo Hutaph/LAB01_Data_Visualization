@@ -13,7 +13,7 @@ TAB_CONFIG = [
     {"label": "Phân tích Ngành hàng", "icon": "bi-box-fill"},
     {"label": "Chiến lược Giá cả",   "icon": "bi-tag-fill"},
     {"label": "Chỉ số Tín nhiệm",    "icon": "bi-star-fill"},
-    {"label": "Chương trình Ưu đãi", "icon": "bi-percent"},
+    {"label": "Chương trình Ưu đãi", "icon": "bi-gift-fill"},
     {"label": "Chất lượng Niêm yết", "icon": "bi-info-circle-fill"},
     {"label": "Vị thế Thương hiệu",  "icon": "bi-patch-check-fill"},
     {"label": "Xu hướng Nổi bật",    "icon": "bi-bar-chart-fill", "icon_style": "font-size: 24px;"},
