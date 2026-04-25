@@ -58,285 +58,215 @@ def render(df_raw):
     data_json_str = export_df.to_json(orient="records", force_ascii=False)
 
     # ══════════════════════════════════════════════════════════════
-    # 3. HTML/CSS/JS CHUẨN ĐỒNG BỘ - COMPACT VERSION
+    # 3. HTML/CSS/JS CHUẨN ĐỒNG BỘ
     # ══════════════════════════════════════════════════════════════
-    html_code = f"""<!DOCTYPE html>
+    _HTML = """<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        :root {{
-            --primary: #F97316; --primary-light: #FDBA74; --secondary: #3B82F6;
-            --dark: #9A3412; --bg: #F8FAFC; --card-bg: #FFFFFF;
-            --text-primary: #0F172A; --text-secondary: #64748B;
-            --border-radius: 12px; --font-family: 'Inter', sans-serif;
-            --success: #10B981; --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
-        }}
-        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{ 
-            background: var(--bg); font-family: var(--font-family); color: var(--text-primary); 
-            padding: 8px 12px; overflow: hidden; width: 100vw; height: 100vh;
-        }}
-        .header-row {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }}
-        .title-main {{ font-size: 14px; font-weight: 800; color: var(--dark); letter-spacing: -0.2px; }}
-        select {{ padding: 3px 8px; border: 1px solid #E2E8F0; border-radius: 6px; font-size: 10px; font-weight: 600; outline: none; background: white; }}
+        :root{--pr:#F97316;--dk:#9A3412;--bg:#FEF3E2;--card:#FFFFFF;--t1:#1C1917;--t2:#78716C;--t3:#A8A29E;--bd:#E7E5E4;--r:8px;--fn:'Inter',sans-serif;--ft:'Montserrat',sans-serif}
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px 8px;height:100vh;overflow:hidden;display:flex;flex-direction:column;gap:8px}
 
-        .q-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }}
-        .q-cell {{ background: white; border: 1px solid #E2E8F0; border-radius: var(--border-radius); padding: 10px 12px; box-shadow: var(--shadow); border-top: 3px solid var(--primary); }}
-        .q-tag {{ font-size: 8px; font-weight: 800; color: var(--primary); text-transform: uppercase; margin-bottom: 2px; display: block; }}
-        .q-text {{ font-size: 11.5px; font-weight: 600; line-height: 1.3; color: #1E293B; }}
+        /* ── FILTER BAR ── */
+        .fb{
+          display:grid;grid-template-columns:1fr;gap:14px;
+          background:#fff;border:1px solid var(--bd);border-radius:10px;
+          padding:12px 16px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;
+        }
+        .fb-item label{
+          display:block;font-size:10px;font-weight:700;color:var(--t2);
+          text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;
+        }
+        .fb-item select{
+          width:100%;padding:7px 30px 7px 10px;
+          border:1px solid var(--bd);border-radius:6px;
+          font-size:13px;font-family:var(--fn);color:var(--t1);
+          background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
+          appearance:none;cursor:pointer;outline:none;transition:border-color .15s;
+        }
+        .fb-item select:hover{border-color:var(--pr);}
+        .fb-item select:focus{border-color:var(--pr);box-shadow:0 0 0 3px rgba(249,115,22,.12);}
 
-        .display-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; height: calc(100% - 105px); }}
-        .panel {{ display: flex; flex-direction: column; gap: 12px; height: 100%; }}
-        .chart-card {{ background: white; border-radius: var(--border-radius); padding: 10px; box-shadow: var(--shadow); flex: 1; min-height: 0; display: flex; flex-direction: column; }}
-        .chart-title {{ font-size: 9.5px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px; }}
-        .chart-wrapper {{ position: relative; width: 100%; flex: 1; min-height: 0; }}
+        /* ── KPI ── */
+        .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
+        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;border-left:3px solid var(--t3);}
+        .kc.hi{border-left-color:var(--pr);background:#FFF7ED}
+        .kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+        .kv{font-family:var(--ft);font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
+        .ks{font-size:10.5px;color:var(--t3)}
+        .kc.hi .kv{color:var(--dk)}
 
-        .kpi-mini {{ background: linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%); border-radius: var(--border-radius); padding: 8px 12px; border-left: 4px solid var(--success); display: flex; flex-direction: column; box-shadow: var(--shadow); }}
-        .kpi-mini-label {{ font-size: 8.5px; font-weight: 700; color: #9A3412; opacity: 0.7; text-transform: uppercase; }}
-        .kpi-mini-val {{ font-size: 20px; font-weight: 800; color: #7C2D12; margin: 1px 0; }}
-        .kpi-mini-sub {{ font-size: 9.5px; font-weight: 500; color: #C2410C; }}
+        /* ── CHARTS ── */
+        .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
+        .cc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+        .ct{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
+        .cs{font-size:11px;color:var(--t2);margin-bottom:10px}
+        .cw{position:relative;flex:1;min-height:0}
+        .leg{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:8px}
+        .li{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2);font-weight:500}
+        .ld{width:10px;height:10px;border-radius:2px;flex-shrink:0}
     </style>
 </head>
 <body>
-    <div class="header-row">
-        <div class="title-main">📊 DASHBOARD NHÃN UY TÍN (AMAZON'S CHOICE)</div>
-        <select id="selCategory" onchange="applyFilters()"><option value="ALL">Tất cả Danh mục</option></select>
-    </div>
-    <div class="q-grid">
-        <div class="q-cell">
-            <span class="q-tag">MỤC TIÊU 1: ĐÁNH GIÁ HIỆU NĂNG CỦA NHÃN UY TÍN (SMART)</span>
-            <div class="q-text">Thực hiện so sánh doanh số đơn hàng trung bình giữa nhóm sản phẩm có nhãn Amazon's Choice và nhóm thông thường để kiểm chứng liệu nhãn uy tín có thúc đẩy doanh số tăng trưởng ít nhất 15% trong tập dữ liệu mẫu hay không.</div>
-        </div>
-        <div class="q-cell">
-            <span class="q-tag">MỤC TIÊU 2: PHÂN TÍCH CHIẾN LƯỢC ĐỊNH GIÁ TỐI ƯU (SMART)</span>
-            <div class="q-text">Phân tích sự phân bổ tỷ lệ gắn nhãn Amazon’s Choice trên 4 phân khúc giá để xác định liệu Amazon có ưu tiên các sản phẩm thuộc "Sweet Spot" ($25-$50) nhằm tối ưu hóa khả năng tiếp cận khách hàng hay không.</div>
-        </div>
-    </div>
-    <div class="display-grid">
-        <!-- Panel 1: Hiệu ứng nhãn -->
-        <div class="panel">
-            <div class="kpi-mini">
-                <span class="kpi-mini-label">Chênh lệch doanh số trung bình</span>
-                <div class="kpi-mini-val" id="kpi_sales_diff">+0%</div>
-                <div class="kpi-mini-sub" id="kpi_sales_sub">TB: 0 (Choice) vs 0 (Best Seller)</div>
-            </div>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div class="kpi-mini" style="border-left-color: var(--secondary); background: #EFF6FF; padding: 6px 10px;">
-                    <span class="kpi-mini-label" style="color: #1E40AF;">Rating Trung Bình</span>
-                    <div class="kpi-mini-val" id="kpi_rating" style="font-size: 16px; color: #1E3A8A;">0.0 ⭐</div>
-                </div>
-                <div class="kpi-mini" style="border-left-color: #A855F7; background: #FAF5FF; padding: 6px 10px;">
-                    <span class="kpi-mini-label" style="color: #6B21A8;">Số Review TB</span>
-                    <div class="kpi-mini-val" id="kpi_reviews" style="font-size: 16px; color: #581C87;">0</div>
-                </div>
-            </div>
 
-            <div class="chart-card">
-                <div class="chart-title">So sánh hiệu suất bán ra (Doanh số)</div>
-                <div class="chart-wrapper"><canvas id="cBarSales"></canvas></div>
-            </div>
-        </div>
-        <div class="panel" style="display: grid; grid-template-rows: 1.2fr 0.8fr; gap: 10px;">
-            <div class="chart-card"><div class="chart-title">Ma trận Giá vs. Doanh Số Bán</div><div class="chart-wrapper"><canvas id="cScatter"></canvas></div></div>
-            <div class="chart-card"><div class="chart-title">Tỷ lệ Amazon's Choice theo mức giá</div><div class="chart-wrapper"><canvas id="cPriceTier"></canvas></div></div>
-        </div>
-    </div>
+<!-- FILTER BAR -->
+<div class="fb">
+  <div class="fb-item">
+    <label>Danh mục</label>
+    <select id="selCategory" onchange="applyFilters()">
+      <option value="ALL">Tất cả Danh mục</option>
+    </select>
+  </div>
+</div>
+
+<!-- KPI -->
+<div class="kpi-row" id="kpiRow"></div>
+
+<!-- CHARTS -->
+<div class="g2">
+  <div class="cc">
+    <div class="ct">Thị phần theo Nhãn Uy Tín</div>
+    <div class="cs">Tỷ trọng số lượng sản phẩm có nhãn Amazon's Choice</div>
+    <div class="leg" id="dLeg"></div>
+    <div class="cw"><canvas id="cDonut"></canvas></div>
+  </div>
+  <div class="cc">
+    <div class="ct">So sánh hiệu suất bán ra (Doanh số)</div>
+    <div class="cs">Doanh số trung bình giữa nhóm có và không có nhãn</div>
+    <div class="cw"><canvas id="cBarSales"></canvas></div>
+  </div>
+  <div class="cc">
+    <div class="ct">Tỷ lệ Amazon's Choice theo mức giá</div>
+    <div class="cs">Phân bổ nhãn uy tín theo từng phân khúc giá</div>
+    <div class="cw"><canvas id="cPriceTier"></canvas></div>
+  </div>
+  <div class="cc">
+    <div class="ct">Ma trận Giá vs. Doanh Số Bán</div>
+    <div class="cs">Mỗi điểm = 1 sản phẩm. Tương quan theo nhãn uy tín.</div>
+    <div class="leg" id="sLeg"></div>
+    <div class="cw"><canvas id="cScatter"></canvas></div>
+  </div>
+</div>
+
 <script>
-    const RAW = {data_json_str};
-    let globalInstances = {{}};
-    const COLORS = {{ choice: '#F97316', non: '#3B82F6' }};
-    const fmtN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
-    const fmtP = n => Number(n).toFixed(1) + '%';
+    const RAW = __DATA_JSON__;
+    let charts = {};
+    const COLORS = { choice: '#F97316', non: '#9A3412' };
+    const SC = {"Amazon's Choice": '#F97316', "Thường": '#9A3412'};
+    
+    Chart.defaults.font.family="'Inter',sans-serif"; Chart.defaults.color='#78716C';
+    const fN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
+    const fP = n => Number(n).toFixed(1) + '%';
+    const fmtN = n => Number(n).toLocaleString('vi-VN');
 
-    function setup() {{
+    function destroy() { Object.values(charts).forEach(c=>c&&c.destroy()); charts={}; }
+
+    function setup() {
         let cats = new Set();
-        RAW.forEach(d => {{ if(d.crawl_category && d.crawl_category !== 'Không rõ' && d.crawl_category !== 'Khác') cats.add(d.crawl_category); }});
+        RAW.forEach(d => { if(d.crawl_category && d.crawl_category !== 'Không rõ' && d.crawl_category !== 'Khác') cats.add(d.crawl_category); });
         let sel = document.getElementById('selCategory');
-        Array.from(cats).sort().forEach(c => {{
+        Array.from(cats).sort().forEach(c => {
             let opt = document.createElement('option');
             opt.value = c; opt.innerText = c;
             sel.appendChild(opt);
-        }});
-        initCharts();
+        });
         applyFilters();
-    }}
+    }
 
-    function applyFilters() {{
+    function applyFilters() {
         let cat = document.getElementById('selCategory').value;
         let data = RAW.filter(d => cat === 'ALL' || d.crawl_category === cat);
         updateDashboard(data);
-    }}
+    }
 
-    function updateDashboard(data) {{
+    function updateDashboard(data) {
+        destroy();
         if(data.length === 0) return;
-        let G_choice = data.filter(d => d.is_amazon_choice), G_non = data.filter(d => !d.is_amazon_choice);
         
-        // 1. KPI Doanh số (Panel 1)
+        let G_choice = data.filter(d => d.is_amazon_choice);
+        let G_non = data.filter(d => !d.is_amazon_choice);
+        
+        // --- KPIs ---
         let s_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.sales_volume_num,0)/G_choice.length : 0;
         let s_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+b.sales_volume_num,0)/G_non.length : 0;
         let s_pct = s_n > 0 ? ((s_c - s_n) / s_n) * 100 : 0;
-        document.getElementById('kpi_sales_diff').innerText = (s_pct >= 0 ? '+' : '') + fmtP(s_pct);
-        document.getElementById('kpi_sales_sub').innerText = 'TB: ' + fmtN(s_c) + ' (Choice) vs ' + fmtN(s_n) + ' (Best Seller)';
         
-        // 2. Info bổ sung (Rating, Reviews - Panel 1)
         let r_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.rating_val,0)/G_choice.length : 0;
         let rev_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.reviews_val,0)/G_choice.length : 0;
-        document.getElementById('kpi_rating').innerText = r_c.toFixed(1) + ' ⭐';
-        document.getElementById('kpi_reviews').innerText = fmtN(rev_c);
+        
+        const kpis = [
+            {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'TB: '+fN(s_c)+' (Choice) vs '+fN(s_n)+' (Thường)', hi:1},
+            {t:'Rating Trung Bình (Choice)', v:r_c.toFixed(1)+' ⭐', s:'Chất lượng đánh giá'},
+            {t:'Số Review TB (Choice)', v:fmtN(rev_c), s:'Độ nhận diện sản phẩm'},
+            {t:'Tổng Sản Phẩm', v:fmtN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'}
+        ];
+        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div><div class="ks">${x.s}</div></div>`).join('');
+        
+        // --- 1. Donut Chart ---
+        const dCounts = [G_choice.length, G_non.length];
+        const dLabels = ["Amazon's Choice", "Thường"];
+        const dColors = [COLORS.choice, COLORS.non];
+        const dTotal  = data.length;
+        document.getElementById('dLeg').innerHTML = dLabels.map((lb,i)=>`<span class="li"><span class="ld" style="background:${dColors[i]}"></span>${lb} (${dTotal?(dCounts[i]/dTotal*100).toFixed(1):0}%)</span>`).join('');
+        charts.donut = new Chart(document.getElementById('cDonut'),{type:'doughnut',
+            data:{labels:dLabels,datasets:[{data:dCounts,backgroundColor:dColors,borderWidth:0}]},
+            options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtN(c.raw)} SP`}}}}});
 
-        globalInstances.cBarSales.data.datasets[0].data = [s_c, s_n];
-        globalInstances.cBarSales.update();
+        // --- 2. Bar Chart (Sales) ---
+        charts.bar = new Chart(document.getElementById('cBarSales'),{type:'bar',
+            data:{labels:["Amazon's Choice", "Thường"],datasets:[{data:[s_c, s_n],backgroundColor:[COLORS.choice, COLORS.non],borderRadius:6}]},
+            options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.raw)} đơn`}}},
+            scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
-        // 3. Scatter Matrix (Panel 2)
-        let scatterCh = [], scatterNo = [];
-        let renderData = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data;
-        renderData.forEach(d => {{
-            let pt = {{x: d.current_price, y: d.sales_volume_num}};
-            if (d.is_amazon_choice) scatterCh.push(pt); else scatterNo.push(pt);
-        }});
-        globalInstances.cScatter.data.datasets[0].data = scatterCh;
-        globalInstances.cScatter.data.datasets[1].data = scatterNo;
-        globalInstances.cScatter.update();
-
-        // 4. Price Tiers (Panel 2)
+        // --- 3. Price Tier ---
         let tiers = ["1. Bình dân (<$25)", "2. Phổ thông ($25-$50)", "3. Trung cấp ($50-$100)", "4. Cao cấp (>$100)"];
         let tierChData = [], tierNoData = [];
-        tiers.forEach(t => {{
+        tiers.forEach(t => {
             let t_data = data.filter(d => d.price_tier === t);
-            if (t_data.length === 0) {{ tierChData.push(0); tierNoData.push(0); }}
-            else {{ let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100;
-                   tierChData.push(p); tierNoData.push(100 - p); }}
-        }});
-        globalInstances.cPriceTier.data.labels = tiers;
-        globalInstances.cPriceTier.data.datasets[0].data = tierChData;
-        globalInstances.cPriceTier.data.datasets[1].data = tierNoData;
-        globalInstances.cPriceTier.update();
-    }}
+            if (t_data.length === 0) { tierChData.push(0); tierNoData.push(0); }
+            else { 
+                let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100;
+                tierChData.push(p); tierNoData.push(100 - p); 
+            }
+        });
+        charts.tier = new Chart(document.getElementById('cPriceTier'),{type:'bar',
+            data:{labels:tiers,datasets:[{label:"Choice (%)",data:tierChData,backgroundColor:COLORS.choice,borderRadius:3},{label:"Thường (%)",data:tierNoData,backgroundColor:COLORS.non,borderRadius:3}]},
+            options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw.toFixed(1)}%`}}},
+            scales:{x:{stacked:true,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}}}});
 
-    function initCharts() {{
-        Chart.defaults.font.family = "'Inter', sans-serif";
-        Chart.defaults.color = '#64748B';
+        // --- 4. Scatter ---
+        document.getElementById('sLeg').innerHTML = dLabels.map(sg=>`<span class="li"><span class="ld" style="background:${SC[sg]}"></span>${sg}</span>`).join('');
+        let renderData = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data;
+        let scatterCh = [], scatterNo = [];
+        renderData.forEach(d => {
+            let pt = {x: d.current_price, y: d.sales_volume_num};
+            if (d.is_amazon_choice) scatterCh.push(pt); else scatterNo.push(pt);
+        });
+        charts.scat = new Chart(document.getElementById('cScatter'),{type:'scatter',
+            data:{datasets:[
+                {label:"Amazon's Choice",data:scatterCh,backgroundColor:COLORS.choice+'80',pointRadius:4},
+                {label:"Thường",data:scatterNo,backgroundColor:COLORS.non+'50',pointRadius:3}
+            ]},
+            options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${c.parsed.x} | ${fmtN(c.parsed.y)} đơn`}}},
+            scales:{x:{title:{display:true,text:'Giá ($)'},grid:{color:'rgba(0,0,0,0.04)'}},
+                    y:{title:{display:true,text:'Doanh số'},grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v}}}}});
+    }
 
-        // 1. Biểu đồ Doanh số
-        const ctxBar = document.getElementById('cBarSales').getContext('2d');
-        globalInstances.cBarSales = new Chart(ctxBar, {{
-            type: 'bar',
-            data: {{
-                labels: ["Amazon's Choice", "Best Seller"],
-                datasets: [{{
-                    label: 'Doanh Số',
-                    data: [0, 0],
-                    backgroundColor: [COLORS.choice, COLORS.non],
-                    borderRadius: 6
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{ legend: {{ display: false }} }},
-                scales: {{
-                    y: {{
-                        beginAtZero: true,
-                        grid: {{ drawBorder: false, color: '#F1F5F9' }}
-                    }}
-                }}
-            }}
-        }});
-
-        // 2. Biểu đồ Scatter
-        const ctxScatter = document.getElementById('cScatter').getContext('2d');
-        globalInstances.cScatter = new Chart(ctxScatter, {{
-            type: 'scatter',
-            data: {{
-                datasets: [
-                    {{
-                        label: "Choice",
-                        data: [],
-                        backgroundColor: 'rgba(249, 115, 22, 0.7)',
-                        pointRadius: 4
-                    }},
-                    {{
-                        label: "Thường",
-                        data: [],
-                        backgroundColor: 'rgba(59, 130, 246, 0.3)',
-                        pointRadius: 2.5
-                    }}
-                ]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{
-                    legend: {{
-                        position: 'top',
-                        labels: {{ usePointStyle: true, padding: 5, font: {{ size: 9 }} }}
-                    }}
-                }},
-                scales: {{
-                    x: {{
-                        title: {{ display: true, text: 'Giá ($)', font: {{ size: 8 }} }},
-                        grid: {{ color: '#F1F5F9' }}
-                    }},
-                    y: {{
-                        title: {{ display: true, text: 'Doanh Số', font: {{ size: 8 }} }},
-                        grid: {{ color: '#F1F5F9' }}
-                    }}
-                }}
-            }}
-        }});
-
-        // 3. Biểu đồ Price Tier
-        const ctxTier = document.getElementById('cPriceTier').getContext('2d');
-        globalInstances.cPriceTier = new Chart(ctxTier, {{
-            type: 'bar',
-            data: {{
-                labels: [],
-                datasets: [
-                    {{
-                        label: "Choice (%)",
-                        data: [],
-                        backgroundColor: COLORS.choice
-                    }},
-                    {{
-                        label: "Thường (%)",
-                        data: [],
-                        backgroundColor: COLORS.non
-                    }}
-                ]
-            }},
-            options: {{
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {{
-                    legend: {{
-                        position: 'bottom',
-                        labels: {{ usePointStyle: true, padding: 5, font: {{ size: 9 }} }}
-                    }}
-                }},
-                scales: {{
-                    x: {{
-                        stacked: true,
-                        max: 100,
-                        ticks: {{ callback: v => v + '%', font: {{ size: 8 }} }},
-                        grid: {{ display: false }}
-                    }},
-                    y: {{
-                        stacked: true,
-                        grid: {{ display: false }},
-                        ticks: {{ font: {{ size: 8 }} }}
-                    }}
-                }}
-            }}
-        }});
-    }}
     document.addEventListener("DOMContentLoaded", setup);
 </script>
 </body>
 </html>
 """
-    components.html(html_code, height=620, scrolling=False)
+    st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
+    html_final = _HTML.replace("__DATA_JSON__", data_json_str)
+    components.html(html_final, height=650, scrolling=False)
+
+
