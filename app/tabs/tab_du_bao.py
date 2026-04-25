@@ -41,14 +41,38 @@ def render(df):
     # default selection (prefer gradient boosting if present)
     default_name = "best_gradient_boosting_model.pkl"
     default_index = model_options.index(default_name) if default_name in model_options else 0
-    selected_model_name = st.selectbox("Chọn mô hình", model_options, index=default_index,
-                                       format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title())
-    MODEL_PATH = MODELS_DIR / selected_model_name
 
     # CSS + header
     st.markdown(
         """
         <style>
+        /* ========= TỐI ƯU TIÊU ĐỀ ========= */
+        .tab-header-wrapper {
+            margin-top: 25px;
+            padding-bottom: 25px;
+            margin-bottom: 35px;
+            border-bottom: 2px solid rgba(249, 115, 22, 0.1);
+        }
+        .header-title-box {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+        .header-main-title {
+            font-size: 26px;
+            font-weight: 850;
+            background: linear-gradient(90deg, #9A3412 0%, #EA580C 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+        .header-sub-title {
+            font-size: 15px;
+            color: #6b7280;
+            font-weight: 500;
+            margin-top: 2px;
+        }
+
         /* ========= TỐI ƯU NÚT BẤM VÀ LABEL ========= */
         .stButton>button {
             width: 100%;
@@ -107,20 +131,50 @@ def render(df):
         .status-mid { background: #fef08a; color: #854d0e; border: 1px solid #fde047; }
         .status-low { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
         </style>
-
-        <div class="section-sticky" style="margin-bottom:16px;">
-            <div class="section-title-row">
-                <div class="section-title">
-                    <div style="display:flex;flex-direction:column;line-height:1;">
-                        <div style="font-size:20px;font-weight:800;color:#9A3412;">Dự báo hiệu suất sản phẩm</div>
-                        <div style="font-size:16px;color:#6b7280;margin-top:4px;">Forecast product performance</div>
-                    </div>
-                </div>
-            </div>
-        </div>
         """,
         unsafe_allow_html=True,
     )
+
+    # Layout Header: Title + Model Selector
+    st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
+    
+    # Sử dụng tỷ lệ cân đối hơn [3, 2]
+    header_col1, header_col2 = st.columns([3, 2], gap="medium")
+    
+    with header_col1:
+        st.markdown(
+            """
+            <div class="header-title-box">
+                <div class="header-main-title">Dự báo hiệu suất sản phẩm</div>
+                <div class="header-sub-title">Advanced Machine Learning Predictive Model</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    
+    with header_col2:
+        selected_model_name = st.selectbox(
+            "Mô hình AI sử dụng", 
+            model_options, 
+            index=default_index,
+            format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title()
+        )
+    
+    # Border ngăn cách tinh tế hơn
+    st.markdown(
+        """
+        <div style="
+            height: 2px; 
+            background: linear-gradient(90deg, rgba(249, 115, 22, 0.3) 0%, rgba(249, 115, 22, 0) 100%); 
+            margin-top: 15px; 
+            margin-bottom: 30px; 
+            border-radius: 2px;
+        "></div>
+        """, 
+        unsafe_allow_html=True
+    )
+    
+    MODEL_PATH = MODELS_DIR / selected_model_name
 
     # LOAD MODEL + PROCESSOR
     if not MODEL_PATH.exists():
