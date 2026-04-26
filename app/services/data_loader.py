@@ -41,7 +41,7 @@ def _resolve_latest_csv() -> Path:
     candidates = [
         root_dir / "data" / "Processed",
         root_dir / "data" / "processed",
-        app_dir / "data",
+        app_dir / "pics",
     ]
 
     csv_files: list[Path] = []

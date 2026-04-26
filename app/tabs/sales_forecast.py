@@ -37,8 +37,8 @@ def render(df):
         st.error("Không tìm thấy mô hình (.pkl) trong thư mục models")
         return
 
-    # Model mặc định (ưu tiên XGBoost nếu có)
-    default_name = "xgboost_model.pkl"
+    # Model mặc định (ưu tiên Gradient Boosting nếu có)
+    default_name = "gradient_boosting_model.pkl"
     default_index = model_options.index(default_name) if default_name in model_options else 0
 
     # CSS + header

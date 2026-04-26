@@ -3,7 +3,7 @@ from pathlib import Path
 import base64
 
 def _load_logo_base64() -> str | None:
-    logo_path = Path(__file__).resolve().parents[1] / "data" / "Amazon_icon.png"
+    logo_path = Path(__file__).resolve().parents[1] / "pics" / "Amazon_icon.png"
     if not logo_path.exists():
         return None
     try:

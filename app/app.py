@@ -34,7 +34,7 @@ from tabs.sales_forecast import render as render_sales_forecast
 from tabs.listing_quality import render as render_listing_quality
 from utils.css import inject_css
 
-amazon_icon_path = Path(__file__).resolve().parent / "data" / "Amazon_icon.png"
+amazon_icon_path = Path(__file__).resolve().parent / "pics" / "Amazon_icon.png"
 
 st.set_page_config(
     layout="wide",
