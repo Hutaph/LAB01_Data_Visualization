@@ -41,10 +41,9 @@ def render(df_raw):
 
     # Tạo phân khúc giá
     def get_price_tier(p):
-        if p < 25: return "1. Bình dân (<$25)"
-        elif p < 50: return "2. Phổ thông ($25-$50)"
-        elif p < 100: return "3. Trung cấp ($50-$100)"
-        else: return "4. Cao cấp (>$100)"
+        if p <= 17.99: return "1. Bình dân (≤ $17.99)"
+        elif p <= 46.99: return "2. Trung cấp ($17.99-$46.99)"
+        else: return "3. Cao cấp (≥ $46.99)"
     df["price_tier"] = df["current_price"].apply(get_price_tier)
 
     # ══════════════════════════════════════════════════════════════
@@ -64,44 +63,57 @@ def render(df_raw):
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
-        :root{--pr:#F97316;--dk:#9A3412;--bg:#FEF3E2;--card:#FFFFFF;--t1:#1C1917;--t2:#78716C;--t3:#A8A29E;--bd:#E7E5E4;--r:8px;--fn:'Inter',sans-serif;--ft:'Montserrat',sans-serif}
+        :root{--pr:#F97316;--dk:#9A3412;--bg:#FEF3E2;--card:#FFFFFF;--t1:#1C1917;--t2:#78716C;--t3:#A8A29E;--bd:#E7E5E4;--r:8px;--fn:'Inter',sans-serif}
         *{box-sizing:border-box;margin:0;padding:0}
         body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px 8px;height:100vh;overflow:hidden;display:flex;flex-direction:column;gap:8px}
 
         /* ── FILTER BAR ── */
         .fb{
-          display:grid;grid-template-columns:1fr;gap:14px;
+          display:flex;align-items:center;gap:24px;
           background:#fff;border:1px solid var(--bd);border-radius:10px;
-          padding:12px 16px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;
+          padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;flex-wrap:wrap;
         }
         .fb-item label{
           display:block;font-size:10px;font-weight:700;color:var(--t2);
-          text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px;
+          text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;
         }
         .fb-item select{
-          width:100%;padding:7px 30px 7px 10px;
-          border:1px solid var(--bd);border-radius:6px;
-          font-size:13px;font-family:var(--fn);color:var(--t1);
+          padding:7px 30px 7px 10px;border:1px solid var(--bd);border-radius:6px;
+          font-size:13px;font-family:var(--fn);color:var(--t1);min-width:180px;
           background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
-          appearance:none;cursor:pointer;outline:none;transition:border-color .15s;
+          appearance:none;cursor:pointer;outline:none;
         }
-        .fb-item select:hover{border-color:var(--pr);}
-        .fb-item select:focus{border-color:var(--pr);box-shadow:0 0 0 3px rgba(249,115,22,.12);}
+        
+        /* Slider */
+        .sl-wrap{display:flex;flex-direction:column;min-width:220px}
+        .sl-cont{position:relative;height:20px;display:flex;align-items:center}
+        .sl-track{position:absolute;left:0;right:0;height:4px;border-radius:2px;background:#E5E7EB}
+        .sl-input{position:absolute;width:100%;pointer-events:none;background:none;appearance:none;-webkit-appearance:none;margin:0}
+        .sl-input::-webkit-slider-thumb{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:#FFF;border:2px solid var(--pr);cursor:pointer;-webkit-appearance:none;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+        .sl-vals{display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin-top:4px;color:var(--t2)}
+
+        /* Toggle */
+        .tg-grp{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding-bottom:5px}
+        .tg-trk{position:relative;width:40px;height:22px;background:#E5E7EB;border-radius:11px;transition:.3s}
+        .tg-trk.on{background:var(--pr)}
+        .tg-thb{position:absolute;top:2px;left:2px;width:18px;height:18px;background:#FFF;border-radius:50%;transition:.3s;box-shadow:0 1px 2px rgba(0,0,0,0.1)}
+        .tg-trk.on .tg-thb{transform:translateX(18px)}
+        .tg-lbl{font-size:13px;font-weight:600;color:var(--t1)}
 
         /* ── KPI ── */
         .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
-        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;border-left:3px solid var(--t3);}
+        .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:14px 16px;border-left:4px solid var(--t3);}
         .kc.hi{border-left-color:var(--pr);background:#FFF7ED}
-        .kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-        .kv{font-family:var(--ft);font-size:20px;font-weight:700;color:var(--t1);margin-bottom:2px}
-        .ks{font-size:10.5px;color:var(--t3)}
+        .kt{font-size:10px;font-weight:600;color:var(--t2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+        .kv{font-size:22px;font-weight:800;color:var(--t1)}
+        .ks{font-size:10.5px;color:var(--t3);margin-top:2px}
         .kc.hi .kv{color:var(--dk)}
 
         /* ── CHARTS ── */
-        .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
+        .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0}
         .cc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
         .ct{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
         .cs{font-size:11px;color:var(--t2);margin-bottom:10px}
@@ -120,6 +132,15 @@ def render(df_raw):
     <select id="selCategory" onchange="applyFilters()">
       <option value="ALL">Tất cả Danh mục</option>
     </select>
+  </div>
+
+  <div class="tg-grp" onclick="togglePrime()">
+    <div class="tg-trk" id="tgPrime"><div class="tg-thb"></div></div>
+    <span class="tg-lbl">Prime Only</span>
+  </div>
+  <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
+      <div style="font-size:16px; font-weight:800; color:var(--dk); font-family:var(--ft);">PHÂN TÍCH NHÃN AMAZON'S CHOICE</div>
+      <div style="font-size:11px; color:var(--t2); font-weight:500;">Đánh giá tác động của nhãn uy tín đến hiệu suất sản phẩm</div>
   </div>
 </div>
 
@@ -155,109 +176,91 @@ def render(df_raw):
 <script>
     const RAW = __DATA_JSON__;
     let charts = {};
-    const COLORS = { choice: '#F97316', non: '#9A3412' };
-    const SC = {"Amazon's Choice": '#F97316', "Thường": '#9A3412'};
+    const COLORS = { choice: '#F97316', non: '#3266ad' };
+    const SC = {"Amazon's Choice": '#F97316', "Thường": '#3266ad'};
+    let primeOnly = false;
     
     Chart.defaults.font.family="'Inter',sans-serif"; Chart.defaults.color='#78716C';
     const fN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
     const fP = n => Number(n).toFixed(1) + '%';
-    const fmtN = n => Number(n).toLocaleString('vi-VN');
+    const fmtN = n => new Intl.NumberFormat('en-US').format(n);
+    const fF = (n, d = 1) => new Intl.NumberFormat('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }).format(n);
 
     function destroy() { Object.values(charts).forEach(c=>c&&c.destroy()); charts={}; }
 
     function setup() {
         let cats = new Set();
-        RAW.forEach(d => { if(d.crawl_category && d.crawl_category !== 'Không rõ' && d.crawl_category !== 'Khác') cats.add(d.crawl_category); });
+        RAW.forEach(d => { 
+            if(d.crawl_category && d.crawl_category !== 'Không rõ' && d.crawl_category !== 'Khác') cats.add(d.crawl_category); 
+        });
+
         let sel = document.getElementById('selCategory');
         Array.from(cats).sort().forEach(c => {
             let opt = document.createElement('option');
             opt.value = c; opt.innerText = c;
             sel.appendChild(opt);
         });
+
+        applyFilters();
+    }
+
+    function togglePrime() {
+        primeOnly = !primeOnly;
+        document.getElementById('tgPrime').classList.toggle('on', primeOnly);
         applyFilters();
     }
 
     function applyFilters() {
         let cat = document.getElementById('selCategory').value;
-        let data = RAW.filter(d => cat === 'ALL' || d.crawl_category === cat);
+        let data = RAW.filter(d => {
+            if(cat !== 'ALL' && d.crawl_category !== cat) return false;
+            if(primeOnly && !d.is_prime) return false;
+            return true;
+        });
         updateDashboard(data);
     }
 
     function updateDashboard(data) {
         destroy();
-        if(data.length === 0) return;
-        
+        if(data.length === 0) {
+            document.getElementById('kpiRow').innerHTML = '<div style="grid-column:span 4;text-align:center;padding:20px;color:var(--t2)">Không có dữ liệu phù hợp bộ lọc</div>';
+            return;
+        }
         let G_choice = data.filter(d => d.is_amazon_choice);
         let G_non = data.filter(d => !d.is_amazon_choice);
-        
-        // --- KPIs ---
         let s_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.sales_volume_num,0)/G_choice.length : 0;
         let s_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+b.sales_volume_num,0)/G_non.length : 0;
         let s_pct = s_n > 0 ? ((s_c - s_n) / s_n) * 100 : 0;
-        
         let r_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.rating_val,0)/G_choice.length : 0;
         let rev_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.reviews_val,0)/G_choice.length : 0;
         
         const kpis = [
+            {t:'Tổng Sản Phẩm', v:fmtN(data.length), s:fN(G_choice.length)+' Choice / '+fN(G_non.length)+' Thường'},
             {t:'Chênh lệch Doanh số TB', v:(s_pct>=0?'+':'')+fP(s_pct), s:'TB: '+fN(s_c)+' (Choice) vs '+fN(s_n)+' (Thường)', hi:1},
-            {t:'Rating Trung Bình (Choice)', v:r_c.toFixed(1)+' ⭐', s:'Chất lượng đánh giá'},
-            {t:'Số Review TB (Choice)', v:fmtN(rev_c), s:'Độ nhận diện sản phẩm'},
-            {t:'Tổng Sản Phẩm', v:fmtN(data.length), s:G_choice.length+' Choice / '+G_non.length+' Thường'}
+            {t:'Rating Trung Bình (Choice)', v:fF(r_c, 1)+' ⭐', s:'Chất lượng đánh giá'},
+            {t:'Số Review TB (Choice)', v:fN(rev_c), s:'Độ nhận diện sản phẩm'}
         ];
-        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div><div class="ks">${x.s}</div></div>`).join('');
+        document.getElementById('kpiRow').innerHTML = kpis.map(x=>`
+            <div class="kc${x.hi?' hi':''}">
+                <div class="kt">${x.t}</div>
+                <div class="kv">${x.v}</div>
+                <div class="ks">${x.s}</div>
+            </div>`).join('');
         
-        // --- 1. Donut Chart ---
-        const dCounts = [G_choice.length, G_non.length];
-        const dLabels = ["Amazon's Choice", "Thường"];
-        const dColors = [COLORS.choice, COLORS.non];
-        const dTotal  = data.length;
-        document.getElementById('dLeg').innerHTML = dLabels.map((lb,i)=>`<span class="li"><span class="ld" style="background:${dColors[i]}"></span>${lb} (${dTotal?(dCounts[i]/dTotal*100).toFixed(1):0}%)</span>`).join('');
-        charts.donut = new Chart(document.getElementById('cDonut'),{type:'doughnut',
-            data:{labels:dLabels,datasets:[{data:dCounts,backgroundColor:dColors,borderWidth:0}]},
-            options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtN(c.raw)} SP`}}}}});
+        const dCounts = [G_choice.length, G_non.length], dLabels = ["Amazon's Choice", "Thường"], dColors = [COLORS.choice, COLORS.non], dTotal = data.length;
+        document.getElementById('dLeg').innerHTML = dLabels.map((lb,i)=>`<span class="li"><span class="ld" style="background:${dColors[i]}"></span>${lb} (${dTotal?fF(dCounts[i]/dTotal*100, 1):0}%)</span>`).join('');
+        charts.donut = new Chart(document.getElementById('cDonut'),{type:'doughnut',data:{labels:dLabels,datasets:[{data:dCounts,backgroundColor:dColors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtN(c.raw)} SP`}}}}});
 
-        // --- 2. Bar Chart (Sales) ---
-        charts.bar = new Chart(document.getElementById('cBarSales'),{type:'bar',
-            data:{labels:["Amazon's Choice", "Thường"],datasets:[{data:[s_c, s_n],backgroundColor:[COLORS.choice, COLORS.non],borderRadius:6}]},
-            options:{responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.raw)} đơn`}}},
-            scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,0.04)'}}}}});
+        charts.bar = new Chart(document.getElementById('cBarSales'),{type:'bar',data:{labels:["Amazon's Choice", "Thường"],datasets:[{data:[s_c, s_n],backgroundColor:[COLORS.choice, COLORS.non],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.raw)} đơn`}}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
-        // --- 3. Price Tier ---
-        let tiers = ["1. Bình dân (<$25)", "2. Phổ thông ($25-$50)", "3. Trung cấp ($50-$100)", "4. Cao cấp (>$100)"];
-        let tierChData = [], tierNoData = [];
-        tiers.forEach(t => {
-            let t_data = data.filter(d => d.price_tier === t);
-            if (t_data.length === 0) { tierChData.push(0); tierNoData.push(0); }
-            else { 
-                let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100;
-                tierChData.push(p); tierNoData.push(100 - p); 
-            }
-        });
-        charts.tier = new Chart(document.getElementById('cPriceTier'),{type:'bar',
-            data:{labels:tiers,datasets:[{label:"Choice (%)",data:tierChData,backgroundColor:COLORS.choice,borderRadius:3},{label:"Thường (%)",data:tierNoData,backgroundColor:COLORS.non,borderRadius:3}]},
-            options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${c.raw.toFixed(1)}%`}}},
-            scales:{x:{stacked:true,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}}}});
+        let tiers = ["1. Bình dân (≤ $17.99)", "2. Trung cấp ($17.99-$46.99)", "3. Cao cấp (≥ $46.99)"], tierChData = [], tierNoData = [];
+        tiers.forEach(t => { let t_data = data.filter(d => d.price_tier === t); if (t_data.length === 0) { tierChData.push(0); tierNoData.push(0); } else { let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100; tierChData.push(p); tierNoData.push(100 - p); } });
+        charts.tier = new Chart(document.getElementById('cPriceTier'),{type:'bar',data:{labels:tiers,datasets:[{label:"Choice (%)",data:tierChData,backgroundColor:COLORS.choice,borderRadius:3},{label:"Thường (%)",data:tierNoData,backgroundColor:COLORS.non,borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fF(c.raw, 1)}%`}}},scales:{x:{stacked:true,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}}}});
 
-        // --- 4. Scatter ---
         document.getElementById('sLeg').innerHTML = dLabels.map(sg=>`<span class="li"><span class="ld" style="background:${SC[sg]}"></span>${sg}</span>`).join('');
-        let renderData = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data;
-        let scatterCh = [], scatterNo = [];
-        renderData.forEach(d => {
-            let pt = {x: d.current_price, y: d.sales_volume_num};
-            if (d.is_amazon_choice) scatterCh.push(pt); else scatterNo.push(pt);
-        });
-        charts.scat = new Chart(document.getElementById('cScatter'),{type:'scatter',
-            data:{datasets:[
-                {label:"Amazon's Choice",data:scatterCh,backgroundColor:COLORS.choice+'80',pointRadius:4},
-                {label:"Thường",data:scatterNo,backgroundColor:COLORS.non+'50',pointRadius:3}
-            ]},
-            options:{responsive:true,maintainAspectRatio:false,
-            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${c.parsed.x} | ${fmtN(c.parsed.y)} đơn`}}},
-            scales:{x:{title:{display:true,text:'Giá ($)'},grid:{color:'rgba(0,0,0,0.04)'}},
-                    y:{title:{display:true,text:'Doanh số'},grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>v>=1000?(v/1000).toFixed(0)+'K':v}}}}});
+        let rd = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data, scCh = [], scNo = [];
+        rd.forEach(d => { let pt = {x: d.current_price, y: d.sales_volume_num}; if (d.is_amazon_choice) scCh.push(pt); else scNo.push(pt); });
+        charts.scat = new Chart(document.getElementById('cScatter'),{type:'scatter',data:{datasets:[{label:"Amazon's Choice",data:scCh,backgroundColor:COLORS.choice+'80',pointRadius:4},{label:"Thường",data:scNo,backgroundColor:COLORS.non+'50',pointRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` $${fF(c.parsed.x, 2)} | ${fmtN(c.parsed.y)} đơn`}}},scales:{x:{title:{display:true,text:'Giá ($)'},grid:{color:'rgba(0,0,0,0.04)'}},y:{title:{display:true,text:'Doanh số'},grid:{color:'rgba(0,0,0,0.04)'},ticks:{callback:v=>v>=1000?fF(v/1000, 0)+'K':v}}}}});
     }
 
     document.addEventListener("DOMContentLoaded", setup);
@@ -267,6 +270,4 @@ def render(df_raw):
 """
     st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
     html_final = _HTML.replace("__DATA_JSON__", data_json_str)
-    components.html(html_final, height=650, scrolling=False)
-
-
+    components.html(html_final, height=720, scrolling=False)

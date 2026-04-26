@@ -31,10 +31,8 @@ from services.data_loader import COLOR_SEQUENCE, load_data
 from tabs.tab_tong_quan import render as render_tab_tong_quan
 from tabs.tab_danh_gia import render as render_tab_danh_gia
 from tabs.tab_dinh_gia import render as render_tab_dinh_gia
-from tabs.tab_danh_muc import render as render_tab_danh_muc
 from tabs.tab_nhan_uy_tin import render as render_tab_nhan_uy_tin
 from tabs.tab_uu_dai import render as render_tab_uu_dai
-from tabs.tab_noi_bat import render as render_tab_noi_bat
 from tabs.tab_du_bao import render as render_tab_du_bao
 from tabs.tab_thong_tin import render as render_tab_thong_tin
 from utils.css import inject_css
@@ -77,13 +75,11 @@ def _build_metrics(df):
 
 TAB_RENDERERS = {
     "Tổng quan Thị trường": lambda state, df: render_tab_tong_quan(state),
-    "Phân tích Ngành hàng": lambda state, df: render_tab_danh_muc(df),
     "Chiến lược Giá cả":   lambda state, df: render_tab_dinh_gia(df),
     "Chỉ số Tín nhiệm":    lambda state, df: render_tab_danh_gia(df),
     "Chiến lược Ưu đãi": lambda state, df: render_tab_uu_dai(df),
     "Chất lượng Niêm yết": lambda state, df: render_tab_thong_tin(df),
     "Vị thế Thương hiệu":  lambda state, df: render_tab_nhan_uy_tin(df),
-    "Xu hướng Nổi bật":    lambda state, df: render_tab_noi_bat(df),
     "Dự báo Kinh doanh":   lambda state, df: render_tab_du_bao(df),
 }
 
