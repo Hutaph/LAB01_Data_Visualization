@@ -125,3 +125,4 @@ __pycache__/
 
 .agent
 CLAUDE.md
+environment.yml
