@@ -1,10 +1,3 @@
-"""
-Tab Định Giá — Pricing Strategy Analysis
-Câu hỏi: Giá cả ảnh hưởng thế nào đến doanh số? Phân khúc nào được ưa chuộng nhất?
-
-Filter nằm hoàn toàn trong HTML/JS — không dùng st.selectbox.
-Toàn bộ data truyền xuống 1 lần, filter chạy client-side.
-"""
 import json, pandas as pd, numpy as np, streamlit as st
 import streamlit.components.v1 as components
 
@@ -76,11 +69,10 @@ body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px
 .ld{width:12px;height:12px;border-radius:3px;flex-shrink:0}
 .ld-line{width:20px;height:3px;border-radius:2px;flex-shrink:0}
 
-/* Gap badge */
+
 .gap-note{display:inline-flex;align-items:center;gap:5px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;padding:3px 8px;font-size:10px;font-weight:600;color:var(--dk);}
 </style></head><body>
 
-<!-- FILTER BAR -->
 <div class="fb">
   <div class="fb-item">
     <label>Danh Mục Sản Phẩm</label>
@@ -110,10 +102,8 @@ body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px
   </div>
 </div>
 
-<!-- KPI -->
 <div class="kpi-row" id="kpiRow"></div>
 
-<!-- CHARTS -->
 <div class="g2">
   <div class="cc">
     <div class="ct">Thị phần theo phân khúc giá</div>
@@ -192,7 +182,7 @@ function render(rows) {
   rows.forEach(r=>{ if(segCnt[r.seg]!==undefined) segCnt[r.seg]++; });
   const domSeg = SO.reduce((a,b)=>segCnt[a]>=segCnt[b]?a:b);
 
-  // Spearman
+  // Tính hệ số tương quan Spearman giữa giá bán và doanh số
   const wSales = rows.filter(r=>r.sales>0);
   let sp = 0;
   if(wSales.length>30) {
@@ -208,7 +198,7 @@ function render(rows) {
   const avgPrice = +avg(prices).toFixed(2);
   const medPrice = +median(prices).toFixed(2);
 
-  // KPI
+  // Cập nhật các thẻ KPI
   const kpis = [
     {t:'Giá niêm yết TB',   v:'$'+fR(avgPrice,2), s:'Trung vị: $'+fR(medPrice,2)},
     {t:'Phân khúc ưu thế',  v:domSeg,             s:'Chiếm '+(segCnt[domSeg]/t*100).toFixed(1)+'% thị phần', hi:1},
@@ -219,7 +209,7 @@ function render(rows) {
   const kRow = document.getElementById('kpiRow');
   kRow.innerHTML = kpis.map(x=>`<div class="kc${x.hi?' hi':''}"><div class="kt">${x.t}</div><div class="kv">${x.v}</div><div class="ks">${x.s}</div></div>`).join('');
 
-  // Donut
+  // Biểu đồ tròn thị phần theo phân khúc giá
   const dCounts = SO.map(s=>segCnt[s]);
   const dTotal = dCounts.reduce((a,b)=>a+b,0);
   document.getElementById('dLeg').innerHTML = SO.map((lb,i)=>`<span class="li"><span class="ld" style="background:${SC[lb]}"></span>${lb} (${dTotal?(dCounts[i]/dTotal*100).toFixed(1):0}%)</span>`).join('');
@@ -228,7 +218,7 @@ function render(rows) {
     options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fN(c.raw)} SP`}}}}});
 
-  // Scatter
+  // Biểu đồ phân tán tương quan Giá — Doanh số (lấy mẫu tối đa 500 điểm)
   document.getElementById('sLeg').innerHTML = SO.map(sg=>`<span class="li"><span class="ld" style="background:${SC[sg]}"></span>${sg}</span>`).join('');
   let scPts = rows.filter(r=>r.sales>0&&r.price<=200);
   if(scPts.length>500) scPts=scPts.sort(()=>Math.random()-.5).slice(0,500);
@@ -239,13 +229,13 @@ function render(rows) {
       scales:{x:{title:{display:true,text:'Giá niêm yết ($)',font:{size:11,weight:'600'}},grid:{color:'rgba(0,0,0,0.04)'},ticks:{font:{size:10}}},
               y:{beginAtZero:true,title:{display:true,text:'Doanh số (lượt)',font:{size:11,weight:'600'}},ticks:{font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
-  // Bin buckets
+  // Phân nhóm dữ liệu vào các khoảng giá
   const binBuckets = BL.map(()=>[]);
   rows.forEach(r=>{ for(let i=0;i<BINS.length-1;i++){if(r.price>=BINS[i]&&r.price<BINS[i+1]){binBuckets[i].push(r.sales);break;}} });
   const binCount = binBuckets.map(b=>b.length);
   const binSalesData = binBuckets.map(b => METRIC==='median' ? Math.round(median(b)) : Math.round(avg(b)));
 
-  // Bin Sales chart
+  // Biểu đồ doanh số theo mốc giá
   charts.bin = new Chart(document.getElementById('cBinSales'),{type:'bar',
     data:{labels:BL,datasets:[{data:binSalesData,backgroundColor:'#F97316',borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,
@@ -253,15 +243,12 @@ function render(rows) {
       scales:{x:{title:{display:true,text:'Khoảng giá bán ($)',font:{size:11,weight:'600'}},ticks:{font:{size:10},maxRotation:45},grid:{display:false}},
               y:{beginAtZero:true,title:{display:true,text:METRIC==='median'?'Doanh số trung vị':'Doanh số trung bình',font:{size:11,weight:'600'}},ticks:{font:{size:10},callback:v=>fmtK(v)},grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
-  // Market Gap dual-axis chart
-  // Tính opportunity score = sales / (count + 1) để highlight khoảng trống
+  // Biểu đồ khoảng trống thị trường: màu xanh lá = ít SP nhưng doanh số cao
   const maxCount = Math.max(...binCount, 1);
   const maxSales = Math.max(...binSalesData, 1);
-  // Normalize để highlight bars có ít SP nhưng doanh số cao
   const barColors = binBuckets.map((b,i) => {
     const normCount = binCount[i] / maxCount;
     const normSales = binSalesData[i] / maxSales;
-    // Khoảng trống: ít SP (normCount thấp) + doanh số cao (normSales cao)
     const isGap = normCount < 0.3 && normSales > 0.15;
     return isGap ? '#16a34a' : '#3266ad88';
   });
