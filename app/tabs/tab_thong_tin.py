@@ -2,6 +2,14 @@ import json
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+try:
+    from utils.constants import FEATURE_MAP
+except ImportError:
+    try:
+        import utils.constants
+        FEATURE_MAP = getattr(utils.constants, 'FEATURE_MAP', {})
+    except ImportError:
+        FEATURE_MAP = {}
 
 def render(df_raw):
     df = df_raw.copy()
@@ -23,7 +31,12 @@ def render(df_raw):
     p67 = round(float(price_nonzero.quantile(0.67)), 2) if not price_nonzero.empty else 30.0
 
     # Evaluate missing columns
-    exclude_cols = ['asin', 'title', 'price', 'original_price', 'sales_volume', 'sales_volume_num', 'currency', 'is_best_seller', 'link', 'Danh Mục Sản Phẩm', 'crawl_category', 'price_num']
+    exclude_cols = [
+        'asin', 'title', 'price', 'original_price', 'sales_volume', 'sales_volume_num', 
+        'currency', 'is_best_seller', 'link', 'Danh Mục Sản Phẩm', 'crawl_category', 'price_num',
+        'image_url', 'main_image_url', 'additional_image_urls', 'brand_url', 'brand_urls',
+        'product_videos', 'user_videos', 'video_thumbnail', 'slug', 'parent_asin', 'landing_asin', 'date'
+    ]
     eval_cols = [c for c in df.columns if c not in exclude_cols]
     
     def is_missing_series(series):
@@ -363,6 +376,7 @@ def render(df_raw):
     const ALL_FEATS_DATA = {all_feats_json_str};
     const TOP_COUNTS_DATA = {top_counts_json_str};
     const ALL_COUNTS_DATA = {all_counts_json_str};
+    const FEATURE_MAP = {json.dumps(FEATURE_MAP, ensure_ascii=False)};
     const TOTAL_FEATS = {total_features};
     const PRICE_T1 = {p33}; // Top of Bình Dân
     const PRICE_T2 = {p67}; // Top of Trung Cấp
@@ -504,13 +518,17 @@ def render(df_raw):
         let kpiSubEl = kpiFeatEl.nextElementSibling;
         
         if (diffsList.length > 0 && diffsList[0].diff > 0.1) {{
+            let fName = diffsList[0].f;
+            let displayFeatName = FEATURE_MAP[fName] || fName.toUpperCase();
             kpiTitleEl.innerText = "Feature Tạo Sự Khác Biệt";
-            kpiFeatEl.innerText = diffsList[0].f.toUpperCase();
+            kpiFeatEl.innerText = displayFeatName;
             kpiFeatEl.style.fontSize = "16px";
             kpiSubEl.innerHTML = `Chênh lệch <span class="trend-up">+${{diffsList[0].diff.toFixed(1)}}%</span> so với trung bình`;
         }} else {{
             kpiTitleEl.innerText = "Feature #1 Của Top Doanh Số";
-            kpiFeatEl.innerText = Object.keys(topFeatData).length ? Object.keys(topFeatData)[0].toUpperCase() : 'N/A';
+            let fName = Object.keys(topFeatData).length ? Object.keys(topFeatData)[0] : 'N/A';
+            let displayFeatName = FEATURE_MAP[fName] || fName.toUpperCase();
+            kpiFeatEl.innerText = displayFeatName;
             kpiSubEl.innerText = "Xuất hiện nhiều nhất ở SP bán chạy";
         }}
 
@@ -534,7 +552,7 @@ def render(df_raw):
         // Take top 7 features that matter most
         let topDiffs = diffList.slice(0, 7);
         
-        let featLabels = topDiffs.map(d => d.f);
+        let featLabels = topDiffs.map(d => FEATURE_MAP[d.f] || d.f);
 
         let diffValues = topDiffs.map(d => d.diff);
         updateFeaturesChart(featLabels, diffValues);
@@ -563,7 +581,7 @@ def render(df_raw):
         
         let topConcFeatures = concList.slice(0, 7);
         
-        let concFeatLabels = topConcFeatures.map(d => d.f);
+        let concFeatLabels = topConcFeatures.map(d => FEATURE_MAP[d.f] || d.f);
         let topConcData = topConcFeatures.map(d => d.topPct); // Top 10% percentage
         let restConcData = topConcFeatures.map(d => 100 - d.topPct); // Rest percentage
         let rawCountsList = topConcFeatures.map(d => ({{ t: d.t, a: d.a }}));

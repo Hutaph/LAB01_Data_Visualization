@@ -30,3 +30,48 @@ CATEGORY_MAP = {
     "tools_home_improvement": "Dụng cụ Sửa chữa",
     "toys_games": "Đồ chơi",
 }
+FEATURE_MAP = {
+    # Boolean / Flag Features
+    "is_amazon_choice": "Amazon's Choice",
+    "is_prime": "Amazon Prime",
+    "is_climate_friendly": "Climate Pledge Friendly",
+    "is_bestseller": "Sản phẩm Bán chạy",
+    "has_variations": "Có biến thể/phiên bản", 
+    "has_video": "Có Video sản phẩm",
+    "has_aplus_content": "Nội dung A+",
+    "has_brand_story": "Câu chuyện thương hiệu",
+    
+    # Content & Quality Features
+    "key_features": "Đặc điểm nổi bật", 
+    "full_description": "Mô tả đầy đủ",
+    "technical_details": "Chi tiết kỹ thuật",
+    "product_details": "Thông số sản phẩm",
+    "aplus_images": "Hình ảnh A+",
+    "customer_feedback_summary": "Tóm tắt phản hồi",
+    "top_reviews_global": "Đánh giá toàn cầu",
+    
+    # Quantitative Features
+    "rating": "Điểm đánh giá",
+    "reviews": "Số lượt đánh giá",
+    "number_of_offers": "Số lượng Nhà bán",
+    "lowest_offer_price": "Giá chào thấp nhất",
+    "current_price": "Giá hiện tại",
+    "unit_price": "Đơn giá",
+    "unit_count": "Số lượng đơn vị",
+    "min_order_quantity": "Số lượng đặt tối thiểu",
+    "discount": "Mức giảm giá ($)",
+    "discount_rate": "Tỷ lệ giảm giá (%)",
+    "delivery_fee": "Phí vận chuyển",
+    "delivery_info": "Thông tin giao hàng",
+    "availability": "Trạng thái kho",
+    "condition": "Tình trạng SP",
+    "estimated_delivery_date": "Ngày giao dự kiến",
+    
+    # Meta / Organizational Features
+    "main_category": "Danh mục chính",
+    "category_hierarchy": "Cấp bậc danh mục",
+    "brand_info": "Thông tin thương hiệu",
+    "variation_dimensions": "Thuộc tính biến thể",
+    "variants": "Thông tin biến thể",
+    "all_variants": "Danh sách biến thể",
+}
