@@ -42,13 +42,13 @@ header[data-testid="stHeader"] {
 
 html {
   zoom: 1;
-  overflow: hidden;
-  height: 100%;
+  overflow-y: auto !important;
+  height: auto !important;
 }
 
 body {
-  overflow: auto;
-  height: calc(100% / 0.9);
+  overflow-y: auto !important;
+  height: auto !important;
 }
 
 html,

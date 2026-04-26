@@ -256,7 +256,9 @@ def ensure_processor(processor_path: str | Path, sample_df: pd.DataFrame | None 
 def transform_with_feature_names(processor, X: pd.DataFrame) -> pd.DataFrame:
     """Transform DataFrame and return DataFrame with feature names if available.
 
-    If names cannot be determined, returns a DataFrame with auto-generated column names.
+    This function strips sklearn's ColumnTransformer prefixes (num__, cat__, bools__)
+    and removes special characters ([ ] <) to ensure compatibility with models 
+    like XGBoost.
     """
     arr = processor.transform(X)
     if isinstance(arr, np.ndarray):
@@ -267,6 +269,7 @@ def transform_with_feature_names(processor, X: pd.DataFrame) -> pd.DataFrame:
                 cols = list(processor.get_feature_names_out())
         except Exception:
             cols = None
+            
         if cols is None:
             # try column transformer inside pipeline
             try:
@@ -283,12 +286,27 @@ def transform_with_feature_names(processor, X: pd.DataFrame) -> pd.DataFrame:
             except Exception:
                 cols = None
 
+        if cols is not None:
+            new_cols = []
+            for c in cols:
+                c_clean = str(c)
+                if c_clean.startswith("num__"):
+                    c_clean = c_clean.replace("num__", "")
+                elif c_clean.startswith("bools__"):
+                    c_clean = c_clean.replace("bools__", "")
+                elif c_clean.startswith("cat__"):
+                    c_clean = c_clean.replace("cat__", "")
+                
+                # Final step: Remove special characters for XGBoost compatibility
+                c_clean = c_clean.replace("[", "").replace("]", "").replace("<", "")
+                new_cols.append(c_clean)
+            cols = new_cols
+
         if cols is None:
             cols = [f"f_{i}" for i in range(arr.shape[1])]
+            
         return pd.DataFrame(arr, columns=cols)
     else:
         # assume processor returns DataFrame-like
-        try:
-            return pd.DataFrame(arr)
-        except Exception:
-            return pd.DataFrame(arr)
+        return pd.DataFrame(arr)
+

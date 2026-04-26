@@ -23,13 +23,14 @@ from predictor.loader import load_processed_data
 
 def render(df):
     # PATHS
-    # `MODELS_DIR` is provided by the predictor package (points to app/services/models)
-    PROCESSOR_PATH = MODELS_DIR / "sales_prediction_processor.joblib"
+    DATA_PROCESSED_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
+    PROCESSOR_PATH = DATA_PROCESSED_DIR / "sales_prediction_pipeline.joblib"
 
     # Detect available model files and allow user to choose
     try:
         model_files = sorted(MODELS_DIR.glob("*.pkl"))
-        model_options = [p.name for p in model_files]
+        # Filter out metadata files like feature_names.pkl
+        model_options = [p.name for p in model_files if p.name != "feature_names.pkl"]
     except Exception:
         model_files = []
         model_options = []
@@ -38,8 +39,8 @@ def render(df):
         st.error("Không tìm thấy mô hình (.pkl) trong thư mục models")
         return
 
-    # default selection (prefer gradient boosting if present)
-    default_name = "best_gradient_boosting_model.pkl"
+    # default selection (prefer xgboost if present)
+    default_name = "xgboost_model.pkl"
     default_index = model_options.index(default_name) if default_name in model_options else 0
 
     # CSS + header
@@ -57,6 +58,8 @@ def render(df):
             display: flex;
             flex-direction: column;
             line-height: 1.2;
+            margin-bottom: 5px;
+            margin-left: 45px;
         }
         .header-main-title {
             font-size: 26px;
@@ -135,28 +138,27 @@ def render(df):
         unsafe_allow_html=True,
     )
 
-    # Layout Header: Title + Model Selector
-    st.markdown('<div style="margin-top: 25px;"></div>', unsafe_allow_html=True)
-    
-    # Sử dụng tỷ lệ cân đối hơn [3, 2]
-    header_col1, header_col2 = st.columns([3, 2], gap="medium")
-    
-    with header_col1:
-        st.markdown(
-            """
+    # HEADER SECTION
+    st.markdown(
+        """
+        <div class="header-container">
             <div class="header-title-box">
                 <div class="header-main-title">Dự báo hiệu suất sản phẩm</div>
                 <div class="header-sub-title">Advanced Machine Learning Predictive Model</div>
             </div>
-            """,
-            unsafe_allow_html=True
-        )
-    
-    with header_col2:
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # Model Selection Bar
+    model_sel_col1, model_sel_col2 = st.columns([3, 1])
+    with model_sel_col2:
         selected_model_name = st.selectbox(
-            "Mô hình AI sử dụng", 
-            model_options, 
+            "Mô hình AI sử dụng",
+            options=model_options,
             index=default_index,
+            key="model_selector",
             format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title()
         )
     
@@ -170,9 +172,10 @@ def render(df):
             margin-bottom: 30px; 
             border-radius: 2px;
         "></div>
-        """, 
+        """,
         unsafe_allow_html=True
     )
+
     
     MODEL_PATH = MODELS_DIR / selected_model_name
 
@@ -435,7 +438,8 @@ def render(df):
             # Category selector populated from model/dump features if available
             try:
                 fn = dump_features if 'dump_features' in locals() else feature_names
-                cat_options = [c.replace('cat_', '') for c in fn if isinstance(c, str) and c.startswith('cat_')]
+                cat_options = [c.replace('crawl_category_', '').replace('cat_', '') 
+                               for c in fn if isinstance(c, str) and (c.startswith('cat_') or c.startswith('crawl_category_'))]
                 if not cat_options:
                     cat_options = list(model_categories.keys())
             except Exception:
@@ -474,151 +478,74 @@ def render(df):
         if not submit:
             st.info("💡 Vui lòng nhập hoặc điều chỉnh các thông số sản phẩm ở cột bên trái và nhấn 'Dự đoán' để xem kết quả.")
         else:
-            # RAW INPUT
             try:
+                # 1. TÍNH TOÁN CÁC ĐẶC TRƯNG FE (Discount & Discount Rate)
+                f_discount = f_orig_price - f_price
+                f_discount_rate = (f_discount / f_orig_price) if f_orig_price > 0 else 0
+
+                # 2. XÂY DỰNG RAW INPUT
                 raw_input = pd.DataFrame([{
-                "price": f_price,
-                "original_price": f_orig_price,
-                "rating": f_rating,
-                "review_count": f_reviews,
-                "offer_count": f_offers,
-                "delivery_fee": f_delivery_fee,
-                "lowest_offer_price": f_lowest_offer_price,
-                "category": f_cat,
-                "is_prime": f_prime,
-                "is_choice": f_choice,
-                "is_climate": f_climate,
-                "has_variation": f_vars,
-                }])
-            except Exception as _e:
-                st.error(f"Input construction error: {_e}")
-                raw_input = pd.DataFrame([{
-                    "price": medians.get("price", 25.0),
-                    "original_price": medians.get("original_price", 30.0),
-                    "rating": medians.get("rating", 4.2),
-                    "review_count": medians.get("reviews", 0),
-                    "offer_count": medians.get("offers", 1),
-                    "delivery_fee": medians.get("delivery_fee", 0.0),
-                    "lowest_offer_price": 0.0,
-                    "sales_volume": 0,
-                    "category": medians.get("category"),
-                    "is_prime": medians.get("is_prime", True),
-                    "is_choice": medians.get("is_choice", False),
-                    "is_climate": medians.get("is_climate", False),
-                    "has_variation": medians.get("has_variation", True),
+                    "rating": f_rating,
+                    "is_amazon_choice": 1 if f_choice else 0,
+                    "is_prime": 1 if f_prime else 0,
+                    "has_variations": 1 if f_vars else 0,
+                    "is_climate_friendly": 1 if f_climate else 0,
+                    "crawl_category": f_cat,
+                    "price": f_price,
+                    "original_price": f_orig_price,
+                    "reviews": f_reviews,
+                    "number_of_offers": f_offers,
+                    "lowest_offer_price": f_lowest_offer_price,
+                    "delivery_fee": f_delivery_fee,
+                    "discount": f_discount,
+                    "discount_rate": f_discount_rate
                 }])
 
-            try:
-                # PROCESS
-                proc_input = raw_input.copy()
-                col_map = {
-                    "crawl_category": "category",
-                    "has_variations": "has_variation",
-                    "is_amazon_choice": "is_choice",
-                    "is_climate_friendly": "is_climate",
-                    "number_of_offers": "offer_count",
-                    "reviews": "review_count",
-                    "lowest_offer_price": "lowest_offer_price",
-                }
-                defaults = {
-                    "delivery_fee": float(medians.get("delivery_fee", 0.0)),
-                    "number_of_offers": int(medians.get("offers", 0)),
-                    "reviews": int(medians.get("reviews", 0)),
-                }
-                for new_col, src_col in col_map.items():
-                    if new_col not in proc_input.columns:
-                        if src_col in proc_input.columns:
-                            proc_input[new_col] = proc_input[src_col]
-                        else:
-                            proc_input[new_col] = defaults.get(new_col, np.nan)
-                if "delivery_fee" not in proc_input.columns:
-                    proc_input["delivery_fee"] = defaults["delivery_fee"]
-
-                X_processed_array = processor.transform(proc_input)
-
-                # convert processed output to DataFrame
-                if isinstance(X_processed_array, np.ndarray):
-                    arr = X_processed_array
-                    if arr.ndim == 1:
-                        arr = arr.reshape(1, -1)
-                    ncols = arr.shape[1]
-                    cols = None
-                    if isinstance(feature_names, (list, tuple)) and len(feature_names) == ncols:
-                        cols = list(feature_names)
-                    else:
-                        try:
-                            if hasattr(processor, "get_feature_names_out"):
-                                names_out = list(processor.get_feature_names_out())
-                            else:
-                                names_out = None
-                            if names_out and len(names_out) == ncols:
-                                cols = names_out
-                        except Exception:
-                            cols = None
-                    if cols is None:
-                        if isinstance(feature_names, (list, tuple)) and len(feature_names) >= 1:
-                            if len(feature_names) >= ncols:
-                                cols = list(feature_names)[:ncols]
-                            else:
-                                cols = list(feature_names) + [f"f_{i}" for i in range(len(feature_names), ncols)]
-                        else:
-                            cols = [f"f_{i}" for i in range(ncols)]
-                    X_processed = pd.DataFrame(arr, columns=cols)
+                # 3. TIỀN XỬ LÝ (Sử dụng pipeline.joblib)
+                # Load processor từ đường dẫn chính xác
+                DATA_PROCESSED_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
+                PIPELINE_PATH = DATA_PROCESSED_DIR / "sales_prediction_pipeline.joblib"
+                
+                if PIPELINE_PATH.exists():
+                    actual_processor = joblib.load(PIPELINE_PATH)
                 else:
-                    X_processed = X_processed_array
+                    actual_processor = processor # fallback to old one if missing
 
-                # align to model columns
-                if hasattr(model, "feature_names_in_"):
-                    expected = list(model.feature_names_in_)
-                    if not isinstance(X_processed, pd.DataFrame):
-                        arr = np.asarray(X_processed)
-                        if arr.ndim == 1:
-                            arr = arr.reshape(1, -1)
-                        X_processed = pd.DataFrame(arr, columns=[f"f_{i}" for i in range(arr.shape[1])])
-                    missing = [c for c in expected if c not in X_processed.columns]
-                    for c in missing:
-                        X_processed[c] = 0
-                    extras = [c for c in X_processed.columns if c not in expected]
-                    if extras:
-                        X_processed = X_processed.drop(columns=extras)
-                    X_processed = X_processed[expected]
+                # Transform và làm sạch tên đặc trưng
+                X_processed = transform_with_feature_names(actual_processor, raw_input)
 
-                # PREDICT
+                # 4. LOAD FEATURE NAMES VÀ ALIGNMENT
+                FEATURE_NAMES_PATH = MODELS_DIR / "feature_names.pkl"
+                if FEATURE_NAMES_PATH.exists():
+                    final_feature_names = joblib.load(FEATURE_NAMES_PATH)
+                    
+                    # Align columns
+                    for col in final_feature_names:
+                        if col not in X_processed.columns:
+                            X_processed[col] = 0
+                    
+                    X_processed = X_processed[final_feature_names]
+                else:
+                    final_feature_names = X_processed.columns.tolist()
+
+                # 5. THỰC HIỆN DỰ BÁO
+                # Để tránh lỗi và cảnh báo về tên đặc trưng, ta đổi tên cột thành chuỗi số "0", "1", "2"...
+                # vì mô hình được huấn luyện trên đầu ra của Pipeline (mảng đánh số)
+                X_processed.columns = [str(i) for i in range(X_processed.shape[1])]
                 raw_pred = model.predict(X_processed)[0]
-                is_classifier = hasattr(model, "classes_")
 
-                # Display results
+                # 6. INVERSE TRANSFORM (Log1p -> Original)
+                # Chú ý: Một số mô hình Boosting có thể cho kết quả âm ở vùng biên, ta clip về 0
+                final_val = np.expm1(raw_pred)
+                final_val = int(max(0, round(final_val)))
+
+                # 7. HIỂN THỊ KẾT QUẢ
                 st.markdown("### Kết quả Phân tích & Dự báo")
-
-                if is_classifier:
-                    pred_class = int(raw_pred)
-                    txt = "Thấp" if pred_class == 0 else ("Trung bình" if pred_class == 1 else "Cao")
-
-                    if pred_class == 2:
-                        status_class = "status-high"
-                    elif pred_class == 1:
-                        status_class = "status-mid"
-                    else:
-                        status_class = "status-low"
-
-                    st.markdown(f"""
-                        <div class="custom-metric-container">
-                            <div class="custom-metric-label">Phân hạng sản phẩm</div>
-                            <div class="custom-metric-value">{txt}</div>
-                            <div class="custom-metric-status {status_class}">Dựa trên dữ liệu thị trường</div>
-                        </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    use_log = True
-                    val = raw_pred
-                    if use_log:
-                        if target_mean is not None and target_std is not None:
-                            val_log = (val * target_std) + target_mean
-                            val = np.expm1(val_log)
-                        else:
-                            val = np.expm1(val)
-                    final_val = int(max(0, round(val)))
-
+                
+                # Layout kết quả chính
+                res_col1, res_col2 = st.columns([1, 1])
+                
+                with res_col1:
                     if final_val > 200:
                         status_text = "Tiềm năng cao 🚀"
                         status_class = "status-high"
@@ -631,38 +558,48 @@ def render(df):
 
                     st.markdown(f"""
                         <div class="custom-metric-container">
-                            <div class="custom-metric-label">Dự đoán Doanh số (Theo Tháng)</div>
+                            <div class="custom-metric-label">Dự đoán Doanh số (Tháng)</div>
                             <div class="custom-metric-value">{final_val:,} <span style="font-size:20px; color:#9ca3af; font-weight:600;">đơn</span></div>
                             <div class="custom-metric-status {status_class}">{status_text}</div>
                         </div>
                     """, unsafe_allow_html=True)
 
-                # RESULT LAYOUT: chart left, debug/model-info right
-                col_chart, col_side = st.columns([3, 1])
-                with col_chart:
-                    st.markdown("**Mức độ ảnh hưởng của các chỉ số (Feature Importances)**")
-                    if hasattr(model, 'feature_importances_'):
-                        imp = pd.DataFrame({"f": feature_names, "v": model.feature_importances_}).sort_values("v", ascending=False).head(8)
-                        fig = go.Figure(go.Bar(x=imp["v"], y=imp["f"], orientation='h', marker_color='#F97316'))
-                        fig.update_layout(height=320, margin=dict(t=20, b=20, l=40, r=20), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                        st.plotly_chart(fig, use_container_width=True)
-                with col_side:
-                    with st.expander("🛠️ DEBUG DỮ LIỆU", expanded=False):
-                        st.write("RAW INPUT")
-                        st.dataframe(raw_input, height=120)
-                        st.write("PROCESSED (head)")
-                        try:
-                            st.dataframe(X_processed.head(5), height=260)
-                        except Exception:
-                            st.dataframe(X_processed, height=260)
-                        # session_state debug
-                        try:
-                            st.write("session_state keys:")
-                            st.write(list(st.session_state.keys()))
-                        except Exception:
-                            pass
+                with res_col2:
+                    # Thông tin phụ thêm
+                    st.info(f"**Mô hình đang dùng:** {selected_model_name.replace('_', ' ').title()}\n\n**Đặc trưng quan trọng nhất:** Category, Reviews, Price")
 
-               
+                # 8. BIỂU ĐỒ FEATURE IMPORTANCE
+                if hasattr(model, 'feature_importances_'):
+                    st.markdown("---")
+                    st.markdown("**Mức độ ảnh hưởng của các chỉ số (Top 10 Features)**")
+                    
+                    importances = model.feature_importances_
+                    feat_imp = pd.DataFrame({
+                        'Feature': final_feature_names,
+                        'Importance': importances
+                    }).sort_values(by='Importance', ascending=False).head(10)
+
+                    fig = go.Figure(go.Bar(
+                        x=feat_imp['Importance'],
+                        y=feat_imp['Feature'],
+                        orientation='h',
+                        marker=dict(color='rgba(249, 115, 22, 0.8)', line=dict(color='rgba(249, 115, 22, 1.0)', width=1))
+                    ))
+                    
+                    fig.update_layout(
+                        yaxis=dict(autorange="reversed"),
+                        margin=dict(l=20, r=20, t=20, b=20),
+                        height=350,
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        xaxis_title="Gia trị quan trọng",
+                    )
+                    st.plotly_chart(fig, width='stretch')
+
+                # DEBUG
+                with st.expander("🛠️ Xem dữ liệu xử lý (Debug)", expanded=False):
+                    st.write("Dữ liệu đầu vào sau biến đổi (X_processed):")
+                    st.dataframe(X_processed)
 
             except Exception as e:
                 st.error(f"Lỗi predict: {e}")
