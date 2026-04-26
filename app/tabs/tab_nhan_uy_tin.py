@@ -138,6 +138,10 @@ def render(df_raw):
     <div class="tg-trk" id="tgPrime"><div class="tg-thb"></div></div>
     <span class="tg-lbl">Prime Only</span>
   </div>
+  <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
+      <div style="font-size:16px; font-weight:800; color:var(--dk); font-family:var(--ft);">PHÂN TÍCH NHÃN AMAZON'S CHOICE</div>
+      <div style="font-size:11px; color:var(--t2); font-weight:500;">Đánh giá tác động của nhãn uy tín đến hiệu suất sản phẩm</div>
+  </div>
 </div>
 
 <!-- KPI -->
