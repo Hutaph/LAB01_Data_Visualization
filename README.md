@@ -29,13 +29,12 @@ Dashboard được tổ chức thành 6 phân mục phân tích chiến lược:
 
 ```text
 ├── app/                  # Mã nguồn Dashboard Streamlit
-│   ├── pics/             # Asset hình ảnh (Logo, Icons)
+│   ├── pics/             # Asset hình ảnh
 │   ├── tabs/             # Các tệp phân tích theo từng Tab
 │   ├── services/         # Logic xử lý dữ liệu và ML Models
 │   └── styles/           # Custom CSS UI/UX
 ├── data/                 # Dữ liệu CSV (Raw & Processed)
 ├── notebook/             # Quy trình EDA và huấn luyện mô hình
-├── source/               # Pipeline thu thập dữ liệu (Crawling)
 └── requirements.txt      # Danh sách thư viện phụ thuộc
 ```
 
