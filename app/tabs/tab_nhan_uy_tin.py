@@ -72,7 +72,7 @@ def render(df_raw):
 
         /* ── FILTER BAR ── */
         .fb{
-          display:flex;align-items:flex-end;gap:24px;
+          display:flex;align-items:center;gap:24px;
           background:#fff;border:1px solid var(--bd);border-radius:10px;
           padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;flex-wrap:wrap;
         }
