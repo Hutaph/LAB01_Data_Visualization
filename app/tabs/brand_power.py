@@ -4,13 +4,13 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 def render(df_raw):
-    # Renders the Amazon's Choice Analysis tab.
+    # Hiển thị tab Phân tích Nhãn Amazon's Choice.
     df = df_raw.copy()
 
-    # 1. DATA PREPROCESSING & MAPPING
+    # 1. TIỀN XỬ LÝ DỮ LIỆU & MAPPING
     from utils.constants import CATEGORY_MAP
 
-    # Initialize essential columns
+    # Khởi tạo các cột quan trọng
     if "is_amazon_choice" not in df.columns:
         df["is_amazon_choice"] = False
     else:
@@ -24,13 +24,13 @@ def render(df_raw):
     else:
         df["is_prime"] = df["is_prime"].fillna(False).astype(bool)
 
-    # Category mapping
+    # Mapping danh mục
     if "crawl_category" in df.columns:
         df["crawl_category"] = df["crawl_category"].fillna("Không rõ").map(CATEGORY_MAP).fillna("Khác")
     else:
         df["crawl_category"] = "Không rõ"
 
-    # Numeric conversions
+    # Chuyển đổi kiểu dữ liệu số
     df["current_price"] = pd.to_numeric(df.get("price", 0), errors="coerce").fillna(0.0)
     df["sales_volume_num"] = pd.to_numeric(df.get("sales_volume_num", 0), errors="coerce").fillna(0)
     df["rating_val"] = pd.to_numeric(df.get("rating", 0), errors="coerce").fillna(0.0)
@@ -41,7 +41,7 @@ def render(df_raw):
     else:
         df["title"] = df["title"].fillna("Sản phẩm ẩn danh")
 
-    # Define Price Tiers
+    # Định nghĩa phân khúc giá
     def get_price_tier(p):
         if p <= 17.99: return "1. Bình dân (≤ $17.99)"
         if p <= 46.99: return "2. Trung cấp ($17.99-$46.99)"
@@ -49,7 +49,7 @@ def render(df_raw):
         
     df["price_tier"] = df["current_price"].apply(get_price_tier)
 
-    # 2. DATA EXPORT TO JSON
+    # 2. XUẤT DỮ LIỆU SANG JSON
     select_cols = [
         "title", "crawl_category", "is_amazon_choice", "is_best_seller", 
         "current_price", "sales_volume_num", "rating_val", "reviews_val", "is_prime", "price_tier"
@@ -57,7 +57,7 @@ def render(df_raw):
     export_df = df[select_cols].copy()
     data_json_str = export_df.to_json(orient="records", force_ascii=False)
 
-    # 3. VISUALIZATION (HTML/CSS/JS)
+    # 3. TRỰC QUAN HÓA (HTML/CSS/JS)
     _HTML = """<!DOCTYPE html>
 <html lang="vi">
 <head>
