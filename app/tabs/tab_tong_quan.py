@@ -1,6 +1,6 @@
 """
 Tab Tổng quan — Overview dashboard rebuilt dynamically with robust Custom HTML/CSS/JS stack using Chart.js.
-It matches the complex UI configuration previously provided.
+Updated to be 100% charts as requested (removed table).
 """
 
 import json
@@ -10,9 +10,9 @@ import streamlit.components.v1 as components
 
 def render(state):
     df_raw = state["df"]
-
     df = df_raw.copy()
     
+    # Preprocessing
     required_bools = ["is_amazon_choice", "is_climate_friendly", "has_variations"]
     for b in required_bools:
         if b not in df.columns:
@@ -23,6 +23,10 @@ def render(state):
     if "crawl_category" not in df.columns:
         df["crawl_category"] = "Không rõ"
     df["crawl_category"] = df["crawl_category"].fillna("Không rõ")
+
+    # Categories logic (matching tab_thong_tin)
+    from utils.constants import CATEGORY_MAP
+    df["category"] = df["crawl_category"].map(CATEGORY_MAP).fillna(df["crawl_category"])
 
     if "price" in df.columns:
         df["current_price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0.0)
@@ -44,13 +48,8 @@ def render(state):
     else:
         df["sales_volume_num"] = 0
 
-    if "title" not in df.columns:
-         df["title"] = "Sản phẩm ẩn danh"
-    else:
-         df["title"] = df["title"].fillna("Sản phẩm ẩn danh")
-
     select_cols = [
-        "title", "crawl_category", "current_price", "rating", "reviews", 
+        "category", "current_price", "rating", "reviews", 
         "sales_volume_num", "is_amazon_choice", "is_climate_friendly", "has_variations"
     ]
     export_df = df[select_cols].copy()
@@ -63,550 +62,337 @@ def render(state):
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <style>
         :root {{
-            --primary: #F97316;
-            --secondary: #F97316;
-            --dark: #9A3412;
+            --pr: #F97316;
+            --dk: #9A3412;
             --bg: #FEF3E2;
-            --card-bg: #FFFFFF;
-            --text-primary: #1C1917;
-            --text-secondary: #78716C;
-            --border-radius: 8px;
-            --font-family: 'Inter', sans-serif;
+            --card: #FFFFFF;
+            --t1: #1C1917;
+            --t2: #78716C;
+            --t3: #A8A29E;
+            --bd: #E7E5E4;
+            --r: 8px;
+            --fn: 'Inter', sans-serif;
+            --ft: 'Montserrat', sans-serif;
         }}
         
-        * {{
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }}
+        * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         
         body {{
             background-color: var(--bg);
-            font-family: var(--font-family);
-            color: var(--text-primary);
-            padding: 20px;
-            overflow-y: auto;
-            overflow-x: hidden;
-        }}
-
-        .filter-bar {{
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            margin-bottom: 24px;
-            background: var(--card-bg);
-            padding: 16px 20px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            flex-wrap: wrap;
-        }}
-        .f-item {{
+            font-family: var(--fn);
+            color: var(--t1);
+            padding: 6px 14px 8px;
+            height: 100vh;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            gap: 6px;
+            gap: 8px;
         }}
-        .f-label {{
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
+
+        /* ── FILTER BAR ── */
+        .fb {{
+            display: flex; align-items: center; gap: 20px;
+            background: #fff; border: 1px solid var(--bd); border-radius: 12px;
+            padding: 12px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); flex-shrink: 0;
         }}
-        select {{
+        .fb-item {{ display: flex; flex-direction: column; gap: 5px; }}
+        .fb-item label {{
+            font-size: 11px; font-weight: 700; color: var(--t2);
+            text-transform: uppercase; letter-spacing: .8px;
+        }}
+        .fb-item select {{
             padding: 8px 12px;
-            border: 1px solid #D1D5DB;
-            border-radius: 6px;
-            font-family: inherit;
-            color: var(--text-primary);
-            outline: none;
-            cursor: pointer;
-            width: 200px;
+            border: 1px solid var(--bd); border-radius: 8px;
+            font-size: 13px; font-family: var(--fn); color: var(--t1);
+            background: #fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
+            appearance: none; cursor: pointer; outline: none; transition: border-color .15s;
+            min-width: 190px;
         }}
-        select:focus {{ border-color: var(--primary); }}
-        input[type=range]::-webkit-slider-thumb {{
-            -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF;
-            border: 2.5px solid #F97316; box-shadow: 0 1px 4px rgba(245,158,11,0.4); cursor: grab; pointer-events: auto;
-        }}
-        input[type=range]::-webkit-slider-thumb:hover {{ box-shadow: 0 2px 8px rgba(245,158,11,0.6); }}
-        input[type=range]::-webkit-slider-thumb:active {{ cursor: grabbing; transform: scale(1.15); }}
-        input[type=range]::-moz-range-thumb {{
-            width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF;
-            border: 2.5px solid #F97316; box-shadow: 0 1px 4px rgba(245,158,11,0.4); cursor: grab; pointer-events: auto; border: none;
-        }}
-        input[type=range]::-moz-range-thumb:hover {{ box-shadow: 0 2px 8px rgba(245,158,11,0.6); }}
-        input[type=range]::-moz-range-thumb:active {{ cursor: grabbing; transform: scale(1.15); }}; font-weight: 500;}}
+        .fb-item select:hover {{ border-color: var(--pr); }}
+        .fb-item select:focus {{ border-color: var(--pr); box-shadow: 0 0 0 3px rgba(249,115,22,.12); }}
 
-        .toggle-group {{ display: flex; gap: 8px; align-items: center; cursor: pointer; }}
-        .toggle-switch {{
-            position: relative; width: 36px; height: 20px;
-            background-color: #E5E7EB; border-radius: 20px; transition: 0.3s;
+        .toggle-group {{ display: flex; background: #F3F4F6; border-radius: 8px; padding: 3px; gap: 2px; }}
+        .toggle-btn {{
+            border: none; background: transparent; font-family: inherit; font-size: 12px;
+            font-weight: 600; color: var(--t2); padding: 6px 14px; border-radius: 6px;
+            cursor: pointer; transition: all 0.2s;
         }}
-        .toggle-knob {{
-            position: absolute; top: 2px; left: 2px;
-            width: 16px; height: 16px; background: white;
-            border-radius: 50%; transition: 0.3s;
-        }}
-        .toggle-checkbox {{ display: none; }}
-        .toggle-checkbox:checked + .toggle-switch {{ background-color: var(--primary); }}
-        .toggle-checkbox:checked + .toggle-switch .toggle-knob {{ transform: translateX(16px); }}
-        .toggle-lbl {{ font-size: 14px; font-weight: 500; }}
-
-        .kpi-row {{
-            display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 16px;
-            margin-bottom: 24px;
-        }}
-        .kpi-card {{
-            background: var(--card-bg);
-            border-radius: var(--border-radius);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            padding: 16px;
-            border-left: 4px solid var(--primary);
-            display: flex; flex-direction: column; gap: 4px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
-        }}
-        .kpi-title {{ font-size: 12px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-        .kpi-value {{ font-size: 26px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-        .kpi-sub {{ font-size: 12px; color: #9CA3AF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
-
-        .chart-row-1 {{
-            display: grid;
-            grid-template-columns: 55% calc(45% - 20px);
-            gap: 20px;
-            margin-bottom: 24px;
-        }}
-        .chart-row-2 {{
-            margin-bottom: 24px;
-        }}
-        .chart-card {{
-            background: var(--card-bg);
-            border-radius: var(--border-radius);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            padding: 20px;
-        }}
-        .chart-title {{
-            font-size: 15px; font-weight: 600; margin-bottom: 16px; color: var(--text-primary);
-        }}
-        .chart-wrapper {{
-            position: relative;
-            width: 100%;
+        .toggle-btn.active {{
+            background: #FFFFFF; color: var(--pr); box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }}
 
-        .donut-legend {{
-            display: flex; justify-content: center; gap: 16px; margin-top: 16px;
-        }}
-        .dl-item {{ display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; }}
-        .dl-sq {{ width: 10px; height: 10px; border-radius: 2px; }}
+        /* ── KPI ── */
+        .kpi-row {{ display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; flex-shrink: 0; }}
+        .kc {{ background: var(--card); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.06); padding: 12px 16px; border-left: 4px solid var(--pr); }}
+        .kc.hi {{ border-left-color: var(--dk); background: #FFF7ED; }}
+        .kt {{ font-size: 10px; font-weight: 700; color: var(--t2); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; }}
+        .kv {{ font-family: var(--ft); font-size: 22px; font-weight: 700; color: var(--t1); margin-bottom: 2px; }}
+        .ks {{ font-size: 11px; color: var(--t3); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .kc.hi .kv {{ color: var(--dk); }}
+
+        /* ── CHARTS ── */
+        .g2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; flex: 1; min-height: 0; }}
+        .cc {{ background: var(--card); border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,.04); padding: 16px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }}
+        .ct {{ font-size: 14px; font-weight: 700; color: var(--t1); margin-bottom: 4px; }}
+        .cs {{ font-size: 11px; color: var(--t2); margin-bottom: 12px; line-height: 1.4; }}
+        .cw {{ position: relative; flex: 1; min-height: 0; }}
         
-        .combo-legend {{ display: flex; justify-content: flex-end; gap: 16px; margin-bottom: 12px; font-size:12px;font-weight:500;}}
-        .cl-item {{display:flex;align-items:center;gap:6px;}}
-        .cl-line {{width:16px; height:2px; background:var(--text-primary); position:relative;}}
-        .cl-line::after {{content:''; position:absolute; width:6px; height:6px; border-radius:50%; background:var(--text-primary); left:5px; top:-2px;}}
-
-        table {{
-            width: 100%; border-collapse: collapse; font-size: 13px;
-            table-layout: fixed;
-        }}
-        th {{
-            background: var(--primary); color: #FFFFFF; font-weight: 500; font-size: 13px;
-            text-align: left; padding: 12px;
-        }}
-        th:first-child {{ border-top-left-radius: 6px; width: 35%; }}
-        th:nth-child(2) {{ width: 25%; }}
-        th:nth-child(3) {{ width: 10%; }}
-        th:nth-child(4) {{ width: 15%; }}
-        th:last-child {{ border-top-right-radius: 6px; width: 15%; }}
-        td {{ padding: 12px; }}
-        tbody tr:nth-child(even) {{ background: #FEF3E2; }}
-        tbody tr:nth-child(odd) {{ background: #FFFAF5; }}
-        tr {{ border-bottom: 1px solid #E5E7EB; }}
-        .truncate-col {{ white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
+        .leg {{ display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 12px; justify-content: center; }}
+        .li {{ display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--t2); font-weight: 600; }}
+        .ld {{ width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }}
     </style>
 </head>
 <body>
 
-    <!-- Filters -->
-    <div class="filter-bar">
-        <div class="f-item">
-            <span class="f-label">Danh mục</span>
+    <!-- FILTER BAR -->
+    <div class="fb">
+        <div class="fb-item">
+            <label>Danh Mục Sản Phẩm</label>
             <select id="selCategory" onchange="applyFilters()">
-                <option value="ALL">Tất cả</option>
+                <option value="ALL">Tất cả danh mục sản phẩm</option>
             </select>
         </div>
-        <div class="f-item">
-            <div style="display:flex;flex-direction:column;min-width:200px">
-                <span style="font-size:11px;font-weight:600;color:#78716C;letter-spacing:0.05em;text-transform:uppercase;margin-bottom:6px">KHOẢNG GIÁ ($)</span>
-                <div style="position:relative;height:20px;display:flex;align-items:center">
-                    <div id="price_track" style="position:absolute;left:0;right:0;height:4px;border-radius:999px;background:#E5E7EB"></div>
-                    <input type="range" id="price_min" min="0" max="3400" step="1" value="0" oninput="updateSliderUI(this); applyFilters()" style="margin:0;position:absolute;width:100%;pointer-events:none;background:transparent;appearance:none;-webkit-appearance:none">
-                    <input type="range" id="price_max" min="0" max="3400" step="1" value="3400" oninput="updateSliderUI(this); applyFilters()" style="margin:0;position:absolute;width:100%;pointer-events:none;background:transparent;appearance:none;-webkit-appearance:none">
-                </div>
-                <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:500;color:#1C1917;margin-top:6px">
-                    <span id="val_min">$0</span><span id="val_max">$3,400</span>
-                </div>
+        <div class="fb-item">
+            <label>Bộ Lọc Đặc Biệt</label>
+            <select id="selSpecial" onchange="applyFilters()">
+                <option value="ALL">Tất cả sản phẩm</option>
+                <option value="choice">Amazon's Choice</option>
+                <option value="climate">Climate Friendly</option>
+                <option value="variations">Có biến thể (Variations)</option>
+            </select>
+        </div>
+        <div class="fb-item">
+            <label>Chỉ Số Doanh Số</label>
+            <div class="toggle-group">
+                <button class="toggle-btn active" id="btn_mean" onclick="setMetric('mean')">Mean</button>
+                <button class="toggle-btn" id="btn_median" onclick="setMetric('median')">Median</button>
             </div>
         </div>
-        <label class="toggle-group" style="margin-left: 12px;">
-            <input type="checkbox" id="chkChoice" class="toggle-checkbox" onchange="applyFilters()">
-            <div class="toggle-switch"><div class="toggle-knob"></div></div>
-            <span class="toggle-lbl">Amazon's Choice</span>
-        </label>
-        <label class="toggle-group" style="margin-left:12px;">
-            <input type="checkbox" id="chkClimate" class="toggle-checkbox" onchange="applyFilters()">
-            <div class="toggle-switch"><div class="toggle-knob"></div></div>
-            <span class="toggle-lbl">Climate Friendly</span>
-        </label>
-    </div>
-
-    <!-- KPIs -->
-    <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-title">TỔNG SẢN PHẨM</div><div class="kpi-value" id="kpi_t_prod">0</div><div class="kpi-sub" id="kpi_sub_prod">-</div></div>
-        <div class="kpi-card"><div class="kpi-title">GIÁ TRUNG BÌNH</div><div class="kpi-value" id="kpi_avg_price">$0</div><div class="kpi-sub" id="kpi_sub_price">-</div></div>
-        <div class="kpi-card"><div class="kpi-title">ĐÁNH GIÁ TB</div><div class="kpi-value" id="kpi_avg_rating">0★</div><div class="kpi-sub" id="kpi_sub_rating">-</div></div>
-        <div class="kpi-card"><div class="kpi-title">AMAZON'S CHOICE</div><div class="kpi-value" id="kpi_choice">0</div><div class="kpi-sub" id="kpi_sub_choice">-</div></div>
-        <div class="kpi-card"><div class="kpi-title">DOANH SỐ TB/THÁNG</div><div class="kpi-value" id="kpi_sales">0</div><div class="kpi-sub" id="kpi_sub_sales">-</div></div>
-    </div>
-
-    <!-- Charts Row 1 -->
-    <div class="chart-row-1">
-        <div class="chart-card">
-            <div class="chart-title">Top 10 Danh mục nhiều sản phẩm nhất</div>
-            <div class="chart-wrapper" style="height: 420px;">
-                <canvas id="cBarTop"></canvas>
-            </div>
-        </div>
-        <div class="chart-card">
-            <div class="chart-title">Tỉ lệ cờ/nhãn đặc biệt</div>
-            <div class="chart-wrapper" style="height: 330px; display:flex; justify-content:center;">
-                <canvas id="cDonut"></canvas>
-            </div>
-            <div class="donut-legend">
-                <div class="dl-item"><div class="dl-sq" style="background:#FED7AA"></div>Amazon's Choice <span id="lg_choice">0</span></div>
-                <div class="dl-item"><div class="dl-sq" style="background:#F97316"></div>Climate Friendly <span id="lg_climate">0</span></div>
-                <div class="dl-item"><div class="dl-sq" style="background:#9A3412"></div>Has Variations <span id="lg_vars">0</span></div>
-            </div>
+        <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
+            <div style="font-size:16px; font-weight:800; color:var(--dk); font-family:var(--ft);">TỔNG QUAN THỊ TRƯỜNG</div>
+            <div style="font-size:11px; color:var(--t2); font-weight:500;">Báo cáo tổng hợp hiệu quả kinh doanh đa danh mục</div>
         </div>
     </div>
 
-    <!-- Charts Row 2 -->
-    <div class="chart-row-2">
-        <div class="chart-card">
-            <div class="chart-title">Giá trung bình & Doanh số (Top 8 Danh mục)</div>
-            <div class="combo-legend">
-                <div class="cl-item"><div class="dl-sq" style="background:#F97316"></div>Giá TB ($)</div>
-                <div class="cl-item"><div class="cl-line"></div>Doanh số TB (lượt)</div>
-            </div>
-            <div class="chart-wrapper" style="height: 350px;">
-                <canvas id="cCombo"></canvas>
-            </div>
-        </div>
-    </div>
+    <!-- KPI ROW -->
+    <div class="kpi-row" id="kpiRow"></div>
 
-    <!-- Table -->
-    <div class="chart-card" style="margin-bottom:40px;">
-        <div class="chart-title">Top 5 Sản Phẩm Doanh Số Cao Nhất</div>
-        <table>
-            <thead>
-                <tr>
-                    <th>Tên sản phẩm</th>
-                    <th>Danh mục</th>
-                    <th>Giá ($)</th>
-                    <th>Đánh giá (★)</th>
-                    <th>Doanh số (lượt)</th>
-                </tr>
-            </thead>
-            <tbody id="tbTop5">
-                <!-- Rendered JS -->
-            </tbody>
-        </table>
+    <!-- CHARTS GRID -->
+    <div class="g2">
+        <div class="cc">
+            <div class="ct">Quy mô các danh mục dẫn đầu</div>
+            <div class="cs">Top 10 danh mục có số lượng sản phẩm niêm yết lớn nhất</div>
+            <div class="cw"><canvas id="cBarTop"></canvas></div>
+        </div>
+        <div class="cc">
+            <div class="ct">Phân bổ đặc điểm sản phẩm</div>
+            <div class="cs">Tỷ lệ sản phẩm đạt các chứng chỉ hoặc có đặc tính bổ trợ</div>
+            <div class="leg" id="dLeg"></div>
+            <div class="cw"><canvas id="cDonut"></canvas></div>
+        </div>
+        <div class="cc">
+            <div class="ct" id="titleCombo">Giá trị & Hiệu suất theo danh mục</div>
+            <div class="cs">Tương quan giữa mức giá và doanh số bán hàng</div>
+            <div class="cw"><canvas id="cCombo"></canvas></div>
+        </div>
+        <div class="cc">
+            <div class="ct">Phân bổ điểm đánh giá</div>
+            <div class="cs">Tỉ lệ số lượng sản phẩm theo các mức điểm đánh giá (Rating)</div>
+            <div class="cw"><canvas id="cRating"></canvas></div>
+        </div>
     </div>
 
 <script>
     const RAW_DATA = {data_json_str};
-    let globalInstances = {{}};
+    let CHARTS = {{}};
+    let METRIC = 'mean';
 
-    // Format helpers
-    const fmtN = (n) => new Intl.NumberFormat('en-US').format(Math.round(n));
-    const fmtR = (n) => Number(n).toFixed(2);
+    const fmtN = (n) => new Intl.NumberFormat('vi-VN').format(Math.round(n));
+    const fmtC = (n) => '$' + Number(n).toLocaleString('en-US', {{ minimumFractionDigits: 2, maximumFractionDigits: 2 }});
+    const avg = a => a.length ? a.reduce((x,y)=>x+y,0)/a.length : 0;
+    const median = a => {{ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y),m=Math.floor(s.length/2); return s.length%2?s[m]:(s[m-1]+s[m])/2; }};
 
-    // Initial setup
+    function setMetric(m) {{
+        METRIC = m;
+        document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
+        document.getElementById('btn_median').classList.toggle('active', m === 'median');
+        document.getElementById('titleCombo').innerText = m === 'mean' ? 'Giá trị & Hiệu suất trung bình' : 'Giá trị & Hiệu suất trung vị';
+        applyFilters();
+    }}
+
     function setup() {{
         let cats = new Set();
-        let maxP = 0;
-        RAW_DATA.forEach(d => {{
-            if(d.crawl_category && d.crawl_category !== 'Không rõ') cats.add(d.crawl_category);
-            if(d.current_price > maxP) maxP = d.current_price;
-        }});
-        
+        RAW_DATA.forEach(d => {{ if(d.category && d.category !== 'Không rõ') cats.add(d.category); }});
         let sel = document.getElementById('selCategory');
         Array.from(cats).sort().forEach(c => {{
-            let opt = document.createElement('option');
-            opt.value = c; opt.innerText = c;
-            sel.appendChild(opt);
+            let opt = document.createElement('option'); opt.value = c; opt.innerText = c; sel.appendChild(opt);
         }});
-        
-        let roundedMax = Math.ceil(maxP);
-        if(roundedMax <= 0) roundedMax = 1000;
-        
-        document.getElementById('price_min').max = roundedMax;
-        document.getElementById('price_max').max = roundedMax;
-        document.getElementById('price_max').value = roundedMax;
-        
-        updateSliderUI(null);
 
         initCharts();
         applyFilters();
     }}
 
-    const MIN_GAP = 1;
-    function updateSliderUI(activeElem) {{
-        let minE = document.getElementById('price_min');
-        let maxE = document.getElementById('price_max');
-        let track = document.getElementById('price_track');
-        let minV = Number(minE.value);
-        let maxV = Number(maxE.value);
-        
-        if (minV > maxV - MIN_GAP) {{
-            if (activeElem && activeElem.id === 'price_min') {{ minE.value = maxV - MIN_GAP; minV = maxV - MIN_GAP; }}
-            else {{ maxE.value = minV + MIN_GAP; maxV = minV + MIN_GAP; }}
-        }}
-        
-        let maxLimit = Number(minE.max) || 3400;
-        let pMin = (minV / maxLimit) * 100;
-        let pMax = (maxV / maxLimit) * 100;
-        
-        track.style.background = 'linear-gradient(to right, #E5E7EB ' + pMin + '%, #F97316 ' + pMin + '%, #F97316 ' + pMax + '%, #E5E7EB ' + pMax + '%)';
-        document.getElementById('val_min').textContent = '$' + Number(minV).toLocaleString('en-US');
-        document.getElementById('val_max').textContent = '$' + Number(maxV).toLocaleString('en-US');
-    }}
-
     function applyFilters() {{
         let cat = document.getElementById('selCategory').value;
-        let pMin = Number(document.getElementById('price_min').value);
-        let pMax = Number(document.getElementById('price_max').value);
-        let chkAmz = document.getElementById('chkChoice').checked;
-        let chkCli = document.getElementById('chkClimate').checked;
+        let spec = document.getElementById('selSpecial').value;
 
         let filtered = RAW_DATA.filter(d => {{
-            if(cat !== 'ALL' && d.crawl_category !== cat) return false;
-            if(d.current_price < pMin || d.current_price > pMax) return false;
-            if(chkAmz && d.is_amazon_choice !== true) return false;
-            if(chkCli && d.is_climate_friendly !== true) return false;
+            if(cat !== 'ALL' && d.category !== cat) return false;
+            if(spec === 'choice' && !d.is_amazon_choice) return false;
+            if(spec === 'climate' && !d.is_climate_friendly) return false;
+            if(spec === 'variations' && !d.has_variations) return false;
             return true;
         }});
 
-        updateKPIs(filtered);
-        updateData(filtered);
+        updateDashboard(filtered);
     }}
 
-    function updateKPIs(data) {{
-        let tProd = data.length;
-        let unqCat = new Set(data.map(d => d.crawl_category)).size;
+    function updateDashboard(data) {{
+        // KPI Calculations
+        const t = data.length;
+        const totalSales = data.reduce((s, d) => s + d.sales_volume_num, 0);
+        const avgSales = t ? (METRIC === 'mean' ? totalSales / t : median(data.map(d=>d.sales_volume_num))) : 0;
+        const avgPrice = t ? (METRIC === 'mean' ? data.reduce((s, d) => s + d.current_price, 0) / t : median(data.map(d=>d.current_price))) : 0;
+        const avgRating = t ? data.reduce((s, d) => s + d.rating, 0) / t : 0;
+        const choiceCount = data.filter(d => d.is_amazon_choice).length;
         
-        let prices = data.map(d => d.current_price).filter(p => !isNaN(p) && p > 0);
-        prices.sort((a,b)=>a-b);
-        let sP = prices.reduce((a,b)=>a+b, 0);
-        let aP = prices.length ? sP/prices.length : 0;
-        let mP = prices.length ? (prices.length%2===0 ? (prices[prices.length/2-1]+prices[prices.length/2])/2 : prices[Math.floor(prices.length/2)]) : 0;
+        const kpis = [
+            {{ t: 'Tổng sản phẩm', v: fmtN(t), s: 'Sản phẩm trong bộ lọc' }},
+            {{ t: 'Giá ' + (METRIC === 'mean' ? 'TB' : 'Trung vị'), v: fmtC(avgPrice), s: 'Giá niêm yết hiện tại', hi: 1 }},
+            {{ t: 'Doanh số ' + (METRIC === 'mean' ? 'TB' : 'Trung vị'), v: fmtN(avgSales), s: 'Lượt bán / tháng' }},
+            {{ t: 'Đánh giá trung bình', v: avgRating.toFixed(1) + ' ★', s: 'Trên thang điểm 5.0' }},
+            {{ t: "Amazon's Choice", v: fmtN(choiceCount), s: 'Chiếm ' + (t ? (choiceCount/t*100).toFixed(1) : 0) + '% tổng số', hi: 1 }}
+        ];
+        
+        document.getElementById('kpiRow').innerHTML = kpis.map(x => `
+            <div class="kc ${{x.hi ? 'hi' : ''}}">
+                <div class="kt">${{x.t}}</div>
+                <div class="kv">${{x.v}}</div>
+                <div class="ks">${{x.s}}</div>
+            </div>
+        `).join('');
 
-        let rt = data.map(d=>d.rating).filter(p => !isNaN(p) && p > 0);
-        let aR = rt.length ? rt.reduce((a,b)=>a+b,0)/rt.length : 0;
-        let sRev = data.reduce((a,b)=>a+(b.reviews||0), 0);
-
-        let amzCount = data.filter(d => d.is_amazon_choice).length;
-        let amzPct = tProd ? (amzCount / tProd * 100) : 0;
-
-        let sVol = data.reduce((a,b)=>a+(b.sales_volume_num||0), 0);
-        let aVs = data.length ? sVol / data.length : 0;
-
-        document.getElementById('kpi_t_prod').innerText = fmtN(tProd);
-        document.getElementById('kpi_sub_prod').innerText = "thuộc " + fmtN(unqCat) + " danh mục";
-
-        document.getElementById('kpi_avg_price').innerText = "$" + fmtR(aP);
-        document.getElementById('kpi_sub_price').innerText = "median: $" + fmtR(mP);
-
-        document.getElementById('kpi_avg_rating').innerText = fmtR(aR) + "★";
-        document.getElementById('kpi_sub_rating').innerText = "từ " + fmtN(sRev) + " lượt review";
-
-        document.getElementById('kpi_choice').innerText = fmtN(amzCount);
-        document.getElementById('kpi_sub_choice').innerText = "chiếm " + fmtR(amzPct) + "% tổng SP";
-
-        document.getElementById('kpi_sales').innerText = fmtN(aVs);
-        document.getElementById('kpi_sub_sales').innerText = "tổng: " + fmtN(sVol) + " lượt/tháng";
-    }}
-
-    function updateData(data) {{
-        // 1. Chart Horizontal Top 10
+        // 1. Chart Bar Top Categories
         let catCount = {{}};
-        data.forEach(d => {{ 
-            if(d.crawl_category && d.crawl_category !== 'Không rõ') {{
-                catCount[d.crawl_category] = (catCount[d.crawl_category]||0) + 1; 
-            }}
-        }});
-        let arr = Object.keys(catCount).map(k => ({{c: k, count: catCount[k]}})).sort((a,b)=>b.count-a.count).slice(0,10);
-        // reverse to make highest at top in horizontal chart
-        arr.reverse(); 
-
-        globalInstances.cBarTop.data.labels = arr.map(x => x.c);
-        globalInstances.cBarTop.data.datasets[0].data = arr.map(x => x.count);
-        globalInstances.cBarTop.update();
+        data.forEach(d => {{ catCount[d.category] = (catCount[d.category] || 0) + 1; }});
+        let topCats = Object.keys(catCount).map(k => ({{ k, v: catCount[k] }})).sort((a,b) => b.v - a.v).slice(0, 10);
+        
+        CHARTS.bar.data.labels = topCats.map(x => x.k.length > 20 ? x.k.slice(0, 20) + '...' : x.k);
+        CHARTS.bar.data.datasets[0].data = topCats.map(x => x.v);
+        CHARTS.bar.update();
 
         // 2. Chart Donut
-        let numAmz = data.filter(d => d.is_amazon_choice === true).length;
-        let numCli = data.filter(d => d.is_climate_friendly === true).length;
-        let numVar = data.filter(d => d.has_variations === true).length;
-        globalInstances.cDonut.data.datasets[0].data = [numAmz, numCli, numVar];
-        globalInstances.cDonut.update();
-        document.getElementById('lg_choice').innerText = fmtN(numAmz);
-        document.getElementById('lg_climate').innerText = fmtN(numCli);
-        document.getElementById('lg_vars').innerText = fmtN(numVar);
+        let numAmz = data.filter(d => d.is_amazon_choice).length;
+        let numCli = data.filter(d => d.is_climate_friendly).length;
+        let numVar = data.filter(d => d.has_variations).length;
+        let donutData = [numAmz, numCli, numVar];
+        
+        CHARTS.donut.data.datasets[0].data = donutData;
+        CHARTS.donut.update();
+        
+        const dLabels = ["Amazon's Choice", "Climate Friendly", "Variations"];
+        const dColors = ['#FED7AA', '#F97316', '#9A3412'];
+        document.getElementById('dLeg').innerHTML = dLabels.map((l, i) => `
+            <span class="li"><span class="ld" style="background:${{dColors[i]}}"></span>${{l}} (${{fmtN(donutData[i])}})</span>
+        `).join('');
 
         // 3. Chart Combo
-        let catAgg = {{}};
-        let topCatsList = arr.map(x=>x.c).reverse().slice(0,8);
-        topCatsList.forEach(c => {{ catAgg[c] = {{ sumP:0, countP:0, sumS:0 }}; }});
-        
+        let top8Cats = topCats.slice(0, 8).map(x => x.k);
+        let comboData = top8Cats.map(c => {{
+            let sub = data.filter(d => d.category === c);
+            let pArr = sub.map(d => d.current_price);
+            let sArr = sub.map(d => d.sales_volume_num);
+            return {{
+                p: METRIC === 'mean' ? avg(pArr) : median(pArr),
+                s: METRIC === 'mean' ? avg(sArr) : median(sArr)
+            }};
+        }});
+
+        CHARTS.combo.data.labels = top8Cats.map(x => x.length > 15 ? x.slice(0, 15) + '...' : x);
+        CHARTS.combo.data.datasets[0].data = comboData.map(x => x.p);
+        CHARTS.combo.data.datasets[1].data = comboData.map(x => x.s);
+        CHARTS.combo.update();
+
+        // 4. Chart Rating Distribution
+        let rBins = [0,0,0,0,0]; // 0-1, 1-2, 2-3, 3-4, 4-5
         data.forEach(d => {{
-            let c = d.crawl_category;
-            if(catAgg[c]) {{
-                if(d.current_price > 0) {{ catAgg[c].sumP += d.current_price; catAgg[c].countP++; }}
-                if(d.sales_volume_num > 0) {{ catAgg[c].sumS += d.sales_volume_num; }}
-            }}
+            let r = d.rating;
+            if(r > 0 && r <= 1) rBins[0]++;
+            else if(r <= 2) rBins[1]++;
+            else if(r <= 3) rBins[2]++;
+            else if(r <= 4) rBins[3]++;
+            else if(r <= 5) rBins[4]++;
         }});
-        
-        let cLabels = topCatsList;
-        let cPrices = cLabels.map(c => catAgg[c].countP ? (catAgg[c].sumP / catAgg[c].countP) : 0);
-        // Average sales requires tracking count of generic products too, estimating via known.
-        let catsArrFull = data.filter(d=>cLabels.includes(d.crawl_category));
-        let salesMapCount = {{}};
-        catsArrFull.forEach(d => salesMapCount[d.crawl_category] = (salesMapCount[d.crawl_category]||0)+1);
-        let cSales = cLabels.map(c => salesMapCount[c] ? (catAgg[c].sumS / salesMapCount[c]) : 0);
-
-        globalInstances.cCombo.data.labels = cLabels.map(c => c.length > 25 ? c.substring(0, 25) + '...' : c);
-        globalInstances.cCombo.data.datasets[0].data = cPrices;
-        globalInstances.cCombo.data.datasets[1].data = cSales;
-        globalInstances.cCombo.update();
-
-        // 4. HTML Table Top 5
-        let sorted = [...data].sort((a,b) => (b.sales_volume_num||0) - (a.sales_volume_num||0)).slice(0,5);
-        let tb = document.getElementById('tbTop5');
-        tb.innerHTML = "";
-        sorted.forEach(s => {{
-            let title = s.title || "";
-            if(title.length > 55) title = title.substring(0, 55) + "...";
-            let tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td class="truncate-col" title="${{s.title}}">${{title}}</td>
-                <td>${{s.crawl_category}}</td>
-                <td>${{s.current_price > 0 ? ('$'+fmtR(s.current_price)) : '—'}}</td>
-                <td>★ ${{fmtR(s.rating)}}</td>
-                <td>${{fmtN(s.sales_volume_num || 0)}}</td>
-            `;
-            tb.appendChild(tr);
-        }});
+        CHARTS.rating.data.datasets[0].data = rBins;
+        CHARTS.rating.update();
     }}
 
     function initCharts() {{
         Chart.defaults.font.family = "'Inter', sans-serif";
         Chart.defaults.color = '#78716C';
 
-        // Bar Top 10
-        let ctxBar = document.getElementById('cBarTop').getContext('2d');
-        globalInstances.cBarTop = new Chart(ctxBar, {{
+        CHARTS.bar = new Chart(document.getElementById('cBarTop'), {{
             type: 'bar',
-            data: {{
-                labels: [],
-                datasets: [{{
-                    label: 'Số lượng SP',
-                    data: [],
-                    backgroundColor: '#F97316',
-                    borderRadius: 4
-                }}]
-            }},
+            data: {{ labels: [], datasets: [{{ label: 'Số lượng SP', data: [], backgroundColor: '#F97316', borderRadius: 4 }}] }},
             options: {{
-                indexAxis: 'y',
-                responsive: true,
-                maintainAspectRatio: false,
+                indexAxis: 'y', responsive: true, maintainAspectRatio: false,
                 plugins: {{ legend: {{ display: false }} }},
-                scales: {{
-                    x: {{ beginAtZero: true, grid: {{ color: 'rgba(0,0,0,0.05)' }} }},
-                    y: {{ grid: {{ display: false }}, ticks: {{ font: {{ size: 11 }} }} }}
-                }}
+                scales: {{ x: {{ beginAtZero: true, grid: {{ color: 'rgba(0,0,0,0.04)' }} }}, y: {{ grid: {{ display: false }} }} }}
             }}
         }});
 
-        // Donut
-        let ctxDonut = document.getElementById('cDonut').getContext('2d');
-        globalInstances.cDonut = new Chart(ctxDonut, {{
+        CHARTS.donut = new Chart(document.getElementById('cDonut'), {{
             type: 'doughnut',
-            data: {{
-                labels: ["Amazon's Choice", "Climate Friendly", "Has Variations"],
-                datasets: [{{
-                    data: [0,0,0],
-                    backgroundColor: ['#FED7AA', '#F97316', '#9A3412'],
-                    borderWidth: 0
-                }}]
-            }},
+            data: {{ labels: ["Choice", "Climate", "Variations"], datasets: [{{ data: [], backgroundColor: ['#FED7AA', '#F97316', '#9A3412'], borderWidth: 0 }}] }},
             options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                cutout: '65%',
-                plugins: {{
-                    legend: {{ display: false }},
-                    tooltip: {{ callbacks: {{ label: (c) => " " + c.label + ": " + fmtN(c.raw) }} }}
-                }}
+                responsive: true, maintainAspectRatio: false, cutout: '70%',
+                plugins: {{ legend: {{ display: false }} }}
             }}
         }});
 
-        // Combo
-        let ctxCombo = document.getElementById('cCombo').getContext('2d');
-        globalInstances.cCombo = new Chart(ctxCombo, {{
+        CHARTS.combo = new Chart(document.getElementById('cCombo'), {{
             type: 'bar',
             data: {{
                 labels: [],
                 datasets: [
-                    {{
-                        type: 'bar',
-                        label: 'Giá TB ($)',
-                        data: [],
-                        backgroundColor: '#F97316',
-                        yAxisID: 'yLeft',
-                        borderRadius: 3
-                    }},
-                    {{
-                        type: 'line',
-                        label: 'Doanh số TB (lượt)',
-                        data: [],
-                        borderColor: '#1C1917',
-                        borderWidth: 2,
-                        pointRadius: 5,
-                        tension: 0.3,
-                        yAxisID: 'yRight'
-                    }}
+                    {{ label: 'Giá', type: 'bar', data: [], backgroundColor: '#F9731660', yAxisID: 'y', borderRadius: 2 }},
+                    {{ label: 'Doanh số', type: 'line', data: [], borderColor: '#9A3412', borderWidth: 2, pointRadius: 3, tension: 0.3, yAxisID: 'y1' }}
                 ]
             }},
             options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                layout: {{ padding: {{ right: 5 }} }},
-                plugins: {{ legend: {{ display: false }}, tooltip: {{ mode: 'index', intersect: false }} }},
+                responsive: true, maintainAspectRatio: false,
+                plugins: {{ legend: {{ display: false }} }},
                 scales: {{
-                    yLeft: {{ type: 'linear', position: 'left', title: {{ display: false }}, grid: {{ color: 'rgba(0,0,0,0.05)' }} }},
-                    yRight: {{ type: 'linear', position: 'right', title: {{ display: false }}, grid: {{ drawOnChartArea: false }}, ticks: {{ callback: function(val) {{ return fmtN(val); }} }} }},
-                    x: {{ grid: {{ display: false }}, ticks: {{ font: {{ size: 11 }}, maxRotation: 20 }} }}
+                    y: {{ position: 'left', grid: {{ color: 'rgba(0,0,0,0.04)' }}, ticks: {{ callback: v => '$' + v }} }},
+                    y1: {{ position: 'right', grid: {{ display: false }} }},
+                    x: {{ grid: {{ display: false }} }}
                 }}
+            }}
+        }});
+
+        CHARTS.rating = new Chart(document.getElementById('cRating'), {{
+            type: 'bar',
+            data: {{
+                labels: ['1★', '2★', '3★', '4★', '5★'],
+                datasets: [{{ label: 'Số lượng SP', data: [], backgroundColor: '#9A3412', borderRadius: 4 }}]
+            }},
+            options: {{
+                responsive: true, maintainAspectRatio: false,
+                plugins: {{ legend: {{ display: false }} }},
+                scales: {{ y: {{ beginAtZero: true, grid: {{ color: 'rgba(0,0,0,0.04)' }} }}, x: {{ grid: {{ display: false }} }} }}
             }}
         }});
     }}
 
-    document.addEventListener("DOMContentLoaded", setup);
-    </script>
+    setup();
+</script>
 </body>
 </html>
     """
     
-    components.html(html_code, height=1600, scrolling=False)
+    st.markdown("<style>.block-container{padding-top:.4rem!important;}</style>", unsafe_allow_html=True)
+    components.html(html_code, height=650, scrolling=False)
