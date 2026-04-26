@@ -357,9 +357,9 @@ def render(df_raw):
                 <button class="toggle-btn" id="btn_median" onclick="setMetric('median')">Median</button>
             </div>
         </div>
-        <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end;">
-            <div style="font-size:15px; font-weight:700; color:var(--text-primary);">Phân Tích Thông Tin Sản Phẩm & Doanh Số</div>
-            <div style="font-size:11px; color:var(--text-secondary);">Mối liên hệ giữa mức độ thiếu thông tin và hiệu quả bán hàng</div>
+        <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
+            <div style="font-size:16px; font-weight:800; color:var(--dark);">PHÂN TÍCH THÔNG TIN SẢN PHẨM & DOANH SỐ</div>
+            <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">Mối liên hệ giữa mức độ thiếu thông tin và hiệu quả bán hàng</div>
         </div>
     </div>
 
