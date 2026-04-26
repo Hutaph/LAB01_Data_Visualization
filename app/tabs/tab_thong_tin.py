@@ -30,20 +30,36 @@ def render(df_raw):
     p33 = round(float(price_nonzero.quantile(0.33)), 2) if not price_nonzero.empty else 10.0
     p67 = round(float(price_nonzero.quantile(0.67)), 2) if not price_nonzero.empty else 30.0
 
-    # Evaluate missing columns
+    # Evaluate Information Completeness (How much data we have per product record)
     exclude_cols = [
-        'asin', 'title', 'price', 'original_price', 'sales_volume', 'sales_volume_num', 
-        'currency', 'is_best_seller', 'link', 'Danh Mục Sản Phẩm', 'crawl_category', 'price_num',
-        'image_url', 'main_image_url', 'additional_image_urls', 'brand_url', 'brand_urls',
-        'product_videos', 'user_videos', 'video_thumbnail', 'slug', 'parent_asin', 'landing_asin', 'date'
+        'asin', 'link', 'slug', 'parent_asin', 'landing_asin', 'date', 
+        'image_url', 'brand_url', 'brand_urls', 'crawl_category', 'Danh Mục Sản Phẩm',
+        'discount', 'discount_rate',
+        'frequently_bought_together', 'currency', 'min_order_quantity'
     ]
     eval_cols = [c for c in df.columns if c not in exclude_cols]
     
-    def is_missing_series(series):
-        s_str = series.astype(str).str.strip()
-        return s_str.isin(["", "nan", "NaN", "None", "[]", "{}"]) | series.isna()
+    quantitative_cols = [
+        'rating', 'reviews', 'number_of_offers', 'lowest_offer_price', 
+        'current_price', 'unit_price', 'unit_count', 'min_order_quantity', 'sales_volume_num'
+    ]
+    
+    def is_missing_value(series, col_name):
+        s_str = series.astype(str).str.strip().str.lower()
+        # Cơ bản: NaN, Rỗng, None, [], {} là thiếu
+        missing_vals = ["", "nan", "none", "[]", "{}"]
+        
+        # Với các trường flag/boolean hoặc content: False và 0 cũng coi là thiếu (không có thông tin)
+        # Với các trường số lượng (quantitative): 0 vẫn được tính là CÓ thông tin
+        if col_name not in quantitative_cols:
+            missing_vals.extend(["false", "0", "0.0"])
+        else:
+            missing_vals.extend(["false"]) # Trường hợp ngoại lệ nếu numeric bị dính false
 
-    missing_df = df[eval_cols].apply(is_missing_series)
+        return s_str.isin(missing_vals) | series.isna()
+
+    missing_mask_dict = {col: is_missing_value(df[col], col) for col in eval_cols}
+    missing_df = pd.DataFrame(missing_mask_dict)
     provided_df = ~missing_df
 
     df["missing_count"] = missing_df.sum(axis=1)
@@ -439,55 +455,82 @@ def render(df_raw):
     }}
 
     function processData(data, cat) {{
-        // --- Chart 1: Bucket computation (done FIRST so KPIs can use it) ---
-        let bucketMap = new Map();
-        let bucketSize = 3;
-        
+        if (!data.length) return;
+
+        // --- 1. Hybrid Domain Smoothing ---
+        // Pre-merge 41+ into a single domain to strictly fulfill gộp 41-43 & 44-47
+        let freqMap = new Map();
         data.forEach(d => {{
-            let bucket = Math.floor(d.missing_count / bucketSize) * bucketSize;
-            if (!bucketMap.has(bucket)) bucketMap.set(bucket, {{ salesArr: [], count: 0 }});
-            let b = bucketMap.get(bucket);
-            b.salesArr.push(d.sales_volume_num);
-            b.count++;
+            let m = d.missing_count;
+            let key = (m >= 37) ? 999 : m;
+            if (!freqMap.has(key)) freqMap.set(key, {{ count: 0, products: [], vals: [] }});
+            let entry = freqMap.get(key);
+            entry.count++;
+            entry.products.push(d);
+            if (!entry.vals.includes(m)) entry.vals.push(m);
         }});
 
-        let sortedBuckets = Array.from(bucketMap.keys()).sort((a,b) => a - b);
-        let trendLabels = sortedBuckets.map(b => b + '-' + (b + bucketSize - 1));
-        let trendSales = sortedBuckets.map(b => {{
-            let bk = bucketMap.get(b);
-            if (!bk.count) return 0;
-            if (METRIC === 'median') return Math.round(median(bk.salesArr));
-            return Math.round(bk.salesArr.reduce((s,v) => s+v, 0) / bk.count);
-        }});
-        let trendCounts = sortedBuckets.map(b => bucketMap.get(b).count);
+        let sortedKeys = Array.from(freqMap.keys()).sort((a,b) => a - b);
+        let targetSize = data.length / 7;
+        let bins = [];
+        let curBin = {{ vals: [], products: [], count: 0 }};
+        
+        // Critical split points requested by user
+        const FORCED = [6, 18, 28, 999];
 
-        // --- KPIs ---
+        sortedKeys.forEach((v, idx) => {{
+            let entry = freqMap.get(v);
+            let wouldBeTooBig = (curBin.count + entry.count > targetSize * 1.5);
+            let isHalfFull = (curBin.count > targetSize * 0.7);
+            let isForced = FORCED.includes(v);
+
+            if (bins.length < 6 && curBin.count > 0 && (wouldBeTooBig || isHalfFull || isForced)) {{
+                bins.push(curBin);
+                curBin = {{ vals: entry.vals, products: entry.products, count: entry.count }};
+            }} else {{
+                curBin.vals = curBin.vals.concat(entry.vals);
+                curBin.products = curBin.products.concat(entry.products);
+                curBin.count += entry.count;
+            }}
+        }});
+        if (curBin.count > 0) bins.push(curBin);
+
+        // Convert to chart-ready format
+        const chartBins = bins.map(b => {{
+            b.vals.sort((a,b) => a - b);
+            let minM = b.vals[0];
+            let maxM = b.vals[b.vals.length - 1];
+            let label = (minM >= 37) ? '37+' : (minM === maxM ? `${{minM}}` : `${{minM}}-${{maxM}}`);
+            return {{
+                label: label,
+                salesArr: b.products.map(p => p.sales_volume_num),
+                count: b.count,
+                chunk: b.products
+            }};
+        }});
+
+        // --- 2. Chart 1: Sales Trend & Quantity ---
+        const trendLabels = chartBins.map(b => b.label);
+        const trendSales = chartBins.map(b => {{
+            if (METRIC === 'median') return Math.round(median(b.salesArr));
+            return Math.round(b.salesArr.reduce((s,v) => s+v, 0) / b.count);
+        }});
+        const trendCounts = chartBins.map(b => b.count);
+
+        // --- 3. KPIs ---
         let totalMissing = 0;
         data.forEach(d => totalMissing += d.missing_count);
-        let avgMissing = data.length ? totalMissing / data.length : 0;
-
-        // --- Compare Best Bucket vs Worst Bucket ---
-        let statTop = 0, statBot = 0;
-        if (sortedBuckets.length >= 2) {{
-            let firstBucket = bucketMap.get(sortedBuckets[0]);
-            let lastBucket = bucketMap.get(sortedBuckets[sortedBuckets.length - 1]);
-            
-            if (METRIC === 'median') {{
-                statTop = Math.round(median(firstBucket.salesArr));
-                statBot = Math.round(median(lastBucket.salesArr));
-            }} else {{
-                statTop = Math.round(firstBucket.salesArr.reduce((a,b)=>a+b,0) / firstBucket.salesArr.length);
-                statBot = Math.round(lastBucket.salesArr.reduce((a,b)=>a+b,0) / lastBucket.salesArr.length);
-            }}
-        }}
+        let avgMissing = totalMissing / data.length;
 
         document.getElementById('kpi_missing_avg').innerText = Math.round(avgMissing);
+        let statTop = trendSales[0]; // Best group (least missing)
+        let statBot = trendSales[trendSales.length - 1]; // Worst group
         document.getElementById('kpi_sales_good').innerText = statTop > 0 ? fmtN(statTop) : 0;
         document.getElementById('kpi_total_products').innerText = fmtN(data.length);
 
         let diff_el = document.getElementById('kpi_sales_diff');
         let diff = statTop - statBot;
-        if (sortedBuckets.length >= 2) {{
+        if (chartBins.length >= 2) {{
             if (diff > 0) {{
                 diff_el.innerHTML = `So với nhóm thiếu nhiều nhất: <span class="trend-up">Cao hơn +${{fmtN(diff)}}</span>`;
             }} else if (diff < 0) {{
@@ -499,127 +542,67 @@ def render(df_raw):
             diff_el.innerHTML = `<span style="color:#9CA3AF">Không đủ dữ liệu so sánh</span>`;
         }}
 
-        let segForKPI = document.getElementById('selPrice').value;
-        let topFeatData = (TOP_FEATS_DATA[cat] && TOP_FEATS_DATA[cat][segForKPI]) || {{}};
-        let allFeatData = (ALL_FEATS_DATA[cat] && ALL_FEATS_DATA[cat][segForKPI]) || {{}};
+        // Dynamic Features KPI
+        let segCurrent = document.getElementById('selPrice').value;
+        let topFeatData = (TOP_FEATS_DATA[cat] && TOP_FEATS_DATA[cat][segCurrent]) || {{}};
+        let allFeatData = (ALL_FEATS_DATA[cat] && ALL_FEATS_DATA[cat][segCurrent]) || {{}};
         
-        let diffsList = Object.keys(topFeatData).map(f => {{
-            return {{
-                f: f, 
-                diff: (topFeatData[f] || 0) - (allFeatData[f] || 0),
-                t: topFeatData[f] || 0
-            }};
-        }}).filter(item => item.t > 5); // Tồn tại ít nhất 5%
-        
-        diffsList.sort((a,b) => b.diff - a.diff);
+        let diffsList = Object.keys(topFeatData).map(f => ({{
+            f: f, diff: (topFeatData[f] || 0) - (allFeatData[f] || 0), t: topFeatData[f] || 0
+        }})).filter(item => item.t > 5).sort((a,b) => b.diff - a.diff);
         
         let kpiFeatEl = document.getElementById('kpi_top_feat');
         let kpiTitleEl = kpiFeatEl.previousElementSibling;
         let kpiSubEl = kpiFeatEl.nextElementSibling;
         
         if (diffsList.length > 0 && diffsList[0].diff > 0.1) {{
-            let fName = diffsList[0].f;
-            let displayFeatName = FEATURE_MAP[fName] || fName.toUpperCase();
+            let fBest = diffsList[0];
             kpiTitleEl.innerText = "Feature Tạo Sự Khác Biệt";
-            kpiFeatEl.innerText = displayFeatName;
-            kpiFeatEl.style.fontSize = "16px";
-            kpiSubEl.innerHTML = `Chênh lệch <span class="trend-up">+${{diffsList[0].diff.toFixed(1)}}%</span> so với trung bình`;
+            kpiFeatEl.innerText = FEATURE_MAP[fBest.f] || fBest.f;
+            kpiSubEl.innerHTML = `Chênh lệch <span class="trend-up">+${{fBest.diff.toFixed(1)}}%</span> so với trung bình`;
         }} else {{
-            kpiTitleEl.innerText = "Feature #1 Của Top Doanh Số";
-            let fName = Object.keys(topFeatData).length ? Object.keys(topFeatData)[0] : 'N/A';
-            let displayFeatName = FEATURE_MAP[fName] || fName.toUpperCase();
-            kpiFeatEl.innerText = displayFeatName;
-            kpiSubEl.innerText = "Xuất hiện nhiều nhất ở SP bán chạy";
+            kpiTitleEl.innerText = "Thông tin Quan trọng";
+            kpiFeatEl.innerText = "N/A";
+            kpiSubEl.innerText = "Chưa có dữ liệu phân hoá";
         }}
 
         updateTrendChart(trendLabels, trendSales, trendCounts);
 
-        // --- Chart 2: Feature distribution comparison ---
-        let seg = document.getElementById('selPrice').value;
-        let topFeats = (TOP_FEATS_DATA[cat] && TOP_FEATS_DATA[cat][seg]) || {{}};
-        let allFeats = (ALL_FEATS_DATA[cat] && ALL_FEATS_DATA[cat][seg]) || {{}};
-        
-        // Calculate diff to find the features with highest gap
-        let diffList = Object.keys(topFeats).map(f => {{
-            let t = topFeats[f] || 0;
-            let a = allFeats[f] || 0;
-            return {{ f: f, t: t, a: a, diff: t - a }};
-        }});
-        
-        // Sort by biggest difference descending
-        diffList.sort((a,b) => b.diff - a.diff);
-        
-        // Take top 7 features that matter most
-        let topDiffs = diffList.slice(0, 7);
-        
-        let featLabels = topDiffs.map(d => FEATURE_MAP[d.f] || d.f);
+        // --- Chart 2: Feature Distribution Diffs ---
+        let featsList = Object.keys(topFeatData).map(f => ({{
+            f: f, diff: (topFeatData[f] || 0) - (allFeatData[f] || 0)
+        }})).sort((a,b) => b.diff - a.diff).slice(0, 7);
+        updateFeaturesChart(featsList.map(d => FEATURE_MAP[d.f] || d.f), featsList.map(d => d.diff));
 
-        let diffValues = topDiffs.map(d => d.diff);
-        updateFeaturesChart(featLabels, diffValues);
+        // --- Chart 3: Concentration ---
+        let tCounts = (TOP_COUNTS_DATA[cat] && TOP_COUNTS_DATA[cat][segCurrent]) || {{}};
+        let aCounts = (ALL_COUNTS_DATA[cat] && ALL_COUNTS_DATA[cat][segCurrent]) || {{}};
+        let MIN_C = Math.max(10, data.length * 0.01);
+        let concList = Object.keys(aCounts).map(f => {{
+            if (aCounts[f] < MIN_C) return null;
+            return {{ f: f, t: tCounts[f] || 0, a: aCounts[f], p: ((tCounts[f] || 0)/aCounts[f])*100 }};
+        }}).filter(i => i !== null).sort((a,b) => b.p - a.p).slice(0, 7);
+        updateConcentrationChart(concList.map(d => FEATURE_MAP[d.f] || d.f), concList.map(d => d.p), concList.map(d => 100-d.p), concList.map(d => ({{t: d.t, a: d.a}})));
 
-        // --- Chart 3: Feature Concentration (Top 10% vs Rest) ---
-        let segForConc = document.getElementById('selPrice').value;
-        let topCounts = (TOP_COUNTS_DATA[cat] && TOP_COUNTS_DATA[cat][segForConc]) || {{}};
-        let allCounts = (ALL_COUNTS_DATA[cat] && ALL_COUNTS_DATA[cat][segForConc]) || {{}};
-        
-        // Only consider features where at least a meaningful number of products have it
-        let MIN_COUNT = Math.max(10, data.length * 0.01);
-        
-        let concList = Object.keys(allCounts).map(f => {{
-            let a = allCounts[f] || 0;
-            let t = topCounts[f] || 0;
-            
-            // Skip features with very low global presence to avoid 100% false positives
-            if (a < MIN_COUNT) return null;
-            
-            let topPct = (t / a) * 100;
-            return {{ f: f, a: a, t: t, topPct: topPct }};
-        }}).filter(item => item !== null);
-        
-        // Sort by highest concentration in Top 10%
-        concList.sort((a,b) => b.topPct - a.topPct);
-        
-        let topConcFeatures = concList.slice(0, 7);
-        
-        let concFeatLabels = topConcFeatures.map(d => FEATURE_MAP[d.f] || d.f);
-        let topConcData = topConcFeatures.map(d => d.topPct); // Top 10% percentage
-        let restConcData = topConcFeatures.map(d => 100 - d.topPct); // Rest percentage
-        let rawCountsList = topConcFeatures.map(d => ({{ t: d.t, a: d.a }}));
+        // --- Chart 4: Missing Distribution (Concentration into Top 10% Sales) ---
+        const sortedSales = [...data].sort((a,b) => b.sales_volume_num - a.sales_volume_num);
+        const t10S = Math.max(1, Math.floor(sortedSales.length * 0.1));
+        const t10T = sortedSales.length >= t10S ? sortedSales[t10S-1].sales_volume_num : 0;
 
-        updateConcentrationChart(concFeatLabels, topConcData, restConcData, rawCountsList);
-
-        // --- Chart 4: Missing Distribution Concentration (Top 10% vs Rest) ---
-        let sortedTop10 = [...data].sort((a,b) => b.sales_volume_num - a.sales_volume_num);
-        let top10Size = Math.max(1, Math.floor(sortedTop10.length * 0.1));
-        let top10Data = sortedTop10.slice(0, top10Size);
-        
-        let topBucketMap = new Map();
-        top10Data.forEach(d => {{
-            let bucket = Math.floor(d.missing_count / bucketSize) * bucketSize;
-            topBucketMap.set(bucket, (topBucketMap.get(bucket) || 0) + 1);
+        let dL = [], dTop = [], dRest = [], dRaw = [];
+        chartBins.forEach(b => {{
+            let topC = b.chunk.filter(d => d.sales_volume_num >= t10T && d.sales_volume_num > 0).length;
+            let p = (topC / b.count) * 100;
+            dL.push(b.label + ' Thiếu');
+            dTop.push(p);
+            dRest.push(100 - p);
+            dRaw.push({{ t: topC, a: b.count }});
         }});
 
-        let distLabels = [];
-        let distTopData = [];
-        let distRestData = [];
-        let distRawCounts = [];
-
-        sortedBuckets.forEach(b => {{
-            let label = b + '-' + (b + bucketSize - 1) + ' Thiếu';
-            let allC = bucketMap.get(b).count;
-            let topC = topBucketMap.get(b) || 0;
-            let topPct = (topC / allC) * 100;
-
-            distLabels.push(label);
-            distTopData.push(topPct);
-            distRestData.push(100 - topPct);
-            distRawCounts.push({{ t: topC, a: allC }});
-        }});
-
-        CHARTS.missingDist._rawCounts = distRawCounts;
-        CHARTS.missingDist.data.labels = distLabels;
-        CHARTS.missingDist.data.datasets[0].data = distTopData;
-        CHARTS.missingDist.data.datasets[1].data = distRestData;
+        CHARTS.missingDist._rawCounts = dRaw;
+        CHARTS.missingDist.data.labels = dL;
+        CHARTS.missingDist.data.datasets[0].data = dTop;
+        CHARTS.missingDist.data.datasets[1].data = dRest;
         CHARTS.missingDist.update();
     }}
 

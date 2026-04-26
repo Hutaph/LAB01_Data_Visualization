@@ -67,6 +67,30 @@ FEATURE_MAP = {
     "condition": "Tình trạng SP",
     "estimated_delivery_date": "Ngày giao dự kiến",
     
+    # Identification
+    "title": "Têu đề sản phẩm",
+    "product_name": "Tên sản phẩm",
+    
+    # Prices & Quantitative
+    "original_price": "Giá niêm yết (Gốc)",
+    "detailed_rating": "Điểm đánh giá chi tiết",
+    "top_reviews": "Đánh giá nổi bật",
+    "country": "Quốc gia/Khu vực",
+    "currency": "Đơn vị tiền tệ",
+    
+    # Media & Assets
+    "main_image_url": "Hình ảnh chính (URL)",
+    "additional_image_urls": "Hình ảnh bổ sung",
+    "product_videos": "Video giới thiệu SP",
+    "user_videos": "Video đánh giá từ khách",
+    "video_thumbnail": "Ảnh đại diện Video",
+    
+    # Interactions & Logistics
+    "frequently_bought_together": "Thường được mua kèm",
+    "delivery_date_text": "Thông tin thời gian giao",
+    "delivery_ship_to": "Vị trí giao hàng",
+    "delivery_stock_note": "Ghi chú tồn kho",
+    
     # Meta / Organizational Features
     "main_category": "Danh mục chính",
     "category_hierarchy": "Cấp bậc danh mục",
@@ -74,4 +98,5 @@ FEATURE_MAP = {
     "variation_dimensions": "Thuộc tính biến thể",
     "variants": "Thông tin biến thể",
     "all_variants": "Danh sách biến thể",
+    "is_best_seller": "Sản phẩm Bán chạy (Gốc)",
 }
