@@ -72,18 +72,6 @@ def render(df: pd.DataFrame):
     ]
     export = data[select_cols].copy()
 
-    # Tính phân khúc giá (giống tab_dinh_gia)
-    price_nonzero = export["current_price"][export["current_price"] > 0]
-    p33 = round(float(price_nonzero.quantile(0.33)), 2) if not price_nonzero.empty else 20.0
-    p67 = round(float(price_nonzero.quantile(0.67)), 2) if not price_nonzero.empty else 70.0
-
-    def _seg(p):
-        if p <= p33: return "Bình dân"
-        if p <= p67: return "Trung cấp"
-        return "Cao cấp"
-    export = export.copy()
-    export["segment"] = export["current_price"].apply(_seg)
-
     # Chuẩn hóa kiểu dữ liệu trước khi serialize
     for c in ["current_price", "original_price", "rating", "reviews", "sales_volume_num"]:
         export[c] = pd.to_numeric(export[c], errors="coerce").fillna(0)
@@ -336,15 +324,6 @@ body::-webkit-scrollbar {{
         </select>
     </div>
     <div class="fb-item">
-        <label>Phân Khúc Giá</label>
-        <select id="fSeg" onchange="applyFilters()">
-            <option value="all">Tất cả phân khúc</option>
-            <option value="Bình dân">Bình Dân (≤ ${p33})</option>
-            <option value="Trung cấp">Trung Cấp (${p33}–${p67})</option>
-            <option value="Cao cấp">Cao Cấp (≥ ${p67})</option>
-        </select>
-    </div>
-    <div class="fb-item">
         <label>Nhóm Biểu Đồ</label>
         <div class="toggle-group">
             <button class="toggle-btn active" id="btn_rating" onclick="setMode('rating')">Theo Rating</button>
@@ -485,10 +464,8 @@ function setMode(m) {{
 
 function getFiltered() {{
     const cat = document.getElementById('selCategory').value;
-    const seg = document.getElementById('fSeg').value;
     return RAW_DATA.filter(d => {{
         if (cat !== 'ALL' && d.crawl_category !== cat) return false;
-        if (seg !== 'all' && d.segment !== seg) return false;
         return true;
     }});
 }}
