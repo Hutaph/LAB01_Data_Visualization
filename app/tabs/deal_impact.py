@@ -68,14 +68,22 @@ def render(df_raw):
             --title-font: 'Montserrat', sans-serif;
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-        body {{ background-color: var(--bg); font-family: var(--font-family); color: var(--text-primary); padding: 8px; }}
+        body {{
+            background-color: var(--bg);
+            font-family: var(--font-family);
+            color: var(--text-primary);
+            padding: 6px 14px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }}
 
         .filter-bar {{
-            display: flex; align-items: flex-end; gap: 24px;
+            display: flex; align-items: center; gap: 20px;
             background: var(--card-bg); padding: 12px 20px;
-            border-radius: var(--border-radius); margin-bottom: 10px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            flex-wrap: wrap;
+            border-radius: var(--border-radius); margin-bottom: 2px;
+            box-shadow: 0 1px 4px rgba(0,0,0,.06);
+            flex-shrink: 0;
         }}
         .f-item {{ display: flex; flex-direction: column; gap: 6px; }}
         .f-label {{ font-size: 13px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; }}

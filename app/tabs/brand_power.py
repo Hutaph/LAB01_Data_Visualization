@@ -69,30 +69,40 @@ def render(df_raw):
         *{box-sizing:border-box;margin:0;padding:0}
         body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px 8px;height:100vh;overflow:hidden;display:flex;flex-direction:column;gap:8px}
 
-        /* Filter Bar */
-        .fb{
-            display:flex;align-items:center;gap:24px;
-            background:#fff;border:1px solid var(--bd);border-radius:10px;
-            padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;flex-wrap:wrap;
+        /* Filter Bar (Harmonized with deal_impact.py) */
+        .fb {
+            display: flex; align-items: flex-end; gap: 24px;
+            background: #fff; border: 1px solid var(--bd); border-radius: 10px;
+            padding: 12px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); flex-shrink: 0; flex-wrap: wrap;
         }
-        .fb-item label{
-            display:block;font-size:10px;font-weight:700;color:var(--t2);
-            text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;
+        .fb-item { display: flex; flex-direction: column; gap: 6px; }
+        .fb-item label {
+            display: block; font-size: 11px; font-weight: 700; color: var(--t2);
+            text-transform: uppercase; letter-spacing: .5px;
         }
-        .fb-item select{
-            padding:7px 30px 7px 10px;border:1px solid var(--bd);border-radius:6px;
-            font-size:13px;font-family:var(--fn);color:var(--t1);min-width:180px;
-            background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
-            appearance:none;cursor:pointer;outline:none;
+        .fb-item select {
+            padding: 8px 30px 8px 12px; border: 1px solid var(--bd); border-radius: 6px;
+            font-size: 13px; font-family: var(--fn); color: var(--t1); min-width: 200px;
+            background: #fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
+            appearance: none; cursor: pointer; outline: none; transition: border-color 0.2s;
         }
+        .fb-item select:focus { border-color: var(--pr); }
         
-        /* Toggle Switch */
-        .tg-grp{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding-bottom:5px}
-        .tg-trk{position:relative;width:40px;height:22px;background:#E5E7EB;border-radius:11px;transition:.3s}
-        .tg-trk.on{background:var(--pr)}
-        .tg-thb{position:absolute;top:2px;left:2px;width:18px;height:18px;background:#FFF;border-radius:50%;transition:.3s;box-shadow:0 1px 2px rgba(0,0,0,0.1)}
-        .tg-trk.on .tg-thb{transform:translateX(18px)}
-        .tg-lbl{font-size:13px;font-weight:600;color:var(--t1)}
+        /* Toggle Switch (Matched with deal_impact.py) */
+        .toggle-lbl { font-size: 11px; font-weight: 700; color: var(--t2); text-transform: uppercase; letter-spacing: 0.5px; }
+        .toggle-group { display: flex; gap: 10px; align-items: center; cursor: pointer; user-select: none; }
+        .toggle-track {
+            position: relative; width: 44px; height: 24px;
+            background-color: #E5E7EB; border-radius: 20px; transition: background-color 0.3s;
+        }
+        .toggle-track.active { background-color: var(--pr); }
+        .toggle-thumb {
+            position: absolute; top: 2px; left: 2px;
+            width: 20px; height: 20px; background: white;
+            border-radius: 50%; transition: transform 0.3s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        .toggle-track.active .toggle-thumb { transform: translateX(20px); }
 
         /* KPI Cards */
         .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
@@ -125,9 +135,12 @@ def render(df_raw):
     </select>
   </div>
 
-  <div class="tg-grp" onclick="togglePrime()">
-    <div class="tg-trk" id="tgPrime"><div class="tg-thb"></div></div>
-    <span class="tg-lbl">Prime Only</span>
+  <div class="fb-item">
+    <label>Bộ lọc Prime</label>
+    <div class="toggle-group" onclick="togglePrime()" style="height: 32px;">
+      <div class="toggle-track" id="primeTrack"><div class="toggle-thumb"></div></div>
+      <span class="toggle-lbl">Chỉ Prime</span>
+    </div>
   </div>
 
   <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
@@ -200,7 +213,7 @@ def render(df_raw):
 
     function togglePrime() {
         primeOnly = !primeOnly;
-        document.getElementById('tgPrime').classList.toggle('on', primeOnly);
+        document.getElementById('primeTrack').classList.toggle('active', primeOnly);
         applyFilters();
     }
 
