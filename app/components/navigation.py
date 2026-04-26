@@ -10,13 +10,11 @@ import streamlit.components.v1 as components
 
 TAB_CONFIG = [
     {"label": "Tổng quan Thị trường", "icon": "bi-house-fill"},
-    {"label": "Phân tích Ngành hàng", "icon": "bi-box-fill"},
     {"label": "Chiến lược Giá cả",   "icon": "bi-tag-fill"},
     {"label": "Chỉ số Tín nhiệm",    "icon": "bi-star-fill"},
     {"label": "Chiến lược Ưu đãi", "icon": "bi-gift-fill"},
     {"label": "Chất lượng Niêm yết", "icon": "bi-info-circle-fill"},
     {"label": "Vị thế Thương hiệu",  "icon": "bi-patch-check-fill"},
-    {"label": "Xu hướng Nổi bật",    "icon": "bi-bar-chart-fill", "icon_style": "font-size: 24px;"},
     {"label": "Dự báo Kinh doanh",   "icon": "bi-cpu-fill"},
 ]
 
