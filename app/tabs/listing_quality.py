@@ -36,13 +36,21 @@ def render(df_raw):
         'image_url', 'brand_url', 'brand_urls', 'crawl_category', 'Danh Mục Sản Phẩm',
         'discount', 'discount_rate',
         'frequently_bought_together', 'currency', 'min_order_quantity',
-        'is_amazon_choice', 'is_prime', 'is_bestseller', 'is_best_seller'
+        # Derived helper columns for visualization/processing (not listing fields)
+        'price_num', 'price_clean', 'rating_clean',
+        'delivery_date_text', 'delivery_ship_to', 'delivery_stock_note',
+        # Exclude logistics fields that vary by time/location.
+        'delivery_info', 'delivery_fee', 'estimated_delivery_date',
+        # Keep core review/social-proof signals, exclude heavy structured fields.
+        'top_reviews', 'detailed_rating',
+        'is_amazon_choice', 'is_prime', 'is_bestseller', 'is_best_seller',
+        'sales_volume', 'sales_volume_num'
     ]
     eval_cols = [c for c in df.columns if c not in exclude_cols]
     
     quantitative_cols = [
         'rating', 'reviews', 'number_of_offers', 'lowest_offer_price', 
-        'current_price', 'unit_price', 'unit_count', 'min_order_quantity', 'sales_volume_num'
+        'current_price', 'unit_price', 'unit_count', 'min_order_quantity'
     ]
     
     def is_missing_value(series, col_name):
@@ -133,6 +141,7 @@ def render(df_raw):
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         :root {{
             --primary: #F97316;
@@ -225,6 +234,52 @@ def render(df_raw):
             background: #FFFFFF;
             color: var(--primary);
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }}
+
+        .download-bar {{
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+            background: var(--card-bg);
+            padding: 8px 16px;
+            border-radius: var(--border-radius);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+            flex-wrap: wrap;
+        }}
+
+        .download-group {{
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }}
+
+        .download-btn {{
+            border: 1px solid #E5E7EB;
+            background: #fff;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            color: #44403C;
+            padding: 7px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }}
+
+        .download-btn:hover {{
+            border-color: rgba(249,115,22,0.65);
+            box-shadow: 0 0 0 3px rgba(249,115,22,0.08);
+            transform: translateY(-0.5px);
+        }}
+
+        .download-hint {{
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.4;
         }}
 
         .kpi-row {{
@@ -325,6 +380,18 @@ def render(df_raw):
         </div>
     </div>
 
+    <div class="download-bar">
+        <div class="download-group">
+            <button class="download-btn" onclick="downloadCard('card_trend', 'trend')">Tải ảnh: Xu hướng Doanh số</button>
+            <button class="download-btn" onclick="downloadCard('card_features', 'features')">Tải ảnh: Phân hoá Feature</button>
+            <button class="download-btn" onclick="downloadCard('card_missing', 'missing')">Tải ảnh: Tập trung theo Thiếu</button>
+            <button class="download-btn" onclick="downloadCard('card_top10', 'top10')">Tải ảnh: Tập trung Top 10%</button>
+        </div>
+        <div class="download-hint">
+            Ảnh xuất ra dạng PNG (gồm tiêu đề/phụ đề) phù hợp để chèn vào báo cáo.
+        </div>
+    </div>
+
     <!-- KPI ROW -->
     <div class="kpi-row">
         <div class="kpi-card">
@@ -352,7 +419,7 @@ def render(df_raw):
     <!-- CHARTS -->
     <div class="charts-wrapper">
         
-        <div class="chart-card">
+        <div class="chart-card" id="card_trend">
             <div class="chart-header">
                 <div class="chart-title">Sự Chuyển Biến Doanh Số</div>
                 <div class="chart-subtitle">Trục X: Số Trường Thông Tin Thiếu | Trục Y: Doanh Số & Số Lượng Sản Phẩm</div>
@@ -360,7 +427,7 @@ def render(df_raw):
             <div class="chart-container"><canvas id="c_trend"></canvas></div>
         </div>
 
-        <div class="chart-card">
+        <div class="chart-card" id="card_features">
             <div class="chart-header">
                 <div class="chart-title">Trường Thông Tin Phân Hoá: Top 10% Doanh Số so với Toàn Bộ</div>
                 <div class="chart-subtitle">Top các feature có mức độ chênh lệch tỷ lệ xuất hiện cao nhất</div>
@@ -368,7 +435,7 @@ def render(df_raw):
             <div class="chart-container"><canvas id="c_features"></canvas></div>
         </div>
 
-        <div class="chart-card">
+        <div class="chart-card" id="card_missing">
             <div class="chart-header">
                 <div class="chart-title">Mức Độ Tập Trung Theo Nhóm Thông Tin Thiếu</div>
                 <div class="chart-subtitle">Đường đỏ (10%): Tỷ lệ kỳ vọng ngẫu nhiên (Baseline)</div>
@@ -378,7 +445,7 @@ def render(df_raw):
             </div>
         </div>
 
-        <div class="chart-card">
+        <div class="chart-card" id="card_top10">
             <div class="chart-header">
                 <div class="chart-title">Mức Độ Tập Trung Ở Top 10% Doanh Số</div>
                 <div class="chart-subtitle">Đường đỏ (10%): Tỷ lệ kỳ vọng ngẫu nhiên (Baseline)</div>
@@ -399,6 +466,54 @@ def render(df_raw):
     const PRICE_T2 = {p67}; // Top of Trung Cấp
     let CHARTS = {{}};
     let METRIC = 'mean'; // 'mean' or 'median'
+
+    function _slugify(s) {{
+        return String(s || '')
+            .trim()
+            .toLowerCase()
+            .replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 64) || 'all';
+    }}
+
+    async function downloadCard(cardId, chartKey) {{
+        const el = document.getElementById(cardId);
+        if (!el) return;
+
+        const cat = document.getElementById('selCategory')?.value || 'ALL';
+        const seg = document.getElementById('selPrice')?.value || 'ALL';
+        const metric = METRIC || 'mean';
+        const filename = `chat-luong-niem-yet_${{_slugify(cat)}}_${{_slugify(seg)}}_${{metric}}_${{chartKey}}.png`;
+
+        // Prefer capturing the whole chart card (title + subtitle + chart) with a solid background.
+        if (typeof html2canvas === 'function') {{
+            const canvas = await html2canvas(el, {{
+                backgroundColor: '#FFFFFF',
+                scale: 2,
+                useCORS: true,
+            }});
+            const url = canvas.toDataURL('image/png', 1.0);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            return;
+        }}
+
+        // Fallback: export only the chart canvas.
+        const chartCanvas = el.querySelector('canvas');
+        if (!chartCanvas) return;
+        const url = chartCanvas.toDataURL('image/png', 1.0);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    }}
 
     function median(arr) {{
         if (!arr.length) return 0;
@@ -497,7 +612,7 @@ def render(df_raw):
         if (curBin.count > 0) bins.push(curBin);
 
         // Convert to chart-ready format
-        const chartBins = bins.map(b => {{
+        let chartBins = bins.map(b => {{
             b.vals.sort((a,b) => a - b);
             let minM = b.vals[0];
             let maxM = b.vals[b.vals.length - 1];
@@ -509,6 +624,25 @@ def render(df_raw):
                 chunk: b.products
             }};
         }});
+
+        // Merge specific bins to keep chart readable (requested: merge 29 with 30-31)
+        const mergedBins = [];
+        for (let i = 0; i < chartBins.length; i++) {{
+            const cur = chartBins[i];
+            const nxt = chartBins[i + 1];
+            if (cur && nxt && cur.label === '29' && (nxt.label === '30-31' || nxt.label === '30' || nxt.label.startsWith('30-31'))) {{
+                mergedBins.push({{
+                    label: '29-31',
+                    salesArr: cur.salesArr.concat(nxt.salesArr),
+                    count: cur.count + nxt.count,
+                    chunk: cur.chunk.concat(nxt.chunk),
+                }});
+                i += 1;
+                continue;
+            }}
+            mergedBins.push(cur);
+        }}
+        chartBins = mergedBins;
 
         // --- 2. Chart 1: Sales Trend & Quantity ---
         const trendLabels = chartBins.map(b => b.label);
@@ -771,11 +905,17 @@ def render(df_raw):
                 responsive: true,
                 maintainAspectRatio: false,
                 indexAxis: 'y',
+                layout: {{
+                    // Prevent right-side labels from being clipped.
+                    padding: {{ right: 28 }}
+                }},
                 scales: {{
                     x: {{
                         grid: {{ color: 'rgba(0,0,0,0.04)' }},
                         ticks: {{ callback: (v) => (v > 0 ? '+' : '') + v + '%', font: {{ size: 10 }} }},
-                        title: {{ display: true, text: 'Mức độ ảnh hưởng (Chênh lệch % độ phủ)', color: '#78716C', font: {{ size: 11, weight: '600' }} }}
+                        title: {{ display: true, text: 'Mức độ ảnh hưởng (Chênh lệch % độ phủ)', color: '#78716C', font: {{ size: 11, weight: '600' }} }},
+                        grace: '10%',
+                        suggestedMax: 20
                     }},
                     y: {{
                         grid: {{ display: false }},
@@ -791,7 +931,9 @@ def render(df_raw):
                         formatter: (v) => (v > 0 ? '+' : '') + v.toFixed(1) + '%',
                         anchor: 'end',
                         align: 'right',
-                        offset: 4
+                        offset: 6,
+                        clamp: true,
+                        clip: false
                     }},
                     tooltip: {{
                         backgroundColor: 'rgba(28,25,23,0.92)',

@@ -85,12 +85,6 @@ FEATURE_MAP = {
     "user_videos": "Video đánh giá từ khách",
     "video_thumbnail": "Ảnh đại diện Video",
     
-    # Interactions & Logistics
-    "frequently_bought_together": "Thường được mua kèm",
-    "delivery_date_text": "Thông tin thời gian giao",
-    "delivery_ship_to": "Vị trí giao hàng",
-    "delivery_stock_note": "Ghi chú tồn kho",
-    
     # Meta / Organizational Features
     "main_category": "Danh mục chính",
     "category_hierarchy": "Cấp bậc danh mục",
