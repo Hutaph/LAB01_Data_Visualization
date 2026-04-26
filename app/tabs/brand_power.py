@@ -4,13 +4,17 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 def render(df_raw):
+    """
+    Renders the Amazon's Choice Analysis tab.
+    """
     df = df_raw.copy()
 
     # ══════════════════════════════════════════════════════════════
-    # 1. TIỀN XỬ LÝ DỮ LIỆU & MAPPING DANH MỤC
+    # 1. DATA PREPROCESSING & MAPPING
     # ══════════════════════════════════════════════════════════════
     from utils.constants import CATEGORY_MAP
 
+    # Initialize essential columns
     if "is_amazon_choice" not in df.columns:
         df["is_amazon_choice"] = False
     else:
@@ -24,11 +28,13 @@ def render(df_raw):
     else:
         df["is_prime"] = df["is_prime"].fillna(False).astype(bool)
 
-    if "crawl_category" not in df.columns:
-        df["crawl_category"] = "Không rõ"
-    else:
+    # Category mapping
+    if "crawl_category" in df.columns:
         df["crawl_category"] = df["crawl_category"].fillna("Không rõ").map(CATEGORY_MAP).fillna("Khác")
+    else:
+        df["crawl_category"] = "Không rõ"
 
+    # Numeric conversions
     df["current_price"] = pd.to_numeric(df.get("price", 0), errors="coerce").fillna(0.0)
     df["sales_volume_num"] = pd.to_numeric(df.get("sales_volume_num", 0), errors="coerce").fillna(0)
     df["rating_val"] = pd.to_numeric(df.get("rating", 0), errors="coerce").fillna(0.0)
@@ -39,15 +45,16 @@ def render(df_raw):
     else:
         df["title"] = df["title"].fillna("Sản phẩm ẩn danh")
 
-    # Tạo phân khúc giá
+    # Define Price Tiers
     def get_price_tier(p):
         if p <= 17.99: return "1. Bình dân (≤ $17.99)"
-        elif p <= 46.99: return "2. Trung cấp ($17.99-$46.99)"
-        else: return "3. Cao cấp (≥ $46.99)"
+        if p <= 46.99: return "2. Trung cấp ($17.99-$46.99)"
+        return "3. Cao cấp (≥ $46.99)"
+        
     df["price_tier"] = df["current_price"].apply(get_price_tier)
 
     # ══════════════════════════════════════════════════════════════
-    # 2. XUẤT JSON CHO CHART.JS
+    # 2. DATA EXPORT TO JSON
     # ══════════════════════════════════════════════════════════════
     select_cols = [
         "title", "crawl_category", "is_amazon_choice", "is_best_seller", 
@@ -57,7 +64,7 @@ def render(df_raw):
     data_json_str = export_df.to_json(orient="records", force_ascii=False)
 
     # ══════════════════════════════════════════════════════════════
-    # 3. HTML/CSS/JS CHUẨN ĐỒNG BỘ
+    # 3. VISUALIZATION (HTML/CSS/JS)
     # ══════════════════════════════════════════════════════════════
     _HTML = """<!DOCTYPE html>
 <html lang="vi">
@@ -70,32 +77,24 @@ def render(df_raw):
         *{box-sizing:border-box;margin:0;padding:0}
         body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px 8px;height:100vh;overflow:hidden;display:flex;flex-direction:column;gap:8px}
 
-        /* ── FILTER BAR ── */
+        /* Filter Bar */
         .fb{
-          display:flex;align-items:center;gap:24px;
-          background:#fff;border:1px solid var(--bd);border-radius:10px;
-          padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;flex-wrap:wrap;
+            display:flex;align-items:center;gap:24px;
+            background:#fff;border:1px solid var(--bd);border-radius:10px;
+            padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;flex-wrap:wrap;
         }
         .fb-item label{
-          display:block;font-size:10px;font-weight:700;color:var(--t2);
-          text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;
+            display:block;font-size:10px;font-weight:700;color:var(--t2);
+            text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;
         }
         .fb-item select{
-          padding:7px 30px 7px 10px;border:1px solid var(--bd);border-radius:6px;
-          font-size:13px;font-family:var(--fn);color:var(--t1);min-width:180px;
-          background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
-          appearance:none;cursor:pointer;outline:none;
+            padding:7px 30px 7px 10px;border:1px solid var(--bd);border-radius:6px;
+            font-size:13px;font-family:var(--fn);color:var(--t1);min-width:180px;
+            background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
+            appearance:none;cursor:pointer;outline:none;
         }
         
-        /* Slider */
-        .sl-wrap{display:flex;flex-direction:column;min-width:220px}
-        .sl-cont{position:relative;height:20px;display:flex;align-items:center}
-        .sl-track{position:absolute;left:0;right:0;height:4px;border-radius:2px;background:#E5E7EB}
-        .sl-input{position:absolute;width:100%;pointer-events:none;background:none;appearance:none;-webkit-appearance:none;margin:0}
-        .sl-input::-webkit-slider-thumb{pointer-events:auto;width:14px;height:14px;border-radius:50%;background:#FFF;border:2px solid var(--pr);cursor:pointer;-webkit-appearance:none;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
-        .sl-vals{display:flex;justify-content:space-between;font-size:11px;font-weight:600;margin-top:4px;color:var(--t2)}
-
-        /* Toggle */
+        /* Toggle Switch */
         .tg-grp{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;padding-bottom:5px}
         .tg-trk{position:relative;width:40px;height:22px;background:#E5E7EB;border-radius:11px;transition:.3s}
         .tg-trk.on{background:var(--pr)}
@@ -103,7 +102,7 @@ def render(df_raw):
         .tg-trk.on .tg-thb{transform:translateX(18px)}
         .tg-lbl{font-size:13px;font-weight:600;color:var(--t1)}
 
-        /* ── KPI ── */
+        /* KPI Cards */
         .kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex-shrink:0}
         .kc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:14px 16px;border-left:4px solid var(--t3);}
         .kc.hi{border-left-color:var(--pr);background:#FFF7ED}
@@ -112,7 +111,7 @@ def render(df_raw):
         .ks{font-size:10.5px;color:var(--t3);margin-top:2px}
         .kc.hi .kv{color:var(--dk)}
 
-        /* ── CHARTS ── */
+        /* Charts Layout */
         .g2{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;min-height:0}
         .cc{background:var(--card);border-radius:var(--r);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:10px 14px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
         .ct{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
@@ -125,7 +124,7 @@ def render(df_raw):
 </head>
 <body>
 
-<!-- FILTER BAR -->
+<!-- 1. HEADER & FILTERS -->
 <div class="fb">
   <div class="fb-item">
     <label>Danh mục</label>
@@ -138,16 +137,17 @@ def render(df_raw):
     <div class="tg-trk" id="tgPrime"><div class="tg-thb"></div></div>
     <span class="tg-lbl">Prime Only</span>
   </div>
+
   <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
       <div style="font-size:16px; font-weight:800; color:var(--dk); font-family:var(--ft);">PHÂN TÍCH NHÃN AMAZON'S CHOICE</div>
       <div style="font-size:11px; color:var(--t2); font-weight:500;">Đánh giá tác động của nhãn uy tín đến hiệu suất sản phẩm</div>
   </div>
 </div>
 
-<!-- KPI -->
+<!-- 2. KPI SUMMARY -->
 <div class="kpi-row" id="kpiRow"></div>
 
-<!-- CHARTS -->
+<!-- 3. DASHBOARD CHARTS -->
 <div class="g2">
   <div class="cc">
     <div class="ct">Thị phần theo Nhãn Uy Tín</div>
@@ -180,7 +180,9 @@ def render(df_raw):
     const SC = {"Amazon's Choice": '#F97316', "Thường": '#3266ad'};
     let primeOnly = false;
     
-    Chart.defaults.font.family="'Inter',sans-serif"; Chart.defaults.color='#78716C';
+    Chart.defaults.font.family="'Inter',sans-serif"; 
+    Chart.defaults.color='#78716C';
+
     const fN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
     const fP = n => Number(n).toFixed(1) + '%';
     const fmtN = n => new Intl.NumberFormat('en-US').format(n);
@@ -226,8 +228,11 @@ def render(df_raw):
             document.getElementById('kpiRow').innerHTML = '<div style="grid-column:span 4;text-align:center;padding:20px;color:var(--t2)">Không có dữ liệu phù hợp bộ lọc</div>';
             return;
         }
+
         let G_choice = data.filter(d => d.is_amazon_choice);
         let G_non = data.filter(d => !d.is_amazon_choice);
+
+        // Calculate KPIs
         let s_c = G_choice.length > 0 ? G_choice.reduce((a,b)=>a+b.sales_volume_num,0)/G_choice.length : 0;
         let s_n = G_non.length > 0 ? G_non.reduce((a,b)=>a+b.sales_volume_num,0)/G_non.length : 0;
         let s_pct = s_n > 0 ? ((s_c - s_n) / s_n) * 100 : 0;
@@ -247,16 +252,27 @@ def render(df_raw):
                 <div class="ks">${x.s}</div>
             </div>`).join('');
         
+        // Donut Chart
         const dCounts = [G_choice.length, G_non.length], dLabels = ["Amazon's Choice", "Thường"], dColors = [COLORS.choice, COLORS.non], dTotal = data.length;
         document.getElementById('dLeg').innerHTML = dLabels.map((lb,i)=>`<span class="li"><span class="ld" style="background:${dColors[i]}"></span>${lb} (${dTotal?fF(dCounts[i]/dTotal*100, 1):0}%)</span>`).join('');
         charts.donut = new Chart(document.getElementById('cDonut'),{type:'doughnut',data:{labels:dLabels,datasets:[{data:dCounts,backgroundColor:dColors,borderWidth:0}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.label}: ${fmtN(c.raw)} SP`}}}}});
 
+        // Bar Chart - Sales Comparison
         charts.bar = new Chart(document.getElementById('cBarSales'),{type:'bar',data:{labels:["Amazon's Choice", "Thường"],datasets:[{data:[s_c, s_n],backgroundColor:[COLORS.choice, COLORS.non],borderRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${fN(c.raw)} đơn`}}},scales:{x:{grid:{display:false}},y:{grid:{color:'rgba(0,0,0,0.04)'}}}}});
 
+        // Price Tier Comparison
         let tiers = ["1. Bình dân (≤ $17.99)", "2. Trung cấp ($17.99-$46.99)", "3. Cao cấp (≥ $46.99)"], tierChData = [], tierNoData = [];
-        tiers.forEach(t => { let t_data = data.filter(d => d.price_tier === t); if (t_data.length === 0) { tierChData.push(0); tierNoData.push(0); } else { let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100; tierChData.push(p); tierNoData.push(100 - p); } });
+        tiers.forEach(t => { 
+            let t_data = data.filter(d => d.price_tier === t); 
+            if (t_data.length === 0) { tierChData.push(0); tierNoData.push(0); } 
+            else { 
+                let p = (t_data.filter(d => d.is_amazon_choice).length / t_data.length) * 100; 
+                tierChData.push(p); tierNoData.push(100 - p); 
+            } 
+        });
         charts.tier = new Chart(document.getElementById('cPriceTier'),{type:'bar',data:{labels:tiers,datasets:[{label:"Choice (%)",data:tierChData,backgroundColor:COLORS.choice,borderRadius:3},{label:"Thường (%)",data:tierNoData,backgroundColor:COLORS.non,borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label}: ${fF(c.raw, 1)}%`}}},scales:{x:{stacked:true,max:100,grid:{display:false},ticks:{callback:v=>v+'%'}},y:{stacked:true,grid:{display:false}}}}});
 
+        // Scatter Chart - Price vs Sales
         document.getElementById('sLeg').innerHTML = dLabels.map(sg=>`<span class="li"><span class="ld" style="background:${SC[sg]}"></span>${sg}</span>`).join('');
         let rd = data.length > 500 ? [...data].sort(() => 0.5 - Math.random()).slice(0, 500) : data, scCh = [], scNo = [];
         rd.forEach(d => { let pt = {x: d.current_price, y: d.sales_volume_num}; if (d.is_amazon_choice) scCh.push(pt); else scNo.push(pt); });
