@@ -534,7 +534,7 @@ function updateKPIs(data) {{
         priceHiEl.textContent = '$' + fmtF(avgHiP, 2);
         if (avgLoP > 0) {{
             const diff = avgHiP - avgLoP;
-            priceHiSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với nhóm < 4.5 (Trung vị: $${{fmtF(medHiP, 2)}})`;
+            priceHiSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với nhóm < 4.5`;
         }} else {{
             priceHiSub.textContent = 'Giá TB nhóm rating ≥ 4.5';
         }}
@@ -577,7 +577,7 @@ function updateKPIs(data) {{
         priceEl.textContent = '$' + fmtF(avgTopP, 2);
         if (avgBotP > 0) {{
             const diff = avgTopP - avgBotP;
-            priceSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với 75% còn lại (Trung vị: $${{fmtF(medTopP, 2)}})`;
+            priceSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với 75% còn lại`;
         }} else {{
             priceSub.textContent = 'Giá TB nhóm reviews top 25%';
         }}
