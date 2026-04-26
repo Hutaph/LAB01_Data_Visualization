@@ -1,6 +1,6 @@
 # Amazon Commerce Lens: E-Commerce Data Analytics Dashboard
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://amazon-commerce-lens.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://amazon-ecommerce-analytics.streamlit.app/)
 ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.55-red?logo=streamlit)
 ![License](https://img.shields.io/badge/License-MIT-green)
