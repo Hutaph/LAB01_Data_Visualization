@@ -326,10 +326,10 @@ def render(df_raw):
             let plotData;
             if (METRIC === 'mean') {{
                 plotData = salesDataFull.map(arr => arr.length ? Math.round(arr.reduce((a,b) => a+b,0) / arr.length) : 0);
-                charts.sales.options.scales.y.title.text = 'Doanh số Trung bình (lượt)';
+                charts.sales.options.scales.y.title.text = 'Doanh số trung bình (lượt)';
             }} else {{
                 plotData = salesDataFull.map(arr => Math.round(getMedian(arr)));
-                charts.sales.options.scales.y.title.text = 'Doanh số Trung vị (lượt)';
+                charts.sales.options.scales.y.title.text = 'Doanh số trung vị (lượt)';
             }}
             charts.sales.data.datasets[0].data = plotData;
             charts.sales.update();
