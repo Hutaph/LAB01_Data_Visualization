@@ -62,6 +62,7 @@ Dữ liệu được nhóm tự thu thập độc lập qua REST API của **Ama
    ```bash
    streamlit run app/app.py
    ```
+   Hoặc xem bản cập nhật trực tuyến tại: [amazon-ecommerce-analytics.streamlit.app](https://amazon-ecommerce-analytics.streamlit.app/)
 
 ---
 © 2026 - [Hutaph](https://github.com/Hutaph) | LAB01 Data Visualization
