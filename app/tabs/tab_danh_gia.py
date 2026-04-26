@@ -71,6 +71,13 @@ def render(df: pd.DataFrame):
         "rating", "reviews", "sales_volume_num",
     ]
     export = data[select_cols].copy()
+
+    # Chuẩn hóa kiểu dữ liệu trước khi serialize
+    for c in ["current_price", "original_price", "rating", "reviews", "sales_volume_num"]:
+        export[c] = pd.to_numeric(export[c], errors="coerce").fillna(0)
+    export["sales_volume_num"] = export["sales_volume_num"].astype(float)
+    export["reviews"] = export["reviews"].astype(float)
+
     data_json_str = json.dumps(export.to_dict(orient="records"), ensure_ascii=False)
 
     html_code = f"""<!DOCTYPE html>
@@ -104,44 +111,71 @@ body {{
 body::-webkit-scrollbar {{
     display: none;
 }}
-.filter-bar {{
+/* ── FILTER BAR ── */
+.fb {{
     display: flex;
-    align-items: flex-start;
-    gap: 16px;
-    flex-wrap: wrap;
-    background: var(--card-bg);
-    padding: 10px 14px;
-    border-radius: var(--border-radius);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    margin-bottom: 20px;
+    align-items: center;
+    gap: 20px;
+    background: #fff;
+    border: 1px solid #E7E5E4;
+    border-radius: 12px;
+    padding: 12px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    flex-shrink: 0;
+    margin-bottom: 16px;
 }}
-.f-item {{
+.fb-item {{
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    min-width: 0;
+    gap: 5px;
 }}
-.f-label {{
+.fb-item label {{
     font-size: 11px;
-    font-weight: 600;
+    font-weight: 700;
     color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.05em;
-    white-space: nowrap;
+    letter-spacing: .8px;
 }}
-select {{
+.fb-item select {{
     padding: 8px 12px;
-    border: 1px solid #D1D5DB;
-    border-radius: 6px;
-    font-family: var(--font);
+    border: 1px solid #E7E5E4;
+    border-radius: 8px;
     font-size: 13px;
+    font-family: var(--font);
     color: var(--text-primary);
-    background: #fff;
-    outline: none;
+    background: #fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
+    appearance: none;
     cursor: pointer;
-    width: 180px;
+    outline: none;
+    transition: border-color .15s;
+    min-width: 200px;
 }}
-select:focus {{ border-color: var(--primary); }}
+.fb-item select:hover {{ border-color: var(--primary); }}
+.fb-item select:focus {{ border-color: var(--primary); box-shadow: 0 0 0 3px rgba(249,115,22,.12); }}
+.toggle-group {{
+    display: flex;
+    background: #F3F4F6;
+    border-radius: 8px;
+    padding: 3px;
+    gap: 2px;
+}}
+.toggle-btn {{
+    border: none;
+    background: transparent;
+    font-family: var(--font);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}}
+.toggle-btn.active {{
+    background: #FFFFFF;
+    color: var(--primary);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}}
 
 .slider-wrap {{
     position: relative;
@@ -199,36 +233,6 @@ select:focus {{ border-color: var(--primary); }}
 }}
 
 
-.mode-divider {{
-    width: 1px;
-    height: 28px;
-    background: #F3E8D8;
-    align-self: center;
-    flex-shrink: 0;
-}}
-.mode-pill {{
-    display: inline-flex;
-    gap: 4px;
-    background: #F3E8D8;
-    border-radius: 20px;
-    padding: 3px;
-    flex-shrink: 0;
-    align-self: center;
-}}
-.mode-opt {{
-    padding: 3px 12px;
-    font: 600 11px var(--font);
-    color: var(--text-secondary);
-    background: transparent;
-    border-radius: 20px;
-    cursor: pointer;
-    user-select: none;
-    transition: background .15s, color .15s;
-}}
-.mode-opt.active {{
-    background: var(--primary);
-    color: #fff;
-}}
 .kpi-row {{
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -312,98 +316,61 @@ select:focus {{ border-color: var(--primary); }}
 </head>
 <body>
 
-<div class="filter-bar">
-
-    <div class="f-item">
-        <span class="f-label">Danh mục</span>
+<div class="fb">
+    <div class="fb-item">
+        <label>Danh Mục Sản Phẩm</label>
         <select id="selCategory" onchange="applyFilters()">
-            <option value="ALL">Tất cả</option>
+            <option value="ALL">Tất cả danh mục</option>
         </select>
     </div>
-
-    <div class="mode-divider"></div>
-    <div class="mode-pill" id="modePill">
-        <div class="mode-opt active" data-mode="rating">Theo Rating</div>
-        <div class="mode-opt"        data-mode="reviews">Theo Reviews</div>
-    </div>
-    <div class="mode-divider"></div>
-
-    <div class="f-item">
-        <span class="f-label">Khoảng Rating (★)</span>
-        <div class="slider-wrap" style="min-width:160px">
-            <div id="rating_track" class="slider-track"></div>
-            <input type="range" id="rating_min" min="1" max="5" step="0.1" value="1"
-                   oninput="updateSlider('rating'); applyFilters()">
-            <input type="range" id="rating_max" min="1" max="5" step="0.1" value="5"
-                   oninput="updateSlider('rating'); applyFilters()">
-        </div>
-        <div class="slider-vals">
-            <span id="rating_val_min">★1.0</span>
-            <span id="rating_val_max">★5.0</span>
+    <div class="fb-item">
+        <label>Nhóm Biểu Đồ</label>
+        <div class="toggle-group">
+            <button class="toggle-btn active" id="btn_rating" onclick="setMode('rating')">Theo Rating</button>
+            <button class="toggle-btn"        id="btn_reviews" onclick="setMode('reviews')">Theo Reviews</button>
         </div>
     </div>
-
-    <div class="f-item">
-        <span class="f-label">Số Reviews</span>
-        <div class="slider-wrap" style="min-width:180px">
-            <div id="reviews_track" class="slider-track"></div>
-            <input type="range" id="reviews_min" min="0" max="500000" step="500" value="0"
-                   oninput="updateSlider('reviews'); applyFilters()">
-            <input type="range" id="reviews_max" min="0" max="500000" step="500" value="500000"
-                   oninput="updateSlider('reviews'); applyFilters()">
-        </div>
-        <div class="slider-vals">
-            <span id="reviews_val_min">0</span>
-            <span id="reviews_val_max">500k</span>
+    <div class="fb-item">
+        <label>Chỉ Số Doanh Số</label>
+        <div class="toggle-group">
+            <button class="toggle-btn active" id="btn_mean"   onclick="setMetric('mean')">Mean</button>
+            <button class="toggle-btn"        id="btn_median" onclick="setMetric('median')">Median</button>
         </div>
     </div>
-
-    <div class="f-item">
-        <span class="f-label">Khoảng Giá ($)</span>
-        <div class="slider-wrap" style="min-width:180px">
-            <div id="price_track" class="slider-track"></div>
-            <input type="range" id="price_min" min="0" max="3400" step="1" value="0"
-                   oninput="updateSlider('price'); applyFilters()">
-            <input type="range" id="price_max" min="0" max="3400" step="1" value="3400"
-                   oninput="updateSlider('price'); applyFilters()">
-        </div>
-        <div class="slider-vals">
-            <span id="price_val_min">$0</span>
-            <span id="price_val_max">$3,400</span>
-        </div>
+    <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
+        <div style="font-size:16px; font-weight:800; color:var(--dark); font-family:var(--font);">PHÂN TÍCH ĐÁNH GIÁ SẢN PHẨM</div>
+        <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">Tương quan giữa rating, reviews và hiệu quả kinh doanh</div>
     </div>
-
-
 </div>
 
 <div class="kpi-row">
 
     <div class="kpi-card">
-        <div class="kpi-title">Rating Trung Bình</div>
+        <div class="kpi-title">Rating</div>
         <div class="kpi-value" id="kpi_rating">0★</div>
         <div class="kpi-sub"  id="kpi_rating_sub">–</div>
     </div>
 
     <div class="kpi-card accent">
-        <div class="kpi-title">Doanh Số TB - Rating ≥ 4.5</div>
+        <div class="kpi-title">Doanh Số - Rating ≥ 4.5</div>
         <div class="kpi-value" id="kpi_sales_hi">–</div>
         <div class="kpi-sub"  id="kpi_sales_hi_sub">So với rating &lt; 4.5</div>
     </div>
 
     <div class="kpi-card accent">
-        <div class="kpi-title">Giá TB - Rating ≥ 4.5</div>
+        <div class="kpi-title">Giá - Rating ≥ 4.5</div>
         <div class="kpi-value" id="kpi_price_hi_rating">–</div>
         <div class="kpi-sub"  id="kpi_price_hi_rating_sub">So với rating &lt; 4.5</div>
     </div>
 
     <div class="kpi-card">
-        <div class="kpi-title">Doanh Số TB - Reviews Top 25%</div>
+        <div class="kpi-title">Doanh Số - Reviews Top 25%</div>
         <div class="kpi-value" id="kpi_sales_top_reviews">–</div>
         <div class="kpi-sub"  id="kpi_sales_top_reviews_sub">So với 75% còn lại</div>
     </div>
 
     <div class="kpi-card">
-        <div class="kpi-title">Giá TB - Reviews Top 25%</div>
+        <div class="kpi-title">Giá - Reviews Top 25%</div>
         <div class="kpi-value" id="kpi_price_top">–</div>
         <div class="kpi-sub"  id="kpi_price_top_sub">So với 75% còn lại</div>
     </div>
@@ -463,62 +430,6 @@ function quantile(arr, q) {{
     return s[lo] + (s[hi] - s[lo]) * (pos - lo);
 }}
 
-const SLIDER_CFG = {{
-    rating:  {{ min: 1, max: 5,      fmt: v => '★'+Number(v).toFixed(1) }},
-    reviews: {{ min: 0, max: 500000, fmt: v => fmtK(Number(v)) }},
-    price:   {{ min: 0, max: 3400,   fmt: v => '$'+fmtN(Number(v)) }},
-}};
-
-function updateSlider(name) {{
-    const minEl  = document.getElementById(name+'_min');
-    const maxEl  = document.getElementById(name+'_max');
-    const track  = document.getElementById(name+'_track');
-    const valMin = document.getElementById(name+'_val_min');
-    const valMax = document.getElementById(name+'_val_max');
-    const cfg    = SLIDER_CFG[name];
-
-    let lo = parseFloat(minEl.value);
-    let hi = parseFloat(maxEl.value);
-    const gap = name === 'rating' ? 0.1 : (name === 'reviews' ? 500 : 1);
-
-    if (lo > hi - gap) {{
-        if (document.activeElement === minEl) {{ lo = hi - gap; minEl.value = lo; }}
-        else                                  {{ hi = lo + gap; maxEl.value = hi; }}
-    }}
-
-    const range = parseFloat(minEl.max) - parseFloat(minEl.min);
-    const pLo   = ((lo - parseFloat(minEl.min)) / range) * 100;
-    const pHi   = ((hi - parseFloat(minEl.min)) / range) * 100;
-    track.style.background =
-        `linear-gradient(to right,#E5E7EB ${{pLo}}%,#F97316 ${{pLo}}%,#F97316 ${{pHi}}%,#E5E7EB ${{pHi}}%)`;
-    valMin.textContent = cfg.fmt(lo);
-    valMax.textContent = cfg.fmt(hi);
-}}
-
-function initSliders() {{
-    let maxRev = 0, maxPrice = 0;
-    RAW_DATA.forEach(d => {{
-        if (d.reviews       > maxRev)   maxRev   = d.reviews;
-        if (d.current_price > maxPrice) maxPrice = d.current_price;
-    }});
-    maxRev   = Math.ceil(maxRev   / 500) * 500  || 500000;
-    maxPrice = Math.ceil(maxPrice / 100) * 100  || 3400;
-
-    ['reviews_min','reviews_max'].forEach(id => {{
-        document.getElementById(id).max   = maxRev;
-        document.getElementById(id).value = id.endsWith('min') ? 0 : maxRev;
-    }});
-    ['price_min','price_max'].forEach(id => {{
-        document.getElementById(id).max   = maxPrice;
-        document.getElementById(id).value = id.endsWith('min') ? 0 : maxPrice;
-    }});
-
-    SLIDER_CFG.reviews.max = maxRev;
-    SLIDER_CFG.price.max   = maxPrice;
-
-    ['rating','reviews','price'].forEach(updateSlider);
-}}
-
 function initDropdown() {{
     const cats = [...new Set(RAW_DATA.map(d => d.crawl_category)
         .filter(c => c && c !== 'Không rõ' && c !== 'Khác'))].sort();
@@ -530,42 +441,38 @@ function initDropdown() {{
     }});
 }}
 
+let METRIC = 'mean';
+function setMetric(m) {{
+    METRIC = m;
+    document.getElementById('btn_mean').classList.toggle('active',   m === 'mean');
+    document.getElementById('btn_median').classList.toggle('active', m === 'median');
+    applyFilters();
+}}
+
 let currentMode = 'rating';
-function initModeToggle() {{
-    document.querySelectorAll('#modePill .mode-opt').forEach(opt => {{
-        opt.addEventListener('click', () => {{
-            const m = opt.getAttribute('data-mode');
-            if (m === currentMode) return;
-            currentMode = m;
-            document.querySelectorAll('#modePill .mode-opt').forEach(o => o.classList.toggle('active', o === opt));
-            document.getElementById('comboTitle').textContent =
-                m === 'rating'
-                    ? 'Doanh số & Giá TB theo nhóm Rating'
-                    : 'Doanh số & Giá TB theo nhóm Reviews';
-            drawComboChart(currentMode, getFiltered());
-        }});
-    }});
+function setMode(m) {{
+    if (m === currentMode) return;
+    currentMode = m;
+    document.getElementById('btn_rating').classList.toggle('active',  m === 'rating');
+    document.getElementById('btn_reviews').classList.toggle('active', m === 'reviews');
+    document.getElementById('comboTitle').textContent =
+        m === 'rating'
+            ? 'Doanh số & Giá TB theo nhóm Rating'
+            : 'Doanh số & Giá TB theo nhóm Reviews';
+    drawComboChart(currentMode, getFiltered());
 }}
 
 function getFiltered() {{
-    const cat       = document.getElementById('selCategory').value;
-    const rLo       = parseFloat(document.getElementById('rating_min').value);
-    const rHi       = parseFloat(document.getElementById('rating_max').value);
-    const revLo     = parseFloat(document.getElementById('reviews_min').value);
-    const revHi     = parseFloat(document.getElementById('reviews_max').value);
-    const pLo       = parseFloat(document.getElementById('price_min').value);
-    const pHi       = parseFloat(document.getElementById('price_max').value);
-
+    const cat = document.getElementById('selCategory').value;
     return RAW_DATA.filter(d => {{
         if (cat !== 'ALL' && d.crawl_category !== cat) return false;
-        if (d.rating        < rLo  || d.rating        > rHi)  return false;
-        if (d.reviews       < revLo|| d.reviews       > revHi) return false;
-        if (d.current_price < pLo  || d.current_price > pHi)  return false;
         return true;
     }});
 }}
 
 function updateKPIs(data) {{
+    const metricFn = arr => METRIC === 'median' ? median(arr) : mean(arr);
+
     const ratings  = data.map(d => d.rating).filter(r => r > 0);
     const avgRat   = mean(ratings);
     const totalRev = data.reduce((a,b) => a + (b.reviews||0), 0);
@@ -574,17 +481,18 @@ function updateKPIs(data) {{
 
     const hiSales = data.filter(d => d.rating >= 4.5 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
     const loSales = data.filter(d => d.rating <  4.5 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
-    const avgHiS  = mean(hiSales);
-    const avgLoS  = mean(loSales);
+    const valHiS  = metricFn(hiSales);
+    const valLoS  = metricFn(loSales);
     const salesEl  = document.getElementById('kpi_sales_hi');
     const salesSub = document.getElementById('kpi_sales_hi_sub');
-    if (avgHiS > 0) {{
-        salesEl.textContent = fmtN(avgHiS) + ' đơn';
-        if (avgLoS > 0) {{
-            const pct = (avgHiS - avgLoS) / avgLoS * 100;
+
+    if (valHiS > 0) {{
+        salesEl.textContent = fmtN(valHiS) + ' đơn';
+        if (valLoS > 0) {{
+            const pct = (valHiS - valLoS) / valLoS * 100;
             salesSub.textContent = `${{pct >= 0 ? '+' : ''}}${{fmtF(pct,1)}}% so với rating < 4.5`;
         }} else {{
-            salesSub.textContent = 'TB doanh số nhóm rating ≥ 4.5';
+            salesSub.textContent = 'Nhóm rating ≥ 4.5';
         }}
     }} else {{
         salesEl.textContent  = 'N/A';
@@ -595,13 +503,15 @@ function updateKPIs(data) {{
     const loPrices = data.filter(d => d.rating <  4.5 && d.current_price > 0).map(d => d.current_price);
     const avgHiP   = mean(hiPrices);
     const avgLoP   = mean(loPrices);
+    const medHiP   = median(hiPrices);
     const priceHiEl  = document.getElementById('kpi_price_hi_rating');
     const priceHiSub = document.getElementById('kpi_price_hi_rating_sub');
+
     if (avgHiP > 0) {{
         priceHiEl.textContent = '$' + fmtF(avgHiP, 2);
         if (avgLoP > 0) {{
             const diff = avgHiP - avgLoP;
-            priceHiSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với rating < 4.5`;
+            priceHiSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với nhóm < 4.5`;
         }} else {{
             priceHiSub.textContent = 'Giá TB nhóm rating ≥ 4.5';
         }}
@@ -614,17 +524,18 @@ function updateKPIs(data) {{
     const q75         = quantile(allRevs, 0.75);
     const topSales    = data.filter(d => d.reviews >= q75 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
     const botSales    = data.filter(d => d.reviews <  q75 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
-    const avgTopS     = mean(topSales);
-    const avgBotS     = mean(botSales);
+    const valTopS     = metricFn(topSales);
+    const valBotS     = metricFn(botSales);
     const salesTopEl  = document.getElementById('kpi_sales_top_reviews');
     const salesTopSub = document.getElementById('kpi_sales_top_reviews_sub');
-    if (avgTopS > 0) {{
-        salesTopEl.textContent = fmtN(avgTopS) + ' đơn';
-        if (avgBotS > 0) {{
-            const pct = (avgTopS - avgBotS) / avgBotS * 100;
+
+    if (valTopS > 0) {{
+        salesTopEl.textContent = fmtN(valTopS) + ' đơn';
+        if (valBotS > 0) {{
+            const pct = (valTopS - valBotS) / valBotS * 100;
             salesTopSub.textContent = `${{pct >= 0 ? '+' : ''}}${{fmtF(pct,1)}}% so với 75% còn lại`;
         }} else {{
-            salesTopSub.textContent = 'TB doanh số nhóm reviews top 25%';
+            salesTopSub.textContent = 'Nhóm reviews top 25%';
         }}
     }} else {{
         salesTopEl.textContent  = 'N/A';
@@ -635,8 +546,10 @@ function updateKPIs(data) {{
     const botPrices = data.filter(d => d.reviews <  q75 && d.current_price > 0).map(d => d.current_price);
     const avgTopP   = mean(topPrices);
     const avgBotP   = mean(botPrices);
+    const medTopP   = median(topPrices);
     const priceEl   = document.getElementById('kpi_price_top');
     const priceSub  = document.getElementById('kpi_price_top_sub');
+
     if (avgTopP > 0) {{
         priceEl.textContent = '$' + fmtF(avgTopP, 2);
         if (avgBotP > 0) {{
@@ -652,6 +565,7 @@ function updateKPIs(data) {{
 }}
 
 function buildComboGroups(mode, data) {{
+    const metricFn = arr => METRIC === 'median' ? median(arr) : mean(arr);
     if (mode === 'rating') {{
         const defs = [
             {{ lbl: '<3.5',    f: r => r < 3.5 }},
@@ -664,7 +578,7 @@ function buildComboGroups(mode, data) {{
             const fData  = data.filter(d => g.f(d.rating));
             const sales  = fData.filter(d => d.sales_volume_num > 0).map(d => d.sales_volume_num);
             const prices = fData.filter(d => d.current_price > 0).map(d => d.current_price);
-            return {{ lbl: g.lbl, s: mean(sales), p: mean(prices), sCount: sales.length, pCount: prices.length }};
+            return {{ lbl: g.lbl, s: metricFn(sales), p: mean(prices), sCount: sales.length, pCount: prices.length }};
         }});
     }}
     const revs = data.map(d => d.reviews || 0);
@@ -688,7 +602,7 @@ function buildComboGroups(mode, data) {{
     }});
     return buckets.map(g => ({{
         lbl: g.lbl,
-        s: mean(g.ds), p: mean(g.ps),
+        s: metricFn(g.ds), p: mean(g.ps),
         sCount: g.ds.length, pCount: g.ps.length
     }}));
 }}
@@ -1023,8 +937,6 @@ window.addEventListener('resize', () => {{
 
 document.addEventListener('DOMContentLoaded', () => {{
     initDropdown();
-    initSliders();
-    initModeToggle();
     applyFilters();
 }});
 </script>

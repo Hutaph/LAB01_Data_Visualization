@@ -57,17 +57,19 @@ def render(df_raw):
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Montserrat:wght@600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {{
             --primary: #F97316;
+            --dark: #9A3412;
             --bg: #FEF3E2;
             --card-bg: #FFFFFF;
             --text-primary: #1C1917;
             --text-secondary: #78716C;
             --border-radius: 12px;
             --font-family: 'Inter', sans-serif;
+            --title-font: 'Montserrat', sans-serif;
         }}
         * {{ box-sizing: border-box; margin: 0; padding: 0; }}
         body {{ background-color: var(--bg); font-family: var(--font-family); color: var(--text-primary); padding: 8px; }}
@@ -153,6 +155,10 @@ def render(df_raw):
                 <div class="toggle-track" id="primeTrack"><div class="toggle-thumb"></div></div>
                 <span class="toggle-lbl">Chỉ Prime</span>
             </div>
+        </div>
+        <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
+            <div style="font-size:16px; font-weight:800; color:var(--dark); font-family:var(--title-font);">CHIẾN LƯỢC ƯU ĐÃI</div>
+            <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">Phân tích tác động của các chương trình khuyến mãi</div>
         </div>
     </div>
 
@@ -326,10 +332,10 @@ def render(df_raw):
             let plotData;
             if (METRIC === 'mean') {{
                 plotData = salesDataFull.map(arr => arr.length ? Math.round(arr.reduce((a,b) => a+b,0) / arr.length) : 0);
-                charts.sales.options.scales.y.title.text = 'Doanh số Trung bình (lượt)';
+                charts.sales.options.scales.y.title.text = 'Doanh số trung bình (lượt)';
             }} else {{
                 plotData = salesDataFull.map(arr => Math.round(getMedian(arr)));
-                charts.sales.options.scales.y.title.text = 'Doanh số Trung vị (lượt)';
+                charts.sales.options.scales.y.title.text = 'Doanh số trung vị (lượt)';
             }}
             charts.sales.data.datasets[0].data = plotData;
             charts.sales.update();
