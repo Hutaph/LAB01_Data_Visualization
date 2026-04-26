@@ -4,7 +4,6 @@ from pathlib import Path
 import streamlit as st
 import joblib
 
-# Fix: Ensure 'app' directory is in sys.path for absolute imports in tabs
 app_dir = os.path.dirname(os.path.abspath(__file__))
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
@@ -14,8 +13,6 @@ dump_path = Path(__file__).resolve().parent / "features_dump.json"
 models_dir = Path(__file__).resolve().parent / "services" / "models"
 best_model = models_dir / "gradient_boosting_model.pkl"
 
-# Attempt to populate a features dump only when a model can be loaded successfully.
-# On failure, write an empty list (do not serialize exception strings into the JSON file).
 dump = []
 if best_model.exists():
     try:
@@ -109,4 +106,3 @@ with col_nav:
 with col_content:
     active_tab = st.session_state.get("active_tab", "Tổng quan Thị trường")
     route_tab(active_tab, STATE, DF)
-
