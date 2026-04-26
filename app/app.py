@@ -28,13 +28,13 @@ if best_model.exists():
 from components.header import render_header
 from components.navigation import render_navigation
 from services.data_loader import COLOR_SEQUENCE, load_data
-from tabs.tab_tong_quan import render as render_tab_tong_quan
-from tabs.tab_danh_gia import render as render_tab_danh_gia
-from tabs.tab_dinh_gia import render as render_tab_dinh_gia
-from tabs.tab_nhan_uy_tin import render as render_tab_nhan_uy_tin
-from tabs.tab_uu_dai import render as render_tab_uu_dai
-from tabs.tab_du_bao import render as render_tab_du_bao
-from tabs.tab_thong_tin import render as render_tab_thong_tin
+from tabs.market_overview import render as render_overview
+from tabs.trust_signals import render as render_trust_signals
+from tabs.price_strategy import render as render_price_strategy
+from tabs.brand_power import render as render_brand_power
+from tabs.deal_impact import render as render_deal_impact
+from tabs.sales_forecast import render as render_sales_forecast
+from tabs.listing_quality import render as render_listing_quality
 from utils.css import inject_css
 
 amazon_icon_path = Path(__file__).resolve().parent / "data" / "Amazon_icon.png"
@@ -74,13 +74,13 @@ def _build_metrics(df):
     }
 
 TAB_RENDERERS = {
-    "Tổng quan Thị trường": lambda state, df: render_tab_tong_quan(state),
-    "Chiến lược Giá cả":   lambda state, df: render_tab_dinh_gia(df),
-    "Chỉ số Tín nhiệm":    lambda state, df: render_tab_danh_gia(df),
-    "Chiến lược Ưu đãi": lambda state, df: render_tab_uu_dai(df),
-    "Chất lượng Niêm yết": lambda state, df: render_tab_thong_tin(df),
-    "Vị thế Thương hiệu":  lambda state, df: render_tab_nhan_uy_tin(df),
-    "Dự báo Kinh doanh":   lambda state, df: render_tab_du_bao(df),
+    "Tổng quan Thị trường": lambda state, df: render_overview(state),
+    "Chiến lược Giá cả":   lambda state, df: render_price_strategy(df),
+    "Chỉ số Tín nhiệm":    lambda state, df: render_trust_signals(df),
+    "Chiến lược Ưu đãi": lambda state, df: render_deal_impact(df),
+    "Chất lượng Niêm yết": lambda state, df: render_listing_quality(df),
+    "Vị thế Thương hiệu":  lambda state, df: render_brand_power(df),
+    "Dự báo Kinh doanh":   lambda state, df: render_sales_forecast(df),
 }
 
 def route_tab(active_tab: str, state: dict, df):
