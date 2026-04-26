@@ -69,22 +69,24 @@ def render(df_raw):
         *{box-sizing:border-box;margin:0;padding:0}
         body{background:var(--bg);font-family:var(--fn);color:var(--t1);padding:6px 14px 8px;height:100vh;overflow:hidden;display:flex;flex-direction:column;gap:8px}
 
-        /* Filter Bar */
-        .fb{
-            display:flex;align-items:center;gap:24px;
-            background:#fff;border:1px solid var(--bd);border-radius:10px;
-            padding:12px 20px;box-shadow:0 1px 4px rgba(0,0,0,.06);flex-shrink:0;flex-wrap:wrap;
+        /* Filter Bar (Harmonized with deal_impact.py) */
+        .fb {
+            display: flex; align-items: flex-end; gap: 24px;
+            background: #fff; border: 1px solid var(--bd); border-radius: 10px;
+            padding: 12px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); flex-shrink: 0; flex-wrap: wrap;
         }
-        .fb-item label{
-            display:block;font-size:10px;font-weight:700;color:var(--t2);
-            text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;
+        .fb-item { display: flex; flex-direction: column; gap: 6px; }
+        .fb-item label {
+            display: block; font-size: 11px; font-weight: 700; color: var(--t2);
+            text-transform: uppercase; letter-spacing: .5px;
         }
-        .fb-item select{
-            padding:7px 30px 7px 10px;border:1px solid var(--bd);border-radius:6px;
-            font-size:13px;font-family:var(--fn);color:var(--t1);min-width:180px;
-            background:#fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
-            appearance:none;cursor:pointer;outline:none;
+        .fb-item select {
+            padding: 8px 30px 8px 12px; border: 1px solid var(--bd); border-radius: 6px;
+            font-size: 13px; font-family: var(--fn); color: var(--t1); min-width: 200px;
+            background: #fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
+            appearance: none; cursor: pointer; outline: none; transition: border-color 0.2s;
         }
+        .fb-item select:focus { border-color: var(--pr); }
         
         /* Toggle Switch (Matched with deal_impact.py) */
         .toggle-lbl { font-size: 11px; font-weight: 700; color: var(--t2); text-transform: uppercase; letter-spacing: 0.5px; }
@@ -134,7 +136,7 @@ def render(df_raw):
   </div>
 
   <div class="fb-item">
-    <span class="tg-lbl" style="display:block;font-size:10px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Bộ lọc Prime</span>
+    <label>Bộ lọc Prime</label>
     <div class="toggle-group" onclick="togglePrime()" style="height: 32px;">
       <div class="toggle-track" id="primeTrack"><div class="toggle-thumb"></div></div>
       <span class="toggle-lbl">Chỉ Prime</span>
