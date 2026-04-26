@@ -35,6 +35,7 @@ _CSS = """
     background: #fff; border: 1px solid var(--bd); border-radius: 10px;
     padding: 12px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); flex-shrink: 0; flex-wrap: wrap;
     margin-bottom: 14px; width: 100%;
+    margin-top: 14px;
 }
 .fb-item { display: flex; flex-direction: column; gap: 6px; }
 .fb-item label {
