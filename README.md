@@ -1,4 +1,4 @@
-# Amazon Commerce Lens: E-Commerce Data Analytics Dashboard
+# Amazon E-Commerce Data Analytics Dashboard
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://amazon-ecommerce-analytics.streamlit.app/)
 ![Python](https://img.shields.io/badge/Python-3.12-blue?logo=python)
@@ -66,4 +66,4 @@ Dữ liệu được nhóm tự thu thập độc lập qua REST API của **Ama
    Hoặc xem bản cập nhật trực tuyến tại: [amazon-ecommerce-analytics.streamlit.app](https://amazon-ecommerce-analytics.streamlit.app/)
 
 ---
-© 2026 - [Hutaph](https://github.com/Hutaph) | LAB01 Data Visualization
+© 2026 - NHÓM 12 | LAB01 Data Visualization
