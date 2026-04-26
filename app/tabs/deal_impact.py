@@ -4,15 +4,13 @@ import numpy as np
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Import category mapping from utility script
 import sys, os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from utils.category_mapping import CATEGORY_MAP, add_display_column
+from utils.constants import CATEGORY_MAP, add_display_column
 
 def render(df_raw):
     df = df_raw.copy()
 
-    # 1. Feature Engineering
     if "price" in df.columns:
         df["price"] = pd.to_numeric(df["price"], errors="coerce").fillna(0.0)
     else:
@@ -44,10 +42,8 @@ def render(df_raw):
             df["crawl_category"] = "Không rõ"
     df["crawl_category"] = df["crawl_category"].fillna("Không rõ")
 
-    # 2. Map category names (does NOT modify crawl_category — safe for other tabs)
     df = add_display_column(df, source_col="crawl_category", target_col="display_category")
 
-    # 3. Export clean JSON data
     export_cols = ["display_category", "price", "original_price", "discount_rate", "sales_volume_num", "is_prime"]
     existing_cols = [c for c in export_cols if c in df.columns]
     data_json_str = df[existing_cols].to_json(orient="records")
