@@ -94,3 +94,11 @@ FEATURE_MAP = {
     "all_variants": "Danh sách biến thể",
     "is_best_seller": "Sản phẩm Bán chạy (Gốc)",
 }
+
+def add_display_column(df, source_col="crawl_category", target_col="display_category"):
+    """
+    Add a 'display_category' column to a DataFrame by mapping crawl_category values.
+    Does NOT modify the original crawl_category column — safe for cross-tab usage.
+    """
+    df[target_col] = df[source_col].map(CATEGORY_MAP).fillna(df[source_col])
+    return df
