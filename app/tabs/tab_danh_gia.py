@@ -524,18 +524,19 @@ function updateKPIs(data) {{
 
     const hiPrices = data.filter(d => d.rating >= 4.5 && d.current_price > 0).map(d => d.current_price);
     const loPrices = data.filter(d => d.rating <  4.5 && d.current_price > 0).map(d => d.current_price);
-    const valHiP   = metricFn(hiPrices);
-    const valLoP   = metricFn(loPrices);
+    const avgHiP   = mean(hiPrices);
+    const avgLoP   = mean(loPrices);
+    const medHiP   = median(hiPrices);
     const priceHiEl  = document.getElementById('kpi_price_hi_rating');
     const priceHiSub = document.getElementById('kpi_price_hi_rating_sub');
 
-    if (valHiP > 0) {{
-        priceHiEl.textContent = '$' + fmtF(valHiP, 2);
-        if (valLoP > 0) {{
-            const diff = valHiP - valLoP;
-            priceHiSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với rating < 4.5`;
+    if (avgHiP > 0) {{
+        priceHiEl.textContent = '$' + fmtF(avgHiP, 2);
+        if (avgLoP > 0) {{
+            const diff = avgHiP - avgLoP;
+            priceHiSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với nhóm < 4.5 (Trung vị: $${{fmtF(medHiP, 2)}})`;
         }} else {{
-            priceHiSub.textContent = 'Nhóm rating ≥ 4.5';
+            priceHiSub.textContent = 'Giá TB nhóm rating ≥ 4.5';
         }}
     }} else {{
         priceHiEl.textContent  = 'N/A';
@@ -566,18 +567,19 @@ function updateKPIs(data) {{
 
     const topPrices = data.filter(d => d.reviews >= q75 && d.current_price > 0).map(d => d.current_price);
     const botPrices = data.filter(d => d.reviews <  q75 && d.current_price > 0).map(d => d.current_price);
-    const valTopP   = metricFn(topPrices);
-    const valBotP   = metricFn(botPrices);
+    const avgTopP   = mean(topPrices);
+    const avgBotP   = mean(botPrices);
+    const medTopP   = median(topPrices);
     const priceEl   = document.getElementById('kpi_price_top');
     const priceSub  = document.getElementById('kpi_price_top_sub');
 
-    if (valTopP > 0) {{
-        priceEl.textContent = '$' + fmtF(valTopP, 2);
-        if (valBotP > 0) {{
-            const diff = valTopP - valBotP;
-            priceSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với 75% còn lại`;
+    if (avgTopP > 0) {{
+        priceEl.textContent = '$' + fmtF(avgTopP, 2);
+        if (avgBotP > 0) {{
+            const diff = avgTopP - avgBotP;
+            priceSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với 75% còn lại (Trung vị: $${{fmtF(medTopP, 2)}})`;
         }} else {{
-            priceSub.textContent = 'Nhóm reviews top 25%';
+            priceSub.textContent = 'Giá TB nhóm reviews top 25%';
         }}
     }} else {{
         priceEl.textContent  = 'N/A';
