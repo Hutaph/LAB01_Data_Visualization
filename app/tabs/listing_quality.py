@@ -2,6 +2,7 @@ import json
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+
 try:
     from utils.constants import FEATURE_MAP
 except ImportError:
@@ -12,91 +13,116 @@ except ImportError:
         FEATURE_MAP = {}
 
 def render(df_raw):
+    """
+    Hàm chính để render tab Phân tích Chất lượng Niêm yết (Thông tin sản phẩm).
+    """
+    # Khởi tạo dữ liệu làm việc từ dataframe gốc
     df = df_raw.copy()
 
-    # Preprocessing
+    # TIỀN XỬ LÝ DỮ LIỆU
+    # Chuyển đổi doanh số sang kiểu số, xử lý lỗi và giá trị thiếu
     df["sales_volume_num"] = pd.to_numeric(df.get("sales_volume_num", 0), errors="coerce").fillna(0).astype(int)
 
-    # Categories logic
+    # Xử lý logic Danh mục sản phẩm (sử dụng CATEGORY_MAP từ constants nếu có)
     from utils.constants import CATEGORY_MAP
     if "crawl_category" in df.columns:
         df["Danh Mục Sản Phẩm"] = df["crawl_category"].map(CATEGORY_MAP).fillna(df["crawl_category"])
     else:
         df["Danh Mục Sản Phẩm"] = "Không Rõ"
 
-    # Prices & Segments thresholds
+    # TÍNH TOÁN CÁC NGƯỠNG PHÂN KHÚC GIÁ
+    # Chuyển đổi giá sang số và xác định các điểm phân vị (quartiles)
     df["price_num"] = pd.to_numeric(df.get("price", 0), errors="coerce").fillna(0)
     price_nonzero = df["price_num"][df["price_num"] > 0]
+    
+    # Mốc 33% và 67% dùng để chia 3 phân khúc: Bình dân, Trung cấp, Cao cấp
     p33 = round(float(price_nonzero.quantile(0.33)), 2) if not price_nonzero.empty else 10.0
     p67 = round(float(price_nonzero.quantile(0.67)), 2) if not price_nonzero.empty else 30.0
 
-    # Evaluate Information Completeness (How much data we have per product record)
+    # ĐÁNH GIÁ MỨC ĐỘ ĐẦY ĐỦ THÔNG TIN (Listing Completeness)
+    # Danh sách các cột KHÔNG dùng để đánh giá chất lượng nội dung niêm yết (ASIN, URL, các cột kỹ thuật...)
     exclude_cols = [
         'asin', 'link', 'slug', 'parent_asin', 'landing_asin', 'date', 
         'image_url', 'brand_url', 'brand_urls', 'crawl_category', 'Danh Mục Sản Phẩm',
         'discount', 'discount_rate',
         'frequently_bought_together', 'currency', 'min_order_quantity',
-        # Derived helper columns for visualization/processing (not listing fields)
+        # Các cột helper phục vụ trực quan hóa
         'price_num', 'price_clean', 'rating_clean',
         'delivery_date_text', 'delivery_ship_to', 'delivery_stock_note',
-        # Exclude logistics fields that vary by time/location.
+        # Loại bỏ các thông tin logistics biến động theo thời gian/vị trí
         'delivery_info', 'delivery_fee', 'estimated_delivery_date',
-        # Keep core review/social-proof signals, exclude heavy structured fields.
+        # Loại bỏ các trường cấu trúc phức tạp hoặc review thô
         'top_reviews', 'detailed_rating',
         'is_amazon_choice', 'is_prime', 'is_bestseller', 'is_best_seller',
         'sales_volume', 'sales_volume_num'
     ]
+    # eval_cols là danh sách các trường thông tin mô tả sản phẩm thực tế
     eval_cols = [c for c in df.columns if c not in exclude_cols]
     
+    # Định nghĩa các cột kiểu số (để xử lý riêng giá trị 0 là CÓ thông tin)
     quantitative_cols = [
         'rating', 'reviews', 'number_of_offers', 'lowest_offer_price', 
         'current_price', 'unit_price', 'unit_count', 'min_order_quantity'
     ]
     
     def is_missing_value(series, col_name):
+        """Kiểm tra xem dữ liệu trong một cột có bị thiếu hay không."""
         s_str = series.astype(str).str.strip().str.lower()
-        # Cơ bản: NaN, Rỗng, None, [], {} là thiếu
+        
+        # Các giá trị cơ bản coi là thiếu: NaN, Rỗng, None, mảng/dict rỗng
         missing_vals = ["", "nan", "none", "[]", "{}"]
         
-        # Với các trường flag/boolean hoặc content: False và 0 cũng coi là thiếu (không có thông tin)
-        # Với các trường số lượng (quantitative): 0 vẫn được tính là CÓ thông tin
+        # Với các trường KHÔNG phải định lượng: "false" hoặc "0" cũng coi là không có thông tin
+        # Với các trường định lượng (quantitative): "0" vẫn được tính là có thông tin
         if col_name not in quantitative_cols:
             missing_vals.extend(["false", "0", "0.0"])
         else:
-            missing_vals.extend(["false"]) # Trường hợp ngoại lệ nếu numeric bị dính false
+            missing_vals.extend(["false"])
 
         return s_str.isin(missing_vals) | series.isna()
 
+    # Tạo mask đánh giá các trường bị thiếu
     missing_mask_dict = {col: is_missing_value(df[col], col) for col in eval_cols}
     missing_df = pd.DataFrame(missing_mask_dict)
     provided_df = ~missing_df
 
+    # Tính tổng số trường thông tin bị thiếu cho mỗi sản phẩm
     df["missing_count"] = missing_df.sum(axis=1)
     total_features = len(eval_cols)
     
-    # --- Pre-calculate Top Features for TOP 10% Sales products ---
-    # We calculate for Category x Price Segment combinations
+    # PHÂN TÍCH ĐẶC TÍNH (FEATURES) CỦA TOP 10% SẢN PHẨM BÁN CHẠY
+    # Tính toán cho từng tổ hợp Danh mục x Phân khúc giá
     top_features_dict = {}
     all_features_dict = {}
     top_counts_dict = {}
     all_counts_dict = {}
 
     def calc_provided_features_with_count(sub_df, prov_mask):
-        if len(sub_df) == 0: return {}, {}
+        """Tính tỷ lệ và số lượng các trường thông tin được cung cấp trong một tập dữ liệu."""
+        if len(sub_df) == 0: 
+            return {}, {}
+        
         prov_counts = prov_mask.loc[sub_df.index].sum()
         prov_pct = (prov_counts / len(sub_df) * 100).round(1)
         return prov_pct.to_dict(), prov_counts.to_dict()
 
     def calc_top_provided_features_with_count(sub_df, prov_mask):
-        if len(sub_df) == 0: return {}, {}
+        """Tính tỷ lệ và số lượng các trường thông tin được cung cấp cho TOP 10% sản phẩm bán chạy nhất."""
+        if len(sub_df) == 0: 
+            return {}, {}
+            
+        # Lấy Top 10% sản phẩm dựa trên doanh số
         top_n = max(1, int(len(sub_df) * 0.1))
         top_indices = sub_df.nlargest(top_n, "sales_volume_num").index
-        if len(top_indices) == 0: return {}, {}
+        
+        if len(top_indices) == 0: 
+            return {}, {}
+            
         prov_counts = prov_mask.loc[top_indices].sum()
         prov_pct = (prov_counts / len(top_indices) * 100).round(1)
         return prov_pct.to_dict(), prov_counts.to_dict()
 
-    # Pre-calculate for every combination of Category and Segment
+    # Định nghĩa các bộ lọc phân khúc giá
     price_segments = {
         "ALL": lambda d: d,
         "LOW": lambda d: d[d["price_num"] <= p33],
@@ -104,6 +130,7 @@ def render(df_raw):
         "HIGH": lambda d: d[d["price_num"] > p67]
     }
 
+    # Lặp qua tất cả danh mục và phân khúc để tính toán trước (Pre-calculate)
     unique_cats = ["ALL"] + list(df["Danh Mục Sản Phẩm"].unique())
     for cat in unique_cats:
         cat_df = df if cat == "ALL" else df[df["Danh Mục Sản Phẩm"] == cat]
@@ -123,11 +150,13 @@ def render(df_raw):
             all_features_dict[cat][seg_name] = a_p
             all_counts_dict[cat][seg_name] = a_c
 
+    # Chuyển đổi dữ liệu sang dạng JSON để truyền vào JavaScript
     top_feats_json_str = json.dumps(top_features_dict)
     all_feats_json_str = json.dumps(all_features_dict)
     top_counts_json_str = json.dumps(top_counts_dict)
     all_counts_json_str = json.dumps(all_counts_dict, ensure_ascii=False)
 
+    # Chuẩn bị dữ liệu xuất bản (export) cho các biểu đồ chính
     select_cols = ["Danh Mục Sản Phẩm", "sales_volume_num", "missing_count", "price_num"]
     export_df = df[select_cols].copy()
     data_json = export_df.to_dict(orient="records")
@@ -141,7 +170,6 @@ def render(df_raw):
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         :root {{
             --primary: #F97316;
@@ -236,51 +264,6 @@ def render(df_raw):
             box-shadow: 0 1px 2px rgba(0,0,0,0.05);
         }}
 
-        .download-bar {{
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            margin-bottom: 10px;
-            background: var(--card-bg);
-            padding: 8px 16px;
-            border-radius: var(--border-radius);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-            flex-wrap: wrap;
-        }}
-
-        .download-group {{
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-            align-items: center;
-        }}
-
-        .download-btn {{
-            border: 1px solid #E5E7EB;
-            background: #fff;
-            font-family: inherit;
-            font-size: 12px;
-            font-weight: 700;
-            color: #44403C;
-            padding: 7px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s;
-            white-space: nowrap;
-        }}
-
-        .download-btn:hover {{
-            border-color: rgba(249,115,22,0.65);
-            box-shadow: 0 0 0 3px rgba(249,115,22,0.08);
-            transform: translateY(-0.5px);
-        }}
-
-        .download-hint {{
-            font-size: 11px;
-            color: var(--text-secondary);
-            line-height: 1.4;
-        }}
 
         .kpi-row {{
             display: grid;
@@ -380,17 +363,6 @@ def render(df_raw):
         </div>
     </div>
 
-    <div class="download-bar">
-        <div class="download-group">
-            <button class="download-btn" onclick="downloadCard('card_trend', 'trend')">Tải ảnh: Xu hướng Doanh số</button>
-            <button class="download-btn" onclick="downloadCard('card_features', 'features')">Tải ảnh: Phân hoá Feature</button>
-            <button class="download-btn" onclick="downloadCard('card_missing', 'missing')">Tải ảnh: Tập trung theo Thiếu</button>
-            <button class="download-btn" onclick="downloadCard('card_top10', 'top10')">Tải ảnh: Tập trung Top 10%</button>
-        </div>
-        <div class="download-hint">
-            Ảnh xuất ra dạng PNG (gồm tiêu đề/phụ đề) phù hợp để chèn vào báo cáo.
-        </div>
-    </div>
 
     <!-- KPI ROW -->
     <div class="kpi-row">
@@ -455,17 +427,19 @@ def render(df_raw):
     </div>
 
 <script>
-    const RAW_DATA = {data_json_str};
-    const TOP_FEATS_DATA = {top_feats_json_str};
-    const ALL_FEATS_DATA = {all_feats_json_str};
-    const TOP_COUNTS_DATA = {top_counts_json_str};
-    const ALL_COUNTS_DATA = {all_counts_json_str};
-    const FEATURE_MAP = {json.dumps(FEATURE_MAP, ensure_ascii=False)};
-    const TOTAL_FEATS = {total_features};
-    const PRICE_T1 = {p33}; // Top of Bình Dân
-    const PRICE_T2 = {p67}; // Top of Trung Cấp
-    let CHARTS = {{}};
-    let METRIC = 'mean'; // 'mean' or 'median'
+    // KHỞI TẠO DỮ LIỆU CHO JAVASCRIPT
+    const RAW_DATA = {data_json_str};              // Dữ liệu sản phẩm thô (danh mục, doanh số, số trường thiếu)
+    const TOP_FEATS_DATA = {top_feats_json_str};   // Tỷ lệ feature của Top 10% doanh số
+    const ALL_FEATS_DATA = {all_feats_json_str};   // Tỷ lệ feature trung bình toàn ngành
+    const TOP_COUNTS_DATA = {top_counts_json_str}; // Số lượng feature của Top 10% doanh số
+    const ALL_COUNTS_DATA = {all_counts_json_str}; // Số lượng feature toàn ngành
+    const FEATURE_MAP = {json.dumps(FEATURE_MAP, ensure_ascii=False)}; // Bản đồ tên feature thân thiện
+    const TOTAL_FEATS = {total_features};           // Tổng số trường thông tin đánh giá
+    const PRICE_T1 = {p33}; // Ngưỡng trên của phân khúc Bình Dân
+    const PRICE_T2 = {p67}; // Ngưỡng trên của phân khúc Trung Cấp
+    
+    let CHARTS = {{}};      // Lưu trữ các đối tượng Chart.js
+    let METRIC = 'mean';   // Chỉ số doanh số hiển thị: 'mean' (trung bình) hoặc 'median' (trung vị)
 
     function _slugify(s) {{
         return String(s || '')
@@ -477,45 +451,9 @@ def render(df_raw):
             .slice(0, 64) || 'all';
     }}
 
-    async function downloadCard(cardId, chartKey) {{
-        const el = document.getElementById(cardId);
-        if (!el) return;
-
-        const cat = document.getElementById('selCategory')?.value || 'ALL';
-        const seg = document.getElementById('selPrice')?.value || 'ALL';
-        const metric = METRIC || 'mean';
-        const filename = `chat-luong-niem-yet_${{_slugify(cat)}}_${{_slugify(seg)}}_${{metric}}_${{chartKey}}.png`;
-
-        // Prefer capturing the whole chart card (title + subtitle + chart) with a solid background.
-        if (typeof html2canvas === 'function') {{
-            const canvas = await html2canvas(el, {{
-                backgroundColor: '#FFFFFF',
-                scale: 2,
-                useCORS: true,
-            }});
-            const url = canvas.toDataURL('image/png', 1.0);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            return;
-        }}
-
-        // Fallback: export only the chart canvas.
-        const chartCanvas = el.querySelector('canvas');
-        if (!chartCanvas) return;
-        const url = chartCanvas.toDataURL('image/png', 1.0);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-    }}
 
     function median(arr) {{
+        /** Tính toán giá trị trung vị (median) của một mảng số */
         if (!arr.length) return 0;
         let sorted = [...arr].sort((a,b) => a - b);
         let mid = Math.floor(sorted.length / 2);
@@ -523,25 +461,28 @@ def render(df_raw):
     }}
 
     function setMetric(m) {{
+        /** Chuyển đổi giữa hiển thị Mean (Trung bình) và Median (Trung vị) */
         METRIC = m;
         document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
         document.getElementById('btn_median').classList.toggle('active', m === 'median');
-        // Update KPI title
+        
+        // Cập nhật tiêu đề KPI và nhãn trục Y của biểu đồ xu hướng
         document.getElementById('kpi_sales_title').innerText = m === 'mean' ? 'Doanh Số Trung Bình (Nhóm Tốt Nhất)' : 'Doanh Số Trung Vị (Nhóm Tốt Nhất)';
-        // Update chart 1 y-axis title
         if (CHARTS.trend) {{
             CHARTS.trend.options.scales.y.title.text = m === 'mean' ? 'Doanh Số Mean (lượt bán)' : 'Doanh Số Median (lượt bán)';
         }}
         applyFilters();
     }}
 
-    const fmtN = (n) => new Intl.NumberFormat('en-US').format(Math.round(n));
+    const fmtN = (n) => new Intl.NumberFormat('en-US').format(Math.round(n)); // Định dạng số kiểu phân cách hàng ngàn
 
     function setup() {{
+        // Cấu hình mặc định cho Chart.js
         Chart.register(ChartDataLabels);
         Chart.defaults.color = '#78716C';
         Chart.defaults.font.family = "'Inter', sans-serif";
         
+        // Khởi tạo danh sách các danh mục sản phẩm vào dropdown
         let cats = new Set();
         RAW_DATA.forEach(d => {{ if(d['Danh Mục Sản Phẩm'] && d['Danh Mục Sản Phẩm'] !== 'Không Rõ') cats.add(d['Danh Mục Sản Phẩm']); }});
         let sel = document.getElementById('selCategory');
@@ -549,6 +490,7 @@ def render(df_raw):
             let opt = document.createElement('option'); opt.value = c; opt.innerText = c; sel.appendChild(opt);
         }});
 
+        // Khởi tạo các biểu đồ và áp dụng bộ lọc ban đầu
         initCharts();
         applyFilters();
     }}
@@ -557,6 +499,7 @@ def render(df_raw):
         let cat = document.getElementById('selCategory').value;
         let seg = document.getElementById('selPrice').value;
         
+        // Lọc dữ liệu thô dựa trên Danh mục và Phân khúc giá đã chọn
         let data = RAW_DATA.filter(d => {{
             let catOk = (cat === 'ALL' || d['Danh Mục Sản Phẩm'] === cat);
             let price = d.price_num || 0;
@@ -573,11 +516,12 @@ def render(df_raw):
     function processData(data, cat) {{
         if (!data.length) return;
 
-        // --- 1. Hybrid Domain Smoothing ---
-        // Pre-merge 41+ into a single domain to strictly fulfill gộp 41-43 & 44-47
+        // 1. PHÂN NHÓM (BINNING) DỮ LIỆU ĐỂ TRỰC QUAN HÓA
+        // Gộp sản phẩm theo số trường thông tin thiếu
         let freqMap = new Map();
         data.forEach(d => {{
             let m = d.missing_count;
+            // Gộp tất cả sản phẩm thiếu từ 34 trường trở lên vào nhóm '34+'
             let key = (m >= 34) ? 999 : m;
             if (!freqMap.has(key)) freqMap.set(key, {{ count: 0, products: [], vals: [] }});
             let entry = freqMap.get(key);
@@ -587,11 +531,11 @@ def render(df_raw):
         }});
 
         let sortedKeys = Array.from(freqMap.keys()).sort((a,b) => a - b);
-        let targetSize = data.length / 7;
+        let targetSize = data.length / 7; // Mục tiêu chia dữ liệu thành ~7 nhóm để biểu đồ cân đối
         let bins = [];
         let curBin = {{ vals: [], products: [], count: 0 }};
         
-        // Critical split points requested by user
+        // Các mốc chia quan trọng được yêu cầu để giữ logic phân tích
         const FORCED = [15, 18, 28, 999];
 
         sortedKeys.forEach((v, idx) => {{
@@ -600,6 +544,7 @@ def render(df_raw):
             let isHalfFull = (curBin.count > targetSize * 0.7);
             let isForced = FORCED.includes(v);
 
+            // Chốt nhóm nếu vượt quá kích thước mục tiêu hoặc gặp mốc quan trọng
             if (bins.length < 6 && curBin.count > 0 && (wouldBeTooBig || isHalfFull || isForced)) {{
                 bins.push(curBin);
                 curBin = {{ vals: entry.vals, products: entry.products, count: entry.count }};
@@ -611,7 +556,7 @@ def render(df_raw):
         }});
         if (curBin.count > 0) bins.push(curBin);
 
-        // Convert to chart-ready format
+        // Chuyển đổi các nhóm (bins) sang định dạng hiển thị trên biểu đồ
         let chartBins = bins.map(b => {{
             b.vals.sort((a,b) => a - b);
             let minM = b.vals[0];
@@ -625,7 +570,7 @@ def render(df_raw):
             }};
         }});
 
-        // Merge specific bins to keep chart readable (requested: merge 29 with 30-31)
+        // Gộp thêm các nhóm đặc thù (ví dụ: nhóm 29 và 30-31) để biểu đồ gọn hơn
         const mergedBins = [];
         for (let i = 0; i < chartBins.length; i++) {{
             const cur = chartBins[i];
@@ -644,7 +589,7 @@ def render(df_raw):
         }}
         chartBins = mergedBins;
 
-        // --- 2. Chart 1: Sales Trend & Quantity ---
+        // 2. Chart 1: Sales Trend & Quantity
         const trendLabels = chartBins.map(b => b.label);
         const trendSales = chartBins.map(b => {{
             if (METRIC === 'median') return Math.round(median(b.salesArr));
@@ -652,7 +597,7 @@ def render(df_raw):
         }});
         const trendCounts = chartBins.map(b => b.count);
 
-        // --- 3. KPIs ---
+        // 3. KPIs
         let totalMissing = 0;
         data.forEach(d => totalMissing += d.missing_count);
         let avgMissing = totalMissing / data.length;
@@ -703,13 +648,13 @@ def render(df_raw):
 
         updateTrendChart(trendLabels, trendSales, trendCounts);
 
-        // --- Chart 2: Feature Distribution Diffs ---
+        // Chart 2: Feature Distribution Diffs
         let featsList = Object.keys(topFeatData).map(f => ({{
             f: f, diff: (topFeatData[f] || 0) - (allFeatData[f] || 0)
         }})).sort((a,b) => b.diff - a.diff).slice(0, 7);
         updateFeaturesChart(featsList.map(d => FEATURE_MAP[d.f] || d.f), featsList.map(d => d.diff));
 
-        // --- Chart 3: Concentration ---
+        // Chart 3: Concentration
         let tCounts = (TOP_COUNTS_DATA[cat] && TOP_COUNTS_DATA[cat][segCurrent]) || {{}};
         let aCounts = (ALL_COUNTS_DATA[cat] && ALL_COUNTS_DATA[cat][segCurrent]) || {{}};
         let MIN_C = Math.max(10, data.length * 0.01);
@@ -719,7 +664,7 @@ def render(df_raw):
         }}).filter(i => i !== null).sort((a,b) => b.p - a.p).slice(0, 7);
         updateConcentrationChart(concList.map(d => FEATURE_MAP[d.f] || d.f), concList.map(d => d.p), concList.map(d => 100-d.p), concList.map(d => ({{t: d.t, a: d.a}})));
 
-        // --- Chart 4: Missing Distribution (Concentration into Top 10% Sales) ---
+        // Chart 4: Missing Distribution (Concentration into Top 10% Sales)
         const sortedSales = [...data].sort((a,b) => b.sales_volume_num - a.sales_volume_num);
         const t10S = Math.max(1, Math.floor(sortedSales.length * 0.1));
         const t10T = sortedSales.length >= t10S ? sortedSales[t10S-1].sales_volume_num : 0;
@@ -767,7 +712,7 @@ def render(df_raw):
     }}
 
     function initCharts() {{
-        // --- Chart 1: Dual-axis Area + Bar (Trend) ---
+        // Chart 1: Dual-axis Area + Bar (Trend)
         let ctxTrend = document.getElementById('c_trend').getContext('2d');
         
         // Create gradient for line fill
@@ -883,7 +828,7 @@ def render(df_raw):
             }}
         }});
         
-        // --- Chart 2: Difference Bar Chart (Feature comparison) ---
+        // Chart 2: Difference Bar Chart (Feature comparison)
         let ctxFeats = document.getElementById('c_features').getContext('2d');
         CHARTS.features = new Chart(ctxFeats, {{
             type: 'bar',
@@ -952,7 +897,7 @@ def render(df_raw):
             }}
         }});
         
-        // --- Chart 3: Concentration 100% Stacked Bar ---
+        // Chart 3: Concentration 100% Stacked Bar
         let ctxConc = document.getElementById('c_concentration').getContext('2d');
         CHARTS.concentration = new Chart(ctxConc, {{
             type: 'bar',
@@ -1040,7 +985,7 @@ def render(df_raw):
             }}]
         }});
 
-        // --- Chart 4: Missing Distribution Concentration (Stacked Bar) ---
+        // Chart 4: Missing Distribution Concentration (Stacked Bar)
         let ctxMissDist = document.getElementById('c_top_missing_dist').getContext('2d');
         CHARTS.missingDist = new Chart(ctxMissDist, {{
             type: 'bar',
