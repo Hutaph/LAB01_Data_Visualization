@@ -2,67 +2,36 @@ import json
 import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
+from utils.constants import CATEGORY_MAP
 
-
-def render(df: pd.DataFrame):
+def _prep_data(df: pd.DataFrame):
+    # Dọn dẹp và chuẩn bị dữ liệu cho biểu đồ
     data = df.copy()
-    CATEGORY_MAP = {
-        "electronics_laptops": "Laptop",
-        "electronics_tablets": "Máy Tính Bảng",
-        "electronics_smartphones": "Điện Thoại",
-        "electronics_monitors": "Màn Hình",
-        "electronics_headphones": "Tai Nghe",
-        "electronics_keyboards": "Bàn Phím",
-        "electronics_storage_ssd": "Ổ Cứng & SSD",
-        "electronics_networking": "Thiết Bị Mạng",
-        "electronics_gaming_consoles": "Máy Chơi Game",
-        "home_kitchen_appliances": "Thiết Bị Bếp",
-        "home_cleaning": "Dụng Cụ Vệ Sinh",
-        "home_air_quality": "Máy Lọc Khí",
-        "home_furniture": "Nội Thất",
-        "office_supplies": "Văn Phòng Phẩm",
-        "office_stationery": "Dụng Cụ VP",
-        "fashion_mens": "Thời Trang Nam",
-        "fashion_womens": "Thời Trang Nữ",
-        "fashion_shoes": "Giày Dép",
-        "fashion_bags": "Túi Xách",
-        "beauty_skincare": "Chăm Sóc Da",
-        "beauty_makeup": "Trang Điểm",
-        "health_personal_care": "Chăm Sóc Cá Nhân",
-        "health_supplements": "TPCN & Vitamin",
-        "baby_products": "Sản Phẩm Cho Bé",
-        "toys_games": "Đồ Chơi & Game",
-        "sports_outdoors": "Thể Thao Ngoài Trời",
-        "sports_fitness": "Dụng Cụ Gym",
-        "pet_supplies": "Thú Cưng",
-        "automotive_accessories": "Phụ Kiện Ô Tô",
-        "tools_home_improvement": "Dụng Cụ Sửa Nhà",
-    }
-
+    
     # Đảm bảo các cột cần thiết tồn tại và có kiểu dữ liệu số
-    for col, fallback in [
+    cols_to_fix = [
         ("current_price", 0.0),
         ("original_price", 0.0),
         ("rating", 0.0),
         ("reviews", 0),
         ("sales_volume_num", 0)
-    ]:
+    ]
+    
+    for col, fallback in cols_to_fix:
         if col == "current_price":
-            # Ưu tiên lấy từ cột "price" nếu có
             src_col = "price" if "price" in data.columns else "current_price"
-            if src_col in data.columns:
-                data[col] = data[src_col]
-            else:
-                data[col] = fallback
+            data[col] = data[src_col] if src_col in data.columns else fallback
         elif col not in data.columns:
             data[col] = fallback
             
         data[col] = pd.to_numeric(data[col], errors="coerce").fillna(fallback)
 
+    # Xử lý danh mục
     if "crawl_category" not in data.columns:
         data["crawl_category"] = "Không rõ"
     else:
         data["crawl_category"] = data["crawl_category"].fillna("Không rõ").map(CATEGORY_MAP).fillna("Khác")
+    
     data["title"] = data.get("title", pd.Series(["Sản phẩm ẩn danh"] * len(data))).fillna("Sản phẩm ẩn danh")
 
     select_cols = [
@@ -75,243 +44,90 @@ def render(df: pd.DataFrame):
     # Chuẩn hóa kiểu dữ liệu trước khi serialize
     for c in ["current_price", "original_price", "rating", "reviews", "sales_volume_num"]:
         export[c] = pd.to_numeric(export[c], errors="coerce").fillna(0)
+    
     export["sales_volume_num"] = export["sales_volume_num"].astype(float)
     export["reviews"] = export["reviews"].astype(float)
+    
+    return export.to_dict(orient="records")
 
-    data_json_str = json.dumps(export.to_dict(orient="records"), ensure_ascii=False)
-
-    html_code = f"""<!DOCTYPE html>
+_HTML_TEMPLATE = r"""<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root {{
+:root {
     --primary:        #F97316;
     --dark:           #9A3412;
     --bg:             #FEF3E2;
     --card-bg:        #FFFFFF;
     --text-primary:   #1C1917;
     --text-secondary: #78716C;
-    --border-radius:  8px;
+    --border-radius:  12px;
     --font:           'Inter', sans-serif;
-}}
+}
 
-* {{ box-sizing: border-box; margin: 0; padding: 0; }}
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-body {{
+body {
     background: var(--bg);
     font-family: var(--font);
     color: var(--text-primary);
-    padding: 20px;
+    padding: 16px;
     overflow-y: auto;
     overflow-x: hidden;
-}}
+}
 
-body::-webkit-scrollbar {{
-    display: none;
-}}
-/* ── FILTER BAR ── */
-.fb {{
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    background: #fff;
-    border: 1px solid #E7E5E4;
-    border-radius: 12px;
-    padding: 12px 20px;
-    box-shadow: 0 1px 4px rgba(0,0,0,.06);
-    flex-shrink: 0;
+body::-webkit-scrollbar { display: none; }
+
+.fb {
+    display: flex; align-items: center; gap: 20px; background: #fff;
+    border: 1px solid #E7E5E4; border-radius: var(--border-radius);
+    padding: 12px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06);
     margin-bottom: 16px;
-}}
-.fb-item {{
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}}
-.fb-item label {{
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: .8px;
-}}
-.fb-item select {{
-    padding: 8px 12px;
-    border: 1px solid #E7E5E4;
-    border-radius: 8px;
-    font-size: 13px;
-    font-family: var(--font);
-    color: var(--text-primary);
+}
+.fb-item { display: flex; flex-direction: column; gap: 4px; }
+.fb-item label { font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .8px; }
+.fb-item select {
+    padding: 8px 12px; border: 1px solid #E7E5E4; border-radius: 8px;
+    font-size: 13px; font-family: var(--font); color: var(--text-primary);
     background: #fafaf9 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 10px center;
-    appearance: none;
-    cursor: pointer;
-    outline: none;
-    transition: border-color .15s;
-    min-width: 200px;
-}}
-.fb-item select:hover {{ border-color: var(--primary); }}
-.fb-item select:focus {{ border-color: var(--primary); box-shadow: 0 0 0 3px rgba(249,115,22,.12); }}
-.toggle-group {{
-    display: flex;
-    background: #F3F4F6;
-    border-radius: 8px;
-    padding: 3px;
-    gap: 2px;
-}}
-.toggle-btn {{
-    border: none;
-    background: transparent;
-    font-family: var(--font);
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-secondary);
-    padding: 6px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-}}
-.toggle-btn.active {{
-    background: #FFFFFF;
-    color: var(--primary);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-}}
+    appearance: none; cursor: pointer; outline: none; min-width: 190px;
+}
+.toggle-group { display: flex; background: #F3F4F6; border-radius: 8px; padding: 3px; gap: 2px; }
+.toggle-btn {
+    border: none; background: transparent; font-family: var(--font); font-size: 11px;
+    font-weight: 600; color: var(--text-secondary); padding: 6px 12px; border-radius: 6px; cursor: pointer;
+}
+.toggle-btn.active { background: #FFFFFF; color: var(--primary); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
-.slider-wrap {{
-    position: relative;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    min-width: 160px;
-}}
-.slider-track {{
-    position: absolute;
-    left: 0; right: 0;
-    height: 4px;
-    border-radius: 999px;
-    background: #E5E7EB;
-    pointer-events: none;
-}}
-.slider-wrap input[type=range] {{
-    position: absolute;
-    width: 100%;
-    pointer-events: none;
-    background: transparent;
-    appearance: none;
-    -webkit-appearance: none;
-    margin: 0;
-}}
-.slider-wrap input[type=range]::-webkit-slider-thumb {{
-    -webkit-appearance: none;
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    background: #fff;
-    border: 2.5px solid var(--primary);
-    box-shadow: 0 1px 4px rgba(249,115,22,0.35);
-    cursor: grab;
-    pointer-events: auto;
-    transition: box-shadow .15s;
-}}
-.slider-wrap input[type=range]::-webkit-slider-thumb:hover {{
-    box-shadow: 0 2px 8px rgba(249,115,22,0.55);
-}}
-.slider-wrap input[type=range]::-moz-range-thumb {{
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    background: #fff;
-    border: 2.5px solid var(--primary);
-    cursor: grab;
-    pointer-events: auto;
-}}
-.slider-vals {{
-    display: flex;
-    justify-content: space-between;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin-top: 5px;
-}}
+.kpi-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.kc {
+    background: var(--card-bg); border-left: 4px solid var(--primary);
+    border-radius: var(--border-radius); box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    padding: 12px 16px; display: flex; flex-direction: column; gap: 4px;
+}
+.kc.accent { border-left-color: var(--dark); background: linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 100%); }
+.kt { font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.06em; }
+.kv { font-size: 22px; font-weight: 700; color: var(--text-primary); line-height: 1.1; }
+.ks { font-size: 11px; color: #9CA3AF; }
 
+#row-charts { display: flex; gap: 12px; height: 420px; }
+.cc {
+    background: var(--card-bg); border-radius: var(--border-radius);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05); padding: 16px;
+    display: flex; flex-direction: column; overflow: hidden;
+}
+.cc.left  { flex: 0 0 55%; }
+.cc.right { flex: 0 0 calc(45% - 12px); }
+.ct { font-size: 14px; font-weight: 700; color: var(--text-primary); margin-bottom: 12px; }
+.cc canvas { flex: 1; width: 100%; min-height: 0; display: block; }
 
-.kpi-row {{
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 16px;
-    margin-bottom: 24px;
-}}
-.kpi-card {{
-    background: var(--card-bg);
-    border-left: 4px solid var(--primary);
-    border-radius: var(--border-radius);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-    overflow: hidden;
-}}
-.kpi-card.accent {{
-    border-left-color: var(--dark);
-    background: linear-gradient(135deg, #FFF7ED 0%, #FFFFFF 100%);
-}}
-.kpi-title {{
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}}
-.kpi-value {{
-    font-size: 26px;
-    font-weight: 700;
-    color: var(--text-primary);
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}}
-.kpi-sub {{
-    font-size: 12px;
-    color: #9CA3AF;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}}
-
-#row-charts {{
-    display: flex;
-    flex-direction: row;
-    gap: 12px;
-    height: 420px;
-}}
-.chart-card {{
-    background: var(--card-bg);
-    border-radius: var(--border-radius);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    padding: 10px 12px;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    min-width: 0;
-}}
-.chart-card.left  {{ flex: 0 0 calc(55% - 6px); }}
-.chart-card.right {{ flex: 0 0 calc(45% - 6px); }}
-.chart-title {{
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--text-primary);
-    margin: 4px 4px 8px 4px;
-}}
-.chart-card canvas {{
-    flex: 1;
-    width: 100%;
-    min-height: 0;
-    display: block;
-}}
+#chartTooltip {
+    position: fixed; background: #1C1917; color: #fff; padding: 6px 10px;
+    border-radius: 6px; font: 12px Inter, sans-serif; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s; z-index: 9999; line-height: 1.6; white-space: pre-wrap;
+}
 </style>
 </head>
 <body>
@@ -337,610 +153,286 @@ body::-webkit-scrollbar {{
             <button class="toggle-btn"        id="btn_median" onclick="setMetric('median')">Median</button>
         </div>
     </div>
-    <div style="margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; justify-content:center;">
-        <div style="font-size:16px; font-weight:800; color:var(--dark); font-family:var(--font);">PHÂN TÍCH ĐÁNH GIÁ SẢN PHẨM</div>
-        <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">Tương quan giữa rating, reviews và hiệu quả kinh doanh</div>
+    <div style="margin-left:auto; text-align:right;">
+        <div style="font-size:16px; font-weight:800; color:var(--dark);">PHÂN TÍCH ĐÁNH GIÁ SẢN PHẨM</div>
+        <div style="font-size:10px; color:var(--text-secondary); font-weight:600; text-transform:uppercase; letter-spacing:0.5px;">Tương quan Rating, Reviews & Doanh số</div>
     </div>
 </div>
 
 <div class="kpi-row">
-
-    <div class="kpi-card">
-        <div class="kpi-title">Rating</div>
-        <div class="kpi-value" id="kpi_rating">0★</div>
-        <div class="kpi-sub"  id="kpi_rating_sub">–</div>
+    <div class="kc">
+        <div class="kt">Rating</div>
+        <div class="kv" id="kpi_rating">0★</div>
+        <div class="ks" id="kpi_rating_sub">–</div>
     </div>
-
-    <div class="kpi-card accent">
-        <div class="kpi-title">Doanh Số - Rating ≥ 4.5</div>
-        <div class="kpi-value" id="kpi_sales_hi">–</div>
-        <div class="kpi-sub"  id="kpi_sales_hi_sub">So với rating &lt; 4.5</div>
+    <div class="kc accent">
+        <div class="kt">Doanh Số - Rating ≥ 4.5</div>
+        <div class="kv" id="kpi_sales_hi">–</div>
+        <div class="ks" id="kpi_sales_hi_sub">So với rating < 4.5</div>
     </div>
-
-    <div class="kpi-card accent">
-        <div class="kpi-title">Giá - Rating ≥ 4.5</div>
-        <div class="kpi-value" id="kpi_price_hi_rating">–</div>
-        <div class="kpi-sub"  id="kpi_price_hi_rating_sub">So với rating &lt; 4.5</div>
+    <div class="kc accent">
+        <div class="kt">Giá - Rating ≥ 4.5</div>
+        <div class="kv" id="kpi_price_hi_rating">–</div>
+        <div class="ks" id="kpi_price_hi_rating_sub">So với rating < 4.5</div>
     </div>
-
-    <div class="kpi-card">
-        <div class="kpi-title">Doanh Số - Reviews Top 25%</div>
-        <div class="kpi-value" id="kpi_sales_top_reviews">–</div>
-        <div class="kpi-sub"  id="kpi_sales_top_reviews_sub">So với 75% còn lại</div>
+    <div class="kc">
+        <div class="kt">Doanh Số - Reviews Top 25%</div>
+        <div class="kv" id="kpi_sales_top_reviews">–</div>
+        <div class="ks" id="kpi_sales_top_reviews_sub">So với 75% còn lại</div>
     </div>
-
-    <div class="kpi-card">
-        <div class="kpi-title">Giá - Reviews Top 25%</div>
-        <div class="kpi-value" id="kpi_price_top">–</div>
-        <div class="kpi-sub"  id="kpi_price_top_sub">So với 75% còn lại</div>
+    <div class="kc">
+        <div class="kt">Giá - Reviews Top 25%</div>
+        <div class="kv" id="kpi_price_top">–</div>
+        <div class="ks" id="kpi_price_top_sub">So với 75% còn lại</div>
     </div>
-
 </div>
 
-<div id="chartTooltip" style="position:fixed; background:#1C1917; color:#fff; padding:6px 10px; border-radius:6px; font:12px Inter, sans-serif; pointer-events:none; opacity:0; transition:opacity 0.15s; z-index:9999; line-height:1.6; white-space:pre-wrap;"></div>
+<div id="chartTooltip"></div>
 
 <div id="row-charts">
-    <div class="chart-card left">
-        <div class="chart-title" id="comboTitle">Doanh số &amp; Giá TB theo nhóm Rating</div>
+    <div class="cc left">
+        <div class="ct" id="comboTitle">Doanh số & Giá TB theo nhóm Rating</div>
         <canvas id="canvasCombo"></canvas>
     </div>
-    <div class="chart-card right">
-        <div class="chart-title">Mối quan hệ giữa Rating và Reviews</div>
+    <div class="cc right">
+        <div class="ct">Mối quan hệ giữa Rating và Reviews</div>
         <canvas id="canvasScatter"></canvas>
     </div>
 </div>
 
 <script>
-const RAW_DATA = {data_json_str};
-
+const RAW_DATA = __DATA_JSON__;
 const tooltip = document.getElementById('chartTooltip');
-function showTooltip(e, text) {{
+
+function showTooltip(e, text) {
     tooltip.textContent = text;
     tooltip.style.opacity = '1';
-    let tx = e.clientX + 12;
-    let ty = e.clientY + 12;
-    if (tx + tooltip.offsetWidth > window.innerWidth) {{
-        tx = e.clientX - tooltip.offsetWidth - 12;
-    }}
-    tooltip.style.left = tx + 'px';
-    tooltip.style.top = ty + 'px';
-}}
-function hideTooltip() {{
-    tooltip.style.opacity = '0';
-}}
+    let tx = e.clientX + 12, ty = e.clientY + 12;
+    if (tx + tooltip.offsetWidth > window.innerWidth) tx = e.clientX - tooltip.offsetWidth - 12;
+    tooltip.style.left = tx + 'px'; tooltip.style.top = ty + 'px';
+}
+function hideTooltip() { tooltip.style.opacity = '0'; }
+
 const fmtN = n => new Intl.NumberFormat('en-US').format(Math.round(n));
 const fmtF = (n, d=2) => Number(n).toFixed(d);
 const fmtK = n => n >= 1000 ? (n/1000).toFixed(0)+'k' : fmtN(n);
 
-function median(arr) {{
+function median(arr) {
     if (!arr.length) return 0;
     const s = [...arr].sort((a,b) => a-b);
     const m = Math.floor(s.length / 2);
     return s.length % 2 === 0 ? (s[m-1]+s[m])/2 : s[m];
-}}
-function mean(arr) {{
-    return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0;
-}}
-function quantile(arr, q) {{
+}
+function mean(arr) { return arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : 0; }
+function quantile(arr, q) {
     if (!arr.length) return 0;
     const s = [...arr].sort((a,b)=>a-b);
     const pos = (s.length - 1) * q;
-    const lo  = Math.floor(pos);
-    const hi  = Math.ceil(pos);
+    const lo = Math.floor(pos), hi = Math.ceil(pos);
     return s[lo] + (s[hi] - s[lo]) * (pos - lo);
-}}
+}
 
-function initDropdown() {{
-    const cats = [...new Set(RAW_DATA.map(d => d.crawl_category)
-        .filter(c => c && c !== 'Không rõ' && c !== 'Khác'))].sort();
+function initDropdown() {
+    const cats = [...new Set(RAW_DATA.map(d => d.crawl_category).filter(c => c && c !== 'Không rõ' && c !== 'Khác'))].sort();
     const sel = document.getElementById('selCategory');
-    cats.forEach(c => {{
-        const o = document.createElement('option');
-        o.value = o.textContent = c;
-        sel.appendChild(o);
-    }});
-}}
+    cats.forEach(c => {
+        const o = document.createElement('option'); o.value = o.textContent = c; sel.appendChild(o);
+    });
+}
 
 let METRIC = 'mean';
-function setMetric(m) {{
+function setMetric(m) {
     METRIC = m;
-    document.getElementById('btn_mean').classList.toggle('active',   m === 'mean');
+    document.getElementById('btn_mean').classList.toggle('active', m === 'mean');
     document.getElementById('btn_median').classList.toggle('active', m === 'median');
     applyFilters();
-}}
+}
 
 let currentMode = 'rating';
-function setMode(m) {{
-    if (m === currentMode) return;
+function setMode(m) {
     currentMode = m;
-    document.getElementById('btn_rating').classList.toggle('active',  m === 'rating');
+    document.getElementById('btn_rating').classList.toggle('active', m === 'rating');
     document.getElementById('btn_reviews').classList.toggle('active', m === 'reviews');
-    document.getElementById('comboTitle').textContent =
-        m === 'rating'
-            ? 'Doanh số & Giá TB theo nhóm Rating'
-            : 'Doanh số & Giá TB theo nhóm Reviews';
-    drawComboChart(currentMode, getFiltered());
-}}
+    document.getElementById('comboTitle').textContent = m === 'rating' ? 'Doanh số & Giá TB theo nhóm Rating' : 'Doanh số & Giá TB theo nhóm Reviews';
+    applyFilters();
+}
 
-function getFiltered() {{
+function getFiltered() {
     const cat = document.getElementById('selCategory').value;
-    return RAW_DATA.filter(d => {{
-        if (cat !== 'ALL' && d.crawl_category !== cat) return false;
-        return true;
-    }});
-}}
+    return RAW_DATA.filter(d => cat === 'ALL' || d.crawl_category === cat);
+}
 
-function updateKPIs(data) {{
+function updateKPIs(data) {
     const metricFn = arr => METRIC === 'median' ? median(arr) : mean(arr);
-
-    const ratings  = data.map(d => d.rating).filter(r => r > 0);
-    const avgRat   = mean(ratings);
+    const ratings = data.map(d => d.rating).filter(r => r > 0);
     const totalRev = data.reduce((a,b) => a + (b.reviews||0), 0);
-    document.getElementById('kpi_rating').textContent     = fmtF(avgRat) + '★';
-    document.getElementById('kpi_rating_sub').textContent = `từ ${{fmtN(totalRev)}} lượt đánh giá`;
+    document.getElementById('kpi_rating').textContent = fmtF(mean(ratings)) + '★';
+    document.getElementById('kpi_rating_sub').textContent = `từ ${fmtN(totalRev)} lượt đánh giá`;
 
     const hiSales = data.filter(d => d.rating >= 4.5 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
     const loSales = data.filter(d => d.rating <  4.5 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
-    const valHiS  = metricFn(hiSales);
-    const valLoS  = metricFn(loSales);
-    const salesEl  = document.getElementById('kpi_sales_hi');
-    const salesSub = document.getElementById('kpi_sales_hi_sub');
-
-    if (valHiS > 0) {{
-        salesEl.textContent = fmtN(valHiS) + ' đơn';
-        if (valLoS > 0) {{
-            const pct = (valHiS - valLoS) / valLoS * 100;
-            salesSub.textContent = `${{pct >= 0 ? '+' : ''}}${{fmtF(pct,1)}}% so với rating < 4.5`;
-        }} else {{
-            salesSub.textContent = 'Nhóm rating ≥ 4.5';
-        }}
-    }} else {{
-        salesEl.textContent  = 'N/A';
-        salesSub.textContent = 'Chưa đủ dữ liệu doanh số';
-    }}
+    const valHiS = metricFn(hiSales), valLoS = metricFn(loSales);
+    document.getElementById('kpi_sales_hi').textContent = valHiS > 0 ? fmtN(valHiS) + ' đơn' : 'N/A';
+    document.getElementById('kpi_sales_hi_sub').textContent = valLoS > 0 ? `${(valHiS-valLoS)/valLoS*100 >= 0 ? '+' : ''}${fmtF((valHiS-valLoS)/valLoS*100,1)}% so với rating < 4.5` : 'Nhóm rating ≥ 4.5';
 
     const hiPrices = data.filter(d => d.rating >= 4.5 && d.current_price > 0).map(d => d.current_price);
     const loPrices = data.filter(d => d.rating <  4.5 && d.current_price > 0).map(d => d.current_price);
-    const avgHiP   = mean(hiPrices);
-    const avgLoP   = mean(loPrices);
-    const medHiP   = median(hiPrices);
-    const priceHiEl  = document.getElementById('kpi_price_hi_rating');
-    const priceHiSub = document.getElementById('kpi_price_hi_rating_sub');
+    const avgHiP = mean(hiPrices), avgLoP = mean(loPrices);
+    document.getElementById('kpi_price_hi_rating').textContent = avgHiP > 0 ? '$' + fmtF(avgHiP, 2) : 'N/A';
+    document.getElementById('kpi_price_hi_rating_sub').textContent = avgLoP > 0 ? `${avgHiP-avgLoP >= 0 ? '+' : '-'}$${fmtF(Math.abs(avgHiP-avgLoP),2)} so với nhóm < 4.5` : 'Giá TB nhóm rating ≥ 4.5';
 
-    if (avgHiP > 0) {{
-        priceHiEl.textContent = '$' + fmtF(avgHiP, 2);
-        if (avgLoP > 0) {{
-            const diff = avgHiP - avgLoP;
-            priceHiSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với nhóm < 4.5`;
-        }} else {{
-            priceHiSub.textContent = 'Giá TB nhóm rating ≥ 4.5';
-        }}
-    }} else {{
-        priceHiEl.textContent  = 'N/A';
-        priceHiSub.textContent = 'Chưa đủ dữ liệu giá';
-    }}
+    const allRevs = data.map(d => d.reviews).filter(r => r > 0);
+    const q75 = quantile(allRevs, 0.75);
+    const topS = data.filter(d => d.reviews >= q75 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
+    const botS = data.filter(d => d.reviews <  q75 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
+    const valTS = metricFn(topS), valBS = metricFn(botS);
+    document.getElementById('kpi_sales_top_reviews').textContent = valTS > 0 ? fmtN(valTS) + ' đơn' : 'N/A';
+    document.getElementById('kpi_sales_top_reviews_sub').textContent = valBS > 0 ? `${(valTS-valBS)/valBS*100 >= 0 ? '+' : ''}${fmtF((valTS-valBS)/valBS*100,1)}% so với 75% còn lại` : 'Nhóm reviews top 25%';
 
-    const allRevs     = data.map(d => d.reviews).filter(r => r > 0);
-    const q75         = quantile(allRevs, 0.75);
-    const topSales    = data.filter(d => d.reviews >= q75 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
-    const botSales    = data.filter(d => d.reviews <  q75 && d.sales_volume_num > 0).map(d => d.sales_volume_num);
-    const valTopS     = metricFn(topSales);
-    const valBotS     = metricFn(botSales);
-    const salesTopEl  = document.getElementById('kpi_sales_top_reviews');
-    const salesTopSub = document.getElementById('kpi_sales_top_reviews_sub');
+    const topP = data.filter(d => d.reviews >= q75 && d.current_price > 0).map(d => d.current_price);
+    const botP = data.filter(d => d.reviews <  q75 && d.current_price > 0).map(d => d.current_price);
+    const avgTP = mean(topP), avgBP = mean(botP);
+    document.getElementById('kpi_price_top').textContent = avgTP > 0 ? '$' + fmtF(avgTP, 2) : 'N/A';
+    document.getElementById('kpi_price_top_sub').textContent = avgBP > 0 ? `${avgTP-avgBP >= 0 ? '+' : '-'}$${fmtF(Math.abs(avgTP-avgBP),2)} so với 75% còn lại` : 'Giá TB nhóm reviews top 25%';
+}
 
-    if (valTopS > 0) {{
-        salesTopEl.textContent = fmtN(valTopS) + ' đơn';
-        if (valBotS > 0) {{
-            const pct = (valTopS - valBotS) / valBotS * 100;
-            salesTopSub.textContent = `${{pct >= 0 ? '+' : ''}}${{fmtF(pct,1)}}% so với 75% còn lại`;
-        }} else {{
-            salesTopSub.textContent = 'Nhóm reviews top 25%';
-        }}
-    }} else {{
-        salesTopEl.textContent  = 'N/A';
-        salesTopSub.textContent = 'Chưa đủ dữ liệu doanh số';
-    }}
+function buildComboGroups(mode, data) {
+    const mFn = arr => METRIC === 'median' ? median(arr) : mean(arr);
+    if (mode === 'rating') {
+        const defs = [{l:'<3.5',f:r=>r<3.5},{l:'3.5-3.9',f:r=>r>=3.5&&r<4},{l:'4.0-4.4',f:r=>r>=4&&r<4.5},{l:'4.5-4.7',f:r=>r>=4.5&&r<4.8},{l:'4.8-5.0',f:r=>r>=4.8}];
+        return defs.map(g => {
+            const fd = data.filter(d => g.f(d.rating));
+            const ds = fd.filter(d=>d.sales_volume_num>0).map(d=>d.sales_volume_num), ps = fd.filter(d=>d.current_price>0).map(d=>d.current_price);
+            return { lbl: g.l, s: mFn(ds), p: mean(ps), sCount: ds.length, pCount: ps.length };
+        });
+    }
+    const revs = data.map(d=>d.reviews||0), q25=quantile(revs,0.25), q50=quantile(revs,0.5), q75=quantile(revs,0.75);
+    const buckets = [{l:'Q1',ds:[],ps:[]},{l:'Q2',ds:[],ps:[]},{l:'Q3',ds:[],ps:[]},{l:'Q4',ds:[],ps:[]}];
+    data.forEach(d => {
+        const r=d.reviews||0, idx = r>=q75?3:r>=q50?2:r>=q25?1:0;
+        if(d.sales_volume_num>0) buckets[idx].ds.push(d.sales_volume_num);
+        if(d.current_price>0) buckets[idx].ps.push(d.current_price);
+    });
+    return buckets.map(g => ({ lbl: g.l, s: mFn(g.ds), p: mean(g.ps), sCount: g.ds.length, pCount: g.ps.length }));
+}
 
-    const topPrices = data.filter(d => d.reviews >= q75 && d.current_price > 0).map(d => d.current_price);
-    const botPrices = data.filter(d => d.reviews <  q75 && d.current_price > 0).map(d => d.current_price);
-    const avgTopP   = mean(topPrices);
-    const avgBotP   = mean(botPrices);
-    const medTopP   = median(topPrices);
-    const priceEl   = document.getElementById('kpi_price_top');
-    const priceSub  = document.getElementById('kpi_price_top_sub');
-
-    if (avgTopP > 0) {{
-        priceEl.textContent = '$' + fmtF(avgTopP, 2);
-        if (avgBotP > 0) {{
-            const diff = avgTopP - avgBotP;
-            priceSub.textContent = `${{diff >= 0 ? '+' : '-'}}$${{fmtF(Math.abs(diff),2)}} so với 75% còn lại`;
-        }} else {{
-            priceSub.textContent = 'Giá TB nhóm reviews top 25%';
-        }}
-    }} else {{
-        priceEl.textContent  = 'N/A';
-        priceSub.textContent = 'Chưa đủ dữ liệu giá';
-    }}
-}}
-
-function buildComboGroups(mode, data) {{
-    const metricFn = arr => METRIC === 'median' ? median(arr) : mean(arr);
-    if (mode === 'rating') {{
-        const defs = [
-            {{ lbl: '<3.5',    f: r => r < 3.5 }},
-            {{ lbl: '3.5-3.9', f: r => r >= 3.5 && r <= 3.9 }},
-            {{ lbl: '4.0-4.4', f: r => r >= 4.0 && r <= 4.4 }},
-            {{ lbl: '4.5-4.7', f: r => r >= 4.5 && r <= 4.7 }},
-            {{ lbl: '4.8-5.0', f: r => r >= 4.8 }}
-        ];
-        return defs.map(g => {{
-            const fData  = data.filter(d => g.f(d.rating));
-            const sales  = fData.filter(d => d.sales_volume_num > 0).map(d => d.sales_volume_num);
-            const prices = fData.filter(d => d.current_price > 0).map(d => d.current_price);
-            return {{ lbl: g.lbl, s: metricFn(sales), p: mean(prices), sCount: sales.length, pCount: prices.length }};
-        }});
-    }}
-    const revs = data.map(d => d.reviews || 0);
-    const q25 = quantile(revs, 0.25);
-    const q50 = quantile(revs, 0.50);
-    const q75 = quantile(revs, 0.75);
-    const buckets = [
-        {{ lbl: 'Q1 (ít nhất)', ds: [], ps: [] }},
-        {{ lbl: 'Q2',           ds: [], ps: [] }},
-        {{ lbl: 'Q3',           ds: [], ps: [] }},
-        {{ lbl: 'Q4 (top 25%)', ds: [], ps: [] }}
-    ];
-    data.forEach(d => {{
-        const r = d.reviews || 0;
-        let idx = 0;
-        if (r >= q75) idx = 3;
-        else if (r >= q50) idx = 2;
-        else if (r >= q25) idx = 1;
-        if (d.sales_volume_num > 0) buckets[idx].ds.push(d.sales_volume_num);
-        if (d.current_price   > 0) buckets[idx].ps.push(d.current_price);
-    }});
-    return buckets.map(g => ({{
-        lbl: g.lbl,
-        s: metricFn(g.ds), p: mean(g.ps),
-        sCount: g.ds.length, pCount: g.ps.length
-    }}));
-}}
-
-function drawComboChart(mode, data) {{
-    const canvas = document.getElementById('canvasCombo');
-    const ctx = canvas.getContext('2d');
-
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width  = canvas.offsetWidth  * dpr;
-    canvas.height = canvas.offsetHeight * dpr;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
-
-    const cW = canvas.offsetWidth;
-    const cH = canvas.offsetHeight;
-    ctx.clearRect(0, 0, cW, cH);
-    if (!data || !data.length) return;
-
-    const stats = buildComboGroups(mode, data);
-    const maxS = Math.max(1, ...stats.map(s => s.s)) * 1.15;
-    const maxP = Math.max(1, ...stats.map(s => s.p)) * 1.15;
-
-    const pad = {{ t: 50, r: 60, b: 50, l: 60 }};
-    const w = cW - pad.l - pad.r;
-    const h = cH - pad.t - pad.b;
-    const gap = w / stats.length;
+function drawComboChart(mode, data) {
+    const canvas = document.getElementById('canvasCombo'), ctx = canvas.getContext('2d'), dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr; canvas.height = canvas.offsetHeight * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);
+    const cW = canvas.offsetWidth, cH = canvas.offsetHeight; ctx.clearRect(0,0,cW,cH);
+    if (!data.length) return;
+    const stats = buildComboGroups(mode, data), maxS = Math.max(1, ...stats.map(s=>s.s))*1.15, maxP = Math.max(1, ...stats.map(s=>s.p))*1.15;
+    const pad = {t:50,r:60,b:50,l:60}, w = cW-pad.l-pad.r, h = cH-pad.t-pad.b, gap = w/stats.length;
 
     ctx.fillStyle = 'rgba(249, 115, 22, 0.08)';
-    if (mode === 'rating') {{
-        ctx.fillRect(pad.l + 3 * gap, pad.t, 2 * gap, h);
-    }} else {{
-        ctx.fillRect(pad.l + 3 * gap, pad.t, gap, h);
-    }}
+    if(mode==='rating') ctx.fillRect(pad.l+3*gap, pad.t, 2*gap, h); else ctx.fillRect(pad.l+3*gap, pad.t, gap, h);
 
-    ctx.fillStyle = '#78716C';
-    ctx.font = '12px Inter';
-    ctx.textBaseline = 'middle';
-    for (let i = 0; i <= 5; i++) {{
-        const y = pad.t + h - (i / 5) * h;
-        ctx.textAlign = 'right';
-        ctx.fillText(fmtK(maxS * i / 5), pad.l - 8, y);
-        ctx.textAlign = 'left';
-        ctx.fillText('$' + fmtN(maxP * i / 5), pad.l + w + 8, y);
-
-        ctx.beginPath();
-        ctx.moveTo(pad.l, y);
-        ctx.lineTo(pad.l + w, y);
-        ctx.strokeStyle = '#E5E7EB';
-        ctx.stroke();
-    }}
-
-    const barW = Math.min(56, gap * 0.42);
-    stats.forEach((d, i) => {{
-        const barH = (d.s / maxS) * h;
-        const x = pad.l + i * gap + gap / 2 - barW / 2;
-        const y = pad.t + h - barH;
-        ctx.fillStyle = '#F97316';
-        ctx.fillRect(x, y, barW, barH);
-
-        ctx.fillStyle = '#78716C';
-        ctx.font = '12px Inter';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'top';
-        ctx.fillText(d.lbl, pad.l + i * gap + gap / 2, pad.t + h + 8);
-    }});
-
-    ctx.beginPath();
-    ctx.strokeStyle = '#9A3412';
-    ctx.lineWidth = 2;
-    stats.forEach((d, i) => {{
-        const x = pad.l + i * gap + gap / 2;
-        const y = pad.t + h - (d.p / maxP) * h;
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-    }});
+    ctx.fillStyle='#78716C'; ctx.font='11px Inter'; ctx.textBaseline='middle';
+    for(let i=0;i<=5;i++){
+        const y=pad.t+h-(i/5)*h; ctx.textAlign='right'; ctx.fillText(fmtK(maxS*i/5),pad.l-8,y);
+        ctx.textAlign='left'; ctx.fillText('$'+fmtN(maxP*i/5),pad.l+w+8,y);
+        ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(pad.l+w,y); ctx.strokeStyle='#E5E7EB'; ctx.stroke();
+    }
+    const barW = Math.min(50, gap*0.4);
+    stats.forEach((d,i) => {
+        const bH=(d.s/maxS)*h, x=pad.l+i*gap+gap/2-barW/2, y=pad.t+h-bH;
+        ctx.fillStyle='#F97316'; ctx.fillRect(x,y,barW,bH);
+        ctx.fillStyle='#78716C'; ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText(d.lbl, pad.l+i*gap+gap/2, pad.t+h+8);
+    });
+    ctx.beginPath(); ctx.strokeStyle='#9A3412'; ctx.lineWidth=2;
+    stats.forEach((d,i) => { const x=pad.l+i*gap+gap/2, y=pad.t+h-(d.p/maxP)*h; if(i===0)ctx.moveTo(x,y); else ctx.lineTo(x,y); });
     ctx.stroke();
+    stats.forEach((d,i) => {
+        const x=pad.l+i*gap+gap/2, y=pad.t+h-(d.p/maxP)*h;
+        ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill(); ctx.strokeStyle='#9A3412'; ctx.lineWidth=1.5; ctx.stroke();
+        ctx.fillStyle='#9A3412'; ctx.textAlign='center'; ctx.textBaseline=y-pad.t<20?'top':'bottom'; ctx.fillText('$'+fmtF(d.p,1),x,y+(y-pad.t<20?8:-8));
+    });
 
-    ctx.font = '12px Inter';
-    stats.forEach((d, i) => {{
-        const x = pad.l + i * gap + gap / 2;
-        const y = pad.t + h - (d.p / maxP) * h;
-
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        ctx.strokeStyle = '#9A3412';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        ctx.fillStyle = '#9A3412';
-        ctx.textAlign = 'center';
-        if (y - pad.t < 22) {{
-            ctx.textBaseline = 'top';
-            ctx.fillText('$' + fmtF(d.p), x, y + 8);
-        }} else {{
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('$' + fmtF(d.p), x, y - 8);
-        }}
-    }});
-
-    const lx = cW / 2;
-    const ly = 18;
-    ctx.fillStyle = '#F97316';
-    ctx.fillRect(lx - 90, ly - 5, 12, 10);
-    ctx.fillStyle = '#1C1917';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.font = '12px Inter';
+    const lx = cW / 2, ly = 18;
+    ctx.fillStyle = '#F97316'; ctx.fillRect(lx - 90, ly - 5, 12, 10);
+    ctx.fillStyle = '#1C1917'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.font = '12px Inter';
     ctx.fillText('Doanh số TB', lx - 72, ly);
+    ctx.beginPath(); ctx.strokeStyle = '#9A3412'; ctx.lineWidth = 2; ctx.moveTo(lx + 14, ly); ctx.lineTo(lx + 34, ly); ctx.stroke();
+    ctx.beginPath(); ctx.fillStyle = '#9A3412'; ctx.arc(lx + 24, ly, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#1C1917'; ctx.fillText('Giá TB ($)', lx + 40, ly);
 
-    ctx.beginPath();
-    ctx.strokeStyle = '#9A3412';
-    ctx.lineWidth = 2;
-    ctx.moveTo(lx + 14, ly);
-    ctx.lineTo(lx + 34, ly);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.fillStyle = '#9A3412';
-    ctx.arc(lx + 24, ly, 3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#1C1917';
-    ctx.fillText('Giá TB ($)', lx + 40, ly);
+    ctx.fillStyle = '#78716C'; ctx.font = '12px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    ctx.fillText(mode === 'rating' ? 'Nhóm Rating' : 'Nhóm Reviews (Quartile)', pad.l + w / 2, pad.t + h + 28);
+    ctx.save(); ctx.translate(14, pad.t + h / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('Doanh số', 0, 0); ctx.restore();
+    ctx.save(); ctx.translate(cW - 14, pad.t + h / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('Giá ($)', 0, 0); ctx.restore();
 
-    ctx.fillStyle = '#78716C';
-    ctx.font = '12px Inter';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(mode === 'rating' ? 'Nhóm Rating' : 'Nhóm Reviews (Quartile)',
-                 pad.l + w / 2, pad.t + h + 28);
-
-    ctx.save();
-    ctx.translate(14, pad.t + h / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Doanh số', 0, 0);
-    ctx.restore();
-
-    ctx.save();
-    ctx.translate(cW - 14, pad.t + h / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Giá ($)', 0, 0);
-    ctx.restore();
-
-    canvas.onmousemove = e => {{
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-
-        for (let i = 0; i < stats.length; i++) {{
-            const px = pad.l + i * gap + gap / 2;
-            const py = pad.t + h - (stats[i].p / maxP) * h;
-            if (Math.hypot(mx - px, my - py) <= 12) {{
-                showTooltip(e, `Nhóm: ${{stats[i].lbl}}\nGiá TB: $${{fmtF(stats[i].p)}}\nSố SP: ${{fmtN(stats[i].pCount)}}`);
-                return;
-            }}
-        }}
-        for (let i = 0; i < stats.length; i++) {{
-            const barH = (stats[i].s / maxS) * h;
-            const bx = pad.l + i * gap + gap / 2 - barW / 2;
-            const by = pad.t + h - barH;
-            if (mx >= bx && mx <= bx + barW && my >= by && my <= pad.t + h) {{
-                showTooltip(e, `Nhóm: ${{stats[i].lbl}}\nDoanh số TB: ${{fmtN(stats[i].s)}} đơn\nSố SP có DS: ${{fmtN(stats[i].sCount)}}`);
-                return;
-            }}
-        }}
+    canvas.onmousemove = e => {
+        const rect=canvas.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
+        for(let i=0;i<stats.length;i++){
+            const px=pad.l+i*gap+gap/2, py=pad.t+h-(stats[i].p/maxP)*h;
+            if(Math.hypot(mx-px,my-py)<=10){ showTooltip(e,`Nhóm: ${stats[i].lbl}\nGiá TB: $${fmtF(stats[i].p)}\nSố SP: ${fmtN(stats[i].pCount)}`); return; }
+            const bH=(stats[i].s/maxS)*h, bx=pad.l+i*gap+gap/2-barW/2, by=pad.t+h-bH;
+            if(mx>=bx && mx<=bx+barW && my>=by && my<=pad.t+h){ showTooltip(e,`Nhóm: ${stats[i].lbl}\nDS TB: ${fmtN(stats[i].s)} đơn\nSố có DS: ${fmtN(stats[i].sCount)}`); return; }
+        }
         hideTooltip();
-    }};
-    canvas.onmouseleave = hideTooltip;
-}}
+    };
+    canvas.onmouseleave=hideTooltip;
+}
 
-function drawScatterPlot(data) {{
-    const canvas = document.getElementById('canvasScatter');
-    const ctx = canvas.getContext('2d');
+function drawScatterPlot(data) {
+    const canvas = document.getElementById('canvasScatter'), ctx = canvas.getContext('2d'), dpr = window.devicePixelRatio || 1;
+    canvas.width = canvas.offsetWidth * dpr; canvas.height = canvas.offsetHeight * dpr;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);
+    const cW = canvas.offsetWidth, cH = canvas.offsetHeight; ctx.clearRect(0,0,cW,cH);
+    const valid = data.filter(d=>d.rating>=1&&d.reviews>0); if(!valid.length) return;
+    const pad = {t:50,r:20,b:50,l:60}, w=cW-pad.l-pad.r, h=cH-pad.t-pad.b;
+    const minLog=Math.floor(Math.log10(Math.min(...valid.map(d=>d.reviews)))), maxLog=Math.ceil(Math.log10(Math.max(...valid.map(d=>d.reviews))));
+    const getX = r => pad.l+((Math.max(2.5,Math.min(5,r))-2.5)/2.5)*(w-10), getY = rv => pad.t+h-((Math.log10(rv)-minLog)/(maxLog-minLog||1))*h;
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width  = canvas.offsetWidth  * dpr;
-    canvas.height = canvas.offsetHeight * dpr;
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.scale(dpr, dpr);
+    ctx.fillStyle='#78716C'; ctx.font='10px Inter'; ctx.textAlign='right';
+    for(let i=minLog;i<=maxLog;i++){ const y=getY(Math.pow(10,i)); ctx.fillText(fmtK(Math.pow(10,i)),pad.l-6,y); ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(pad.l+w,y);ctx.strokeStyle='#f3f4f6';ctx.stroke(); }
+    valid.forEach(d => {
+        ctx.beginPath(); ctx.arc(getX(d.rating),getY(d.reviews),3.5,0,Math.PI*2);
+        const s=d.sales_volume_num; ctx.fillStyle=s>2000?'rgba(154,52,18,0.8)':s>500?'rgba(249,115,22,0.7)':'rgba(209,213,219,0.5)'; ctx.fill();
+    });
 
-    const cW = canvas.offsetWidth;
-    const cH = canvas.offsetHeight;
-    ctx.clearRect(0, 0, cW, cH);
-    if (!data || !data.length) return;
+    const legends = [{l:'Không DS',c:'rgba(209,213,219,0.5)'},{l:'DS Thấp',c:'rgba(249,180,100,0.7)'},{l:'DS TB',c:'rgba(249,115,22,0.7)'},{l:'DS Cao',c:'rgba(154,52,18,0.8)'}];
+    let lx = pad.l + w - 4; const ly = 18; ctx.textAlign = 'right'; ctx.textBaseline = 'middle'; ctx.font = '11px Inter';
+    [...legends].reverse().forEach(lg => {
+        ctx.fillStyle = '#1C1917'; ctx.fillText(lg.l, lx, ly);
+        const tw = ctx.measureText(lg.l).width; ctx.fillStyle = lg.c;
+        ctx.beginPath(); ctx.arc(lx - tw - 6, ly, 4, 0, Math.PI * 2); ctx.fill(); lx -= (tw + 20);
+    });
 
-    const valid = data.filter(d => d.rating >= 1.0 && d.reviews > 0);
-    if (!valid.length) return;
-
-    const pad = {{ t: 50, r: 20, b: 50, l: 60 }};
-    const w = cW - pad.l - pad.r;
-    const h = cH - pad.t - pad.b;
-
-    const minX = 2.5, maxX = 5.0;
-    const xPlotW = w - 20;
-    const getX = r => pad.l + ((Math.max(minX, Math.min(maxX, r)) - minX) / (maxX - minX)) * xPlotW;
-
-    const revs = valid.map(d => d.reviews);
-    const minRev = Math.min(...revs);
-    const maxRev = Math.max(...revs);
-    const minLog = Math.floor(Math.log10(Math.max(1, minRev)));
-    const maxLog = Math.ceil(Math.log10(maxRev));
-    const getY = rev => pad.t + h - ((Math.log10(rev) - minLog) / (maxLog - minLog || 1)) * h;
-
-    ctx.fillStyle = '#78716C';
-    ctx.font = '12px Inter';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    for (let i = minLog; i <= maxLog; i++) {{
-        const y = pad.t + h - ((i - minLog) / (maxLog - minLog || 1)) * h;
-        ctx.fillText(fmtK(Math.pow(10, i)), pad.l - 6, y);
-
-        ctx.beginPath();
-        ctx.moveTo(pad.l, y);
-        ctx.lineTo(pad.l + w, y);
-        ctx.strokeStyle = '#E5E7EB';
-        ctx.stroke();
-    }}
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    for (let r10 = 25; r10 <= 50; r10 += 5) {{
-        const r = r10 / 10;
-        const x = getX(r);
-        ctx.fillText(r.toFixed(1), x, pad.t + h + 6);
-    }}
-
-    const x45 = getX(4.5);
-    ctx.beginPath();
-    ctx.setLineDash([4, 4]);
-    ctx.moveTo(x45, pad.t);
-    ctx.lineTo(x45, pad.t + h);
-    ctx.strokeStyle = 'rgba(154, 52, 18, 0.4)';
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#9A3412';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.font = '12px Inter';
-    ctx.fillText('≥ 4.5', x45, pad.t - 4);
-
-    const getColor = sv => {{
-        if (!sv || sv === 0) return 'rgba(209, 213, 219, 0.5)';
-        if (sv <= 500) return 'rgba(249, 180, 100, 0.7)';
-        if (sv <= 2000) return 'rgba(249, 115, 22, 0.7)';
-        return 'rgba(154, 52, 18, 0.85)';
-    }};
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(pad.l, pad.t - 5, w, h + 10);
-    ctx.clip();
-    valid.forEach(d => {{
-        const x = getX(d.rating);
-        const y = getY(d.reviews);
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2);
-        ctx.fillStyle = getColor(d.sales_volume_num);
-        ctx.fill();
-    }});
-    ctx.restore();
-
-    const legends = [
-        {{ l: 'Không có DS', c: 'rgba(209, 213, 219, 0.5)' }},
-        {{ l: 'DS Thấp',     c: 'rgba(249, 180, 100, 0.7)' }},
-        {{ l: 'DS TB',       c: 'rgba(249, 115, 22, 0.7)' }},
-        {{ l: 'DS Cao',      c: 'rgba(154, 52, 18, 0.85)' }}
-    ];
-    let lx = pad.l + w - 4;
-    const ly = pad.t - 28;
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'middle';
-    ctx.font = '11px Inter';
-    [...legends].reverse().forEach(lg => {{
-        ctx.fillStyle = '#1C1917';
-        ctx.fillText(lg.l, lx, ly);
-        const textW = ctx.measureText(lg.l).width;
-        ctx.fillStyle = lg.c;
-        ctx.beginPath();
-        ctx.arc(lx - textW - 6, ly, 4, 0, Math.PI * 2);
-        ctx.fill();
-        lx -= (textW + 20);
-    }});
-
-    ctx.fillStyle = '#78716C';
-    ctx.font = '12px Inter';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#78716C'; ctx.font = '12px Inter'; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
     ctx.fillText('Rating (★)', pad.l + w / 2, pad.t + h + 26);
+    ctx.save(); ctx.translate(14, pad.t + h / 2); ctx.rotate(-Math.PI / 2); ctx.fillText('Số Reviews (log)', 0, 0); ctx.restore();
 
-    ctx.save();
-    ctx.translate(14, pad.t + h / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('Số Reviews (log)', 0, 0);
-    ctx.restore();
-
-    canvas.onmousemove = e => {{
-        const rect = canvas.getBoundingClientRect();
-        const mx = e.clientX - rect.left;
-        const my = e.clientY - rect.top;
-
-        for (let i = 0; i < valid.length; i++) {{
-            const d = valid[i];
-            const px = getX(d.rating);
-            const py = getY(d.reviews);
-            if (Math.hypot(mx - px, my - py) <= 8) {{
-                showTooltip(e, `Rating: ${{d.rating}}★\nReviews: ${{fmtN(d.reviews)}}\nDoanh số: ${{fmtN(d.sales_volume_num || 0)}} đơn`);
-                return;
-            }}
-        }}
+    canvas.onmousemove = e => {
+        const rect=canvas.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
+        for(let i=0;i<valid.length;i++){
+            const d=valid[i], px=getX(d.rating), py=getY(d.reviews);
+            if(Math.hypot(mx-px,my-py)<=6){ showTooltip(e,`Rating: ${d.rating}★\nReviews: ${fmtN(d.reviews)}\nDoanh số: ${fmtN(d.sales_volume_num||0)} đơn`); return; }
+        }
         hideTooltip();
-    }};
-    canvas.onmouseleave = hideTooltip;
-}}
+    };
+    canvas.onmouseleave=hideTooltip;
+}
 
-function applyFilters() {{
-    const filtered = getFiltered();
-    updateKPIs(filtered);
-    drawComboChart(currentMode, filtered);
-    drawScatterPlot(filtered);
-}}
+function applyFilters() {
+    const d = getFiltered(); updateKPIs(d); drawComboChart(currentMode, d); drawScatterPlot(d);
+}
 
-window.addEventListener('resize', () => {{
-    applyFilters();
-}});
-
-document.addEventListener('DOMContentLoaded', () => {{
-    initDropdown();
-    applyFilters();
-}});
+initDropdown(); applyFilters();
+window.onresize = applyFilters;
 </script>
 </body>
 </html>"""
 
-    components.html(html_code, height=680, scrolling=False)
+def render(df: pd.DataFrame):
+    # Giao diện chính tab Đánh Giá
+    st.markdown("<style>.block-container { padding-top: 1rem !important; }</style>", unsafe_allow_html=True)
+    
+    # Chuẩn bị dữ liệu JSON
+    data_list = _prep_data(df)
+    
+    # Inject dữ liệu vào template
+    html = _HTML_TEMPLATE.replace("__DATA_JSON__", json.dumps(data_list, ensure_ascii=False))
+    
+    components.html(html, height=680, scrolling=False)
