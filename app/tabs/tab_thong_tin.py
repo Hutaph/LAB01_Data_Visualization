@@ -677,7 +677,9 @@ def render(df_raw):
                             formatter: (v) => fmtN(v),
                             anchor: 'end',
                             align: 'top',
-                            offset: 4
+                            offset: 4,
+                            clamp: true,
+                            clip: false
                         }}
                     }},
                     {{
@@ -697,6 +699,9 @@ def render(df_raw):
             options: {{
                 responsive: true,
                 maintainAspectRatio: false,
+                layout: {{
+                    padding: {{ top: 18 }}
+                }},
                 interaction: {{
                     mode: 'index',
                     intersect: false
@@ -711,7 +716,8 @@ def render(df_raw):
                         position: 'left',
                         grid: {{ color: 'rgba(0,0,0,0.04)' }},
                         ticks: {{ callback: (v) => fmtN(v), font: {{ size: 10 }} }},
-                        title: {{ display: true, text: 'Doanh Số Mean (lượt bán)', color: '#ea580c', font: {{ size: 11, weight: '600' }} }}
+                        title: {{ display: true, text: 'Doanh Số Mean (lượt bán)', color: '#ea580c', font: {{ size: 11, weight: '600' }} }},
+                        grace: '12%'
                     }},
                     y1: {{
                         position: 'right',
