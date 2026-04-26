@@ -4,14 +4,10 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 def render(df_raw):
-    """
-    Renders the Amazon's Choice Analysis tab.
-    """
+    # Renders the Amazon's Choice Analysis tab.
     df = df_raw.copy()
 
-    # ══════════════════════════════════════════════════════════════
     # 1. DATA PREPROCESSING & MAPPING
-    # ══════════════════════════════════════════════════════════════
     from utils.constants import CATEGORY_MAP
 
     # Initialize essential columns
@@ -53,9 +49,7 @@ def render(df_raw):
         
     df["price_tier"] = df["current_price"].apply(get_price_tier)
 
-    # ══════════════════════════════════════════════════════════════
     # 2. DATA EXPORT TO JSON
-    # ══════════════════════════════════════════════════════════════
     select_cols = [
         "title", "crawl_category", "is_amazon_choice", "is_best_seller", 
         "current_price", "sales_volume_num", "rating_val", "reviews_val", "is_prime", "price_tier"
@@ -63,9 +57,7 @@ def render(df_raw):
     export_df = df[select_cols].copy()
     data_json_str = export_df.to_json(orient="records", force_ascii=False)
 
-    # ══════════════════════════════════════════════════════════════
     # 3. VISUALIZATION (HTML/CSS/JS)
-    # ══════════════════════════════════════════════════════════════
     _HTML = """<!DOCTYPE html>
 <html lang="vi">
 <head>
