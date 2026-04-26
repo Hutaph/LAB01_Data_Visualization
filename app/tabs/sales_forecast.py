@@ -1,12 +1,10 @@
 """
-`tab_du_bao` - Streamlit tab for product performance forecasting
--------------------------------------------------------------
+Tab `tab_du_bao` (Streamlit) dùng để dự báo hiệu suất sản phẩm.
 
-This module renders the prediction UI and delegates preprocessing
-and model inference to the `predictor` package. The tab accepts a
-single-row input from the user, ensures the processor exists (builds
-it from sample data when missing), transforms the input, and calls
-the selected trained model for prediction.
+Phần UI được dựng ngay trong tab này. Tiền xử lý dữ liệu và gọi mô hình
+được ủy quyền cho package `predictor` (processor/pipeline + model inference).
+Luồng chính: lấy input 1 dòng từ người dùng → transform theo pipeline đã lưu
+→ align feature theo model → predict và hiển thị kết quả.
 """
 
 import streamlit as st
@@ -22,14 +20,14 @@ from predictor import MODELS_DIR, ensure_processor, transform_with_feature_names
 from predictor.loader import load_processed_data
 
 def render(df):
-    # PATHS
+    # Đường dẫn cố định trong project
     DATA_PROCESSED_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
     PROCESSOR_PATH = DATA_PROCESSED_DIR / "sales_prediction_pipeline.joblib"
 
-    # Detect available model files and allow user to choose
+    # Quét các model khả dụng để cho người dùng chọn
     try:
         model_files = sorted(MODELS_DIR.glob("*.pkl"))
-        # Filter out metadata files like feature_names.pkl
+        # Bỏ qua file metadata (không phải model)
         model_options = [p.name for p in model_files if p.name != "feature_names.pkl"]
     except Exception:
         model_files = []
@@ -39,7 +37,7 @@ def render(df):
         st.error("Không tìm thấy mô hình (.pkl) trong thư mục models")
         return
 
-    # default selection (prefer xgboost if present)
+    # Model mặc định (ưu tiên XGBoost nếu có)
     default_name = "xgboost_model.pkl"
     default_index = model_options.index(default_name) if default_name in model_options else 0
 
@@ -47,7 +45,7 @@ def render(df):
     st.markdown(
         """
         <style>
-        /* ========= TỐI ƯU TIÊU ĐỀ ========= */
+        /* Header */
         .tab-header-wrapper {
             margin-top: 25px;
             padding-bottom: 25px;
@@ -76,7 +74,7 @@ def render(df):
             margin-top: 2px;
         }
 
-        /* ========= TỐI ƯU NÚT BẤM VÀ LABEL ========= */
+        /* Buttons + labels */
         .stButton>button {
             width: 100%;
             background-color: #F97316 !important;
@@ -97,7 +95,7 @@ def render(df):
             color: #1d2a39 !important;
         }
 
-        /* ========= TỐI ƯU THẺ KẾT QUẢ DỰ BÁO ========= */
+        /* Prediction result card */
         .custom-metric-container {
             background: #FFFAF5;
             border: 1px solid #efd9bd;
@@ -138,7 +136,7 @@ def render(df):
         unsafe_allow_html=True,
     )
 
-    # HEADER SECTION
+    # Header
     st.markdown(
         """
         <div class="header-container">
@@ -151,7 +149,7 @@ def render(df):
         unsafe_allow_html=True
     )
 
-    # Model Selection Bar
+    # Thanh chọn model
     model_sel_col1, model_sel_col2 = st.columns([3, 1])
     with model_sel_col2:
         selected_model_name = st.selectbox(
@@ -162,7 +160,7 @@ def render(df):
             format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title()
         )
     
-    # Border ngăn cách tinh tế hơn
+    # Đường kẻ ngăn cách
     st.markdown(
         """
         <div style="
@@ -179,7 +177,7 @@ def render(df):
     
     MODEL_PATH = MODELS_DIR / selected_model_name
 
-    # LOAD MODEL + PROCESSOR
+    # Load model + processor
     if not MODEL_PATH.exists():
         st.error("Không tìm thấy model")
         return
@@ -189,10 +187,9 @@ def render(df):
         return
 
     try:
-        # Ensure pickled objects referencing a class defined under
-        # a different top-level module (e.g. "main" when saved)
-        # can still be unpickled here by exposing the class on
-        # those module objects before loading.
+        # Một số object pickled có thể trỏ tới class theo module name cũ
+        # (ví dụ lúc train/save ở file `main.py`). Đoạn này gắn class vào
+        # `main`/`__main__` để tránh lỗi khi unpickle ở môi trường hiện tại.
         try:
             for _m in ("main", "__main__"):
                 mod = sys.modules.get(_m)
@@ -204,12 +201,12 @@ def render(df):
             pass
 
         model = joblib.load(MODEL_PATH)
-        # try to load existing processor, otherwise attempt to build one using a sample processed dataframe
+        # Ưu tiên processor đã lưu; nếu lỗi thì build lại từ sample dữ liệu đã xử lý
         try:
             processor = joblib.load(PROCESSOR_PATH)
         except Exception:
             try:
-                # load a sample dataframe to fit a new processor
+                # Fit lại processor từ một mẫu dataframe
                 sample_df, _ = load_processed_data()
                 processor = ensure_processor(PROCESSOR_PATH, sample_df=sample_df)
             except Exception as _err:
@@ -217,14 +214,14 @@ def render(df):
 
         feature_names = list(model.feature_names_in_) if hasattr(model, "feature_names_in_") else []
 
-        # Try to load a features dump (created at app startup) for display
+        # Nếu có `features_dump.json` thì dùng để hiển thị/đề xuất danh mục đẹp hơn
         features_dump_path = Path(__file__).resolve().parents[1] / "features_dump.json"
         try:
             if features_dump_path.exists():
                 import json
                 with open(features_dump_path, "r", encoding="utf-8") as fh:
                     dump = json.load(fh)
-                    # if dump is a list, prefer it as feature names
+                    # dump có thể là list feature names
                     if isinstance(dump, list) and len(dump) > 0:
                         dump_features = list(dump)
                     else:
@@ -237,10 +234,10 @@ def render(df):
         st.error(f"Lỗi load: {e}")
         return
 
-    # CATEGORY fallback
+    # Mapping danh mục (fallback)
     model_categories = {"electronics": "Điện tử", "home": "Nhà cửa", "fashion": "Thời trang"}
 
-    # Compute median/default values from available crawled data
+    # Lấy giá trị mặc định/median từ dữ liệu crawl (nếu có), để form nhìn "thật" hơn
     def load_medians():
         med = {
             "price": 25.0,
@@ -263,7 +260,7 @@ def render(df):
             if not files:
                 return med
 
-            # read a subset of columns and up to first 20000 rows for speed
+            # Đọc ít cột + giới hạn số dòng để đảm bảo tốc độ
             usecols = [
                 "current_price", "original_price", "rating", "reviews",
                 "number_of_offers", "is_prime", "is_amazon_choice",
@@ -280,7 +277,7 @@ def render(df):
                 return med
             samp = pd.concat(dfs, ignore_index=True, sort=False)
 
-            # numeric medians
+            # Median cho numeric
             if "current_price" in samp.columns:
                 med["price"] = float(samp["current_price"].replace(["", "NA", "None"], np.nan).dropna().astype(float).median(skipna=True)) if samp["current_price"].notna().any() else med["price"]
             if "original_price" in samp.columns:
@@ -304,7 +301,7 @@ def render(df):
                 except Exception:
                     pass
 
-            # booleans/modes
+            # Mode cho các cờ boolean
             if "is_prime" in samp.columns:
                 try:
                     med["is_prime"] = bool(samp["is_prime"].dropna().astype(int).mode().iloc[0])
@@ -326,7 +323,7 @@ def render(df):
                 except Exception:
                     pass
 
-            # delivery fee extraction from delivery_info (simple regex)
+            # Rút phí vận chuyển từ `delivery_info` 
             if "delivery_info" in samp.columns:
                 try:
                     import re
@@ -343,7 +340,7 @@ def render(df):
                 except Exception:
                     pass
 
-            # category mapping: try to pick one matching our short keys
+            # Ưu tiên map về key ngắn (electronics/home/fashion) để đồng bộ
             if "main_category_name" in samp.columns and samp["main_category_name"].notna().any():
                 try:
                     mode_cat = str(samp["main_category_name"].dropna().mode().iloc[0]).lower()
@@ -353,7 +350,7 @@ def render(df):
                             chosen = k
                             break
                     if chosen is None:
-                        # fallback to first mapping key
+                        # fallback: lấy key đầu tiên
                         chosen = list(model_categories.keys())[0]
                     med["category"] = chosen
                 except Exception:
@@ -365,7 +362,7 @@ def render(df):
 
     medians = load_medians()
 
-    # Compute target scaler (mean, std) for sales_volume_num_log_clipped
+    # Ước lượng mean/std cho target (log1p + clip) từ dữ liệu crawl (nếu có)
     def compute_target_scaler():
         try:
             crawl_dir = Path(__file__).resolve().parents[2] / "data" / "amazon_crawl"
@@ -383,7 +380,7 @@ def render(df):
                         dfc = pd.read_csv(f, nrows=1000, low_memory=False)
                     except Exception:
                         continue
-                # find column
+                # Tìm cột sales volume hợp lệ
                 col = None
                 for candidate in ['sales_volume', 'search_sales_volume']:
                     if candidate in dfc.columns:
@@ -416,10 +413,10 @@ def render(df):
 
     target_mean, target_std = compute_target_scaler()
 
-    # Layout: left column for inputs and right column for results
+    # Layout: trái = input, phải = kết quả
     col_form, col_main = st.columns([1, 2], gap="large")
 
-    # ---- Left: Input form ----
+    # Trái: form nhập liệu 
     with col_form:
         with st.form("predict_form", clear_on_submit=False):
 
@@ -435,7 +432,7 @@ def render(df):
             f_reviews = st.number_input("Số lượt đánh giá (Reviews)", value=int(medians.get("reviews", 120)), min_value=0)
 
             st.markdown("<h5 style='color:#EA580C; margin-top: 10px; margin-bottom: 0;'>3. Phân loại & Đặc tính</h5>", unsafe_allow_html=True)
-            # Category selector populated from model/dump features if available
+            # Danh mục: ưu tiên lấy từ feature dump / feature names nếu có
             try:
                 fn = dump_features if 'dump_features' in locals() else feature_names
                 cat_options = [c.replace('crawl_category_', '').replace('cat_', '') 
@@ -445,7 +442,7 @@ def render(df):
             except Exception:
                 cat_options = list(model_categories.keys())
 
-            # display nicer labels for categories
+            # Hiển thị label dễ đọc hơn
             def _fmt_cat(s):
                 return s.replace('_', ' ').title()
 
@@ -473,17 +470,17 @@ def render(df):
             submit = st.form_submit_button("Dự đoán", key="predict_btn")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---- Right: Results / placeholder ----
+    # Phải: kết quả / placeholder
     with col_main:
         if not submit:
             st.info("💡 Vui lòng nhập hoặc điều chỉnh các thông số sản phẩm ở cột bên trái và nhấn 'Dự đoán' để xem kết quả.")
         else:
             try:
-                # 1. TÍNH TOÁN CÁC ĐẶC TRƯNG FE (Discount & Discount Rate)
+                # Tính nhanh discount/discount_rate (đúng theo pipeline khi train)
                 f_discount = f_orig_price - f_price
                 f_discount_rate = (f_discount / f_orig_price) if f_orig_price > 0 else 0
 
-                # 2. XÂY DỰNG RAW INPUT
+                # Gom input về 1 dòng dataframe để đưa vào pipeline
                 raw_input = pd.DataFrame([{
                     "rating": f_rating,
                     "is_amazon_choice": 1 if f_choice else 0,
@@ -501,25 +498,24 @@ def render(df):
                     "discount_rate": f_discount_rate
                 }])
 
-                # 3. TIỀN XỬ LÝ (Sử dụng pipeline.joblib)
-                # Load processor từ đường dẫn chính xác
+                # Tiền xử lý bằng pipeline đã lưu (ưu tiên pipeline chuẩn trong `data/processed`)
                 DATA_PROCESSED_DIR = Path(__file__).resolve().parents[2] / "data" / "processed"
                 PIPELINE_PATH = DATA_PROCESSED_DIR / "sales_prediction_pipeline.joblib"
                 
                 if PIPELINE_PATH.exists():
                     actual_processor = joblib.load(PIPELINE_PATH)
                 else:
-                    actual_processor = processor # fallback to old one if missing
+                    actual_processor = processor  # fallback nếu pipeline chuẩn không có
 
-                # Transform và làm sạch tên đặc trưng
+                # Transform input → feature matrix đã qua xử lý
                 X_processed = transform_with_feature_names(actual_processor, raw_input)
 
-                # 4. LOAD FEATURE NAMES VÀ ALIGNMENT
+                # Align feature theo danh sách đã lưu (nếu có)
                 FEATURE_NAMES_PATH = MODELS_DIR / "feature_names.pkl"
                 if FEATURE_NAMES_PATH.exists():
                     final_feature_names = joblib.load(FEATURE_NAMES_PATH)
                     
-                    # Align columns
+                    # Thiếu feature thì bù 0 để match shape lúc train
                     for col in final_feature_names:
                         if col not in X_processed.columns:
                             X_processed[col] = 0
@@ -528,18 +524,17 @@ def render(df):
                 else:
                     final_feature_names = X_processed.columns.tolist()
 
-                # 5. THỰC HIỆN DỰ BÁO
-                # Để tránh lỗi và cảnh báo về tên đặc trưng, ta đổi tên cột thành chuỗi số "0", "1", "2"...
-                # vì mô hình được huấn luyện trên đầu ra của Pipeline (mảng đánh số)
+                # Predict.
+                # Lưu ý: một số model được train trên output numpy array (cột dạng index),
+                # nên đổi tên cột về "0..n-1" để tránh warning/khác biệt feature name.
                 X_processed.columns = [str(i) for i in range(X_processed.shape[1])]
                 raw_pred = model.predict(X_processed)[0]
 
-                # 6. INVERSE TRANSFORM (Log1p -> Original)
-                # Chú ý: Một số mô hình Boosting có thể cho kết quả âm ở vùng biên, ta clip về 0
+                # Đưa về thang đo gốc (expm1). Nếu model cho giá trị âm ở biên thì clip về 0.
                 final_val = np.expm1(raw_pred)
                 final_val = int(max(0, round(final_val)))
 
-                # 7. HIỂN THỊ KẾT QUẢ
+                # Hiển thị kết quả
                 st.markdown("### Kết quả Phân tích & Dự báo")
                 
                 # Layout kết quả chính
@@ -565,10 +560,10 @@ def render(df):
                     """, unsafe_allow_html=True)
 
                 with res_col2:
-                    # Thông tin phụ thêm
+                    # Thông tin phụ
                     st.info(f"**Mô hình đang dùng:** {selected_model_name.replace('_', ' ').title()}\n\n**Đặc trưng quan trọng nhất:** Category, Reviews, Price")
 
-                # 8. BIỂU ĐỒ FEATURE IMPORTANCE
+                # Feature importance (nếu model hỗ trợ)
                 if hasattr(model, 'feature_importances_'):
                     st.markdown("---")
                     st.markdown("**Mức độ ảnh hưởng của các chỉ số (Top 10 Features)**")
@@ -596,7 +591,7 @@ def render(df):
                     )
                     st.plotly_chart(fig, width='stretch')
 
-                # DEBUG
+                # xem input sau khi transform
                 with st.expander("🛠️ Xem dữ liệu xử lý (Debug)", expanded=False):
                     st.write("Dữ liệu đầu vào sau biến đổi (X_processed):")
                     st.dataframe(X_processed)
@@ -604,9 +599,7 @@ def render(df):
             except Exception as e:
                 st.error(f"Lỗi predict: {e}")
 
-    # =========================
-    # TECH INFO
-    # =========================
+    # Thông tin kỹ thuật (để debug/so sánh model)
     with st.expander("⚙️ Thông tin kỹ thuật", expanded=False):
         st.write("**Loại mô hình thuật toán:**", type(model).__name__)
         st.write("**Tổng số Input Feature:**", len(feature_names))
