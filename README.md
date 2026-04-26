@@ -5,7 +5,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.55-red?logo=streamlit)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-Phân tích chuyên sâu dữ liệu thị trường Amazon (US) dựa trên tập dữ liệu thực tế hơn 9.000 sản phẩm. Dashboard cung cấp các góc nhìn đa chiều về chiến lược định giá, tác động của nhãn uy tín và các mô hình dự báo hiệu suất kinh doanh.
+Phân tích chuyên sâu dữ liệu thị trường Amazon (US) dựa trên tập dữ liệu thực tế hơn 8.000 sản phẩm. Dashboard cung cấp các góc nhìn đa chiều về chiến lược định giá, tác động của nhãn uy tín và các mô hình dự báo hiệu suất kinh doanh.
 
 ## Tính năng chính
 
@@ -29,6 +29,7 @@ Dashboard được tổ chức thành 6 phân mục phân tích chiến lược:
 
 ```text
 ├── app/                  # Mã nguồn Dashboard Streamlit
+│   ├── pics/             # Asset hình ảnh (Logo, Icons)
 │   ├── tabs/             # Các tệp phân tích theo từng Tab
 │   ├── services/         # Logic xử lý dữ liệu và ML Models
 │   └── styles/           # Custom CSS UI/UX
