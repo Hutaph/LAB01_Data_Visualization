@@ -1,7 +1,3 @@
-"""
-`tab_du_bao` - Streamlit tab for product performance forecasting.
-"""
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -13,135 +9,116 @@ import sys
 from predictor.feature_engineering import DiscountFeatureEngineer, OutlierClipper
 from predictor import MODELS_DIR
 
-
-# ── CSS ─────────────────────────────────────────────────────────────────────
 _CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* block container — DO NOT override padding-top; main.css handles it */
-
-/* form reset */
-[data-testid="stForm"] { border:none!important; padding:0!important; background:transparent!important; }
-
-/* ── tab title row ── */
-.fc-title-row {
-    display: flex; align-items: center; justify-content: space-between;
-    padding-bottom: 10px;
-    border-bottom: 2px solid rgba(249,115,22,.12);
-    margin-bottom: 14px;
-}
-.fc-title {
-    font-family: 'Inter', sans-serif; font-size: 20px; font-weight: 800;
-    background: linear-gradient(90deg, #9A3412, #F97316);
-    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
-    letter-spacing: -.4px;
-}
-.fc-sub  { font-size: 12px; color: #a8a29e; font-weight: 500; margin-left: 10px; }
-.fc-badge {
-    font-size: 11px; font-weight: 700; white-space: nowrap;
-    background: #fff7ed; color: #c2410c;
-    border: 1px solid #fed7aa; border-radius: 20px; padding: 4px 13px;
+:root {
+    --pr: #F97316;
+    --dk: #9A3412;
+    --bg: #FEF3E2;
+    --card: #FFFFFF;
+    --t1: #1C1917;
+    --t2: #78716C;
+    --t3: #A8A29E;
+    --bd: #E7E5E4;
+    --r: 8px;
+    --fn: 'Inter', sans-serif;
 }
 
-/* ── model selector label override ── */
-.fc-model-label {
-    font-size: 10px; font-weight: 700; color: #78716c;
-    text-transform: uppercase; letter-spacing: .6px;
-    margin-bottom: 4px;
+* { font-family: var(--fn) !important; }
+
+.main-box { background: var(--bg); min-height: 100vh; }
+
+.fb {
+    display: flex; align-items: flex-end; gap: 24px;
+    background: #fff; border: 1px solid var(--bd); border-radius: 10px;
+    padding: 12px 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); flex-shrink: 0; flex-wrap: wrap;
+    margin-bottom: 14px; width: 100%;
+}
+.fb-item { display: flex; flex-direction: column; gap: 6px; }
+.fb-item label {
+    display: block; font-size: 11px; font-weight: 700; color: var(--t2);
+    text-transform: uppercase; letter-spacing: .5px; margin: 0;
 }
 
-/* ── model selectbox label ── */
-div[data-testid="stSelectbox"] > label {
-    font-size: 11px !important; font-weight: 700 !important;
-    color: #78716c !important; text-transform: uppercase !important;
-    letter-spacing: .6px !important;
+div[data-testid="stSelectbox"] label, 
+div[data-testid="stNumberInput"] label,
+div[data-testid="stSlider"] label,
+div[data-testid="stCheckbox"] label p {
+    font-size: 10.5px !important; font-weight: 700 !important;
+    color: var(--t2) !important; text-transform: uppercase !important;
+    letter-spacing: .4px !important;
+    margin-bottom: 6px !important;
+    line-height: 1.4 !important;
 }
 
-/* ── form widget labels (no uppercase) ── */
-[data-testid="stForm"] label {
-    font-size: 11.5px !important; font-weight: 600 !important;
-    color: #44403c !important; text-transform: none !important;
-    letter-spacing: 0 !important;
+[data-testid="stForm"] {
+    background: #fff !important;
+    border: 1px solid var(--bd) !important;
+    border-radius: 12px !important;
+    padding: 24px 28px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04) !important;
 }
 
-/* ── section heading inside form ── */
-.sec { font-size: 10px; font-weight: 700; color: #F97316;
-    text-transform: uppercase; letter-spacing: .8px;
-    margin: 14px 0 7px; padding-bottom: 5px;
-    border-bottom: 1px solid rgba(249,115,22,.15); }
+.sec {
+    font-size: 10.5px; font-weight: 800; color: var(--dk);
+    text-transform: uppercase; letter-spacing: 0.8px;
+    margin: 24px 0 10px; padding-bottom: 0;
+    border: none !important;
+}
 .sec.first { margin-top: 0; }
 
-/* ── submit button ── */
-[data-testid="stFormSubmitButton"] button,
-[data-testid="stForm"] .stButton > button {
-    width: 100% !important;
-    background: linear-gradient(135deg,#F97316,#EA580C) !important;
-    color: #fff !important; border: none !important;
-    border-radius: 10px !important; padding: 11px 0 !important;
-    font-size: 13px !important; font-weight: 700 !important;
-    margin-top: 12px !important; letter-spacing: .3px !important;
-    box-shadow: 0 2px 8px rgba(249,115,22,.35) !important;
-    transition: all .2s !important; cursor: pointer !important;
-}
-[data-testid="stFormSubmitButton"] button:hover,
-[data-testid="stForm"] .stButton > button:hover {
-    background: linear-gradient(135deg,#EA580C,#C2410C) !important;
-    box-shadow: 0 4px 14px rgba(249,115,22,.45) !important;
-    transform: translateY(-1px) !important;
-}
-
-/* ── metric card ── */
 .mc {
-    background: linear-gradient(135deg,#fff7ed,#ffffff);
-    border: 1px solid #fed7aa; border-left: 5px solid #F97316;
-    border-radius: 14px; padding: 20px 22px; margin-bottom: 12px;
+    background: var(--card);
+    border: 1px solid var(--bd); border-left: 5px solid var(--pr);
+    border-radius: 10px; padding: 22px; margin-bottom: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.04);
 }
-.mc-lbl { font-size: 10.5px; font-weight: 700; color: #a8a29e;
+.mc-lbl { font-size: 10px; font-weight: 700; color: var(--t2);
     text-transform: uppercase; letter-spacing: .6px; margin-bottom: 8px; }
-.mc-val { font-family: 'Inter',sans-serif; font-size: 44px; font-weight: 800;
-    color: #1c1917; line-height: 1; letter-spacing: -1.5px; }
-.mc-unit { font-size: 16px; font-weight: 500; color: #a8a29e; margin-left: 6px; }
-.mc-badge { display:inline-flex; align-items:center; margin-top:12px;
-    font-size:12px; font-weight:700; padding:5px 14px; border-radius:20px; gap:5px; }
-.b-hi { background:#dcfce7; color:#15803d; border:1px solid #bbf7d0; }
-.b-md { background:#fef9c3; color:#92400e; border:1px solid #fde68a; }
-.b-lo { background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; }
+.mc-val { font-size: 40px; font-weight: 800;
+    color: var(--t1); line-height: 1; letter-spacing: -1px; }
+.mc-unit { font-size: 14px; font-weight: 500; color: var(--t3); margin-left: 4px; }
 
-/* ── KPI strip ── */
-.kpi-row { display:flex; gap:10px; margin-bottom:12px; }
-.kpi { flex:1; background:#f9fafb; border:1px solid #e5e7eb;
-    border-radius:10px; padding:10px 12px; text-align:center; }
-.kpi-l { font-size:10px; font-weight:700; color:#9ca3af;
-    text-transform:uppercase; letter-spacing:.5px; margin-bottom:4px; }
-.kpi-v { font-size:18px; font-weight:800; color:#111827; }
+.kpi-row { display:flex; gap:10px; margin-bottom:14px; }
+.kpi { flex:1; background:#fff; border: 1px solid var(--bd);
+    border-radius:8px; padding:10px; text-align:center; }
+.kpi-l { font-size:9px; font-weight:700; color:var(--t3);
+    text-transform: uppercase; letter-spacing:.5px; margin-bottom:4px; }
+.kpi-v { font-size:16px; font-weight:800; color:var(--t1); }
 
-/* ── chip row ── */
-.chips { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
-.chip { display:inline-flex; align-items:center; gap:5px;
-    background:#f9fafb; border:1px solid #e5e7eb;
-    border-radius:8px; padding:5px 10px;
-    font-size:11px; font-weight:600; color:#6b7280; }
-.chip b { color:#111827; }
-
-/* ── placeholder ── */
 .ph {
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    height:360px;
-    background: repeating-linear-gradient(-45deg,#fafafa,#fafafa 8px,#f3f4f6 8px,#f3f4f6 16px);
-    border:1px dashed #d1d5db; border-radius:14px;
-    color:#9ca3af; font-size:13px; line-height:1.8; text-align:center; padding:24px;
+    height:380px; background: #fff;
+    border: 2px dashed #f0f0f0; border-radius: 12px;
+    color: var(--t2); text-align: center; padding: 24px;
 }
-.ph .ico { font-size:38px; margin-bottom:10px; }
-.ph b { color:#6b7280; }
+.ph .ico { font-size:44px; margin-bottom:12px; filter: grayscale(0.5); }
+.ph b { color: var(--t1); font-weight: 700; }
+
+div.stButton > button {
+    background: linear-gradient(135deg, var(--pr), #EA580C) !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: none !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    padding: 0.7rem 1rem !important;
+    width: 100% !important;
+    box-shadow: 0 4px 10px rgba(249,115,22,0.2) !important;
+    transition: all 0.2s !important;
+}
+div.stButton > button:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 15px rgba(249,115,22,0.3) !important;
+}
 </style>
 """
-
 
 def render(df):
     PIPELINE_PATH = Path(__file__).resolve().parents[2] / "data" / "processed" / "sales_prediction_pipeline.joblib"
 
-    # ── Discover models ────────────────────────────────────────────────────
     try:
         model_options = [p.name for p in sorted(MODELS_DIR.glob("*.pkl"))
                          if p.name != "feature_names.pkl"]
@@ -155,35 +132,34 @@ def render(df):
     default_name  = "gradient_boosting_model.pkl"
     default_index = model_options.index(default_name) if default_name in model_options else 0
 
-    # ── CSS ────────────────────────────────────────────────────────────────
     st.markdown(_CSS, unsafe_allow_html=True)
 
-    # ── Title row ──────────────────────────────────────────────────────────
     st.markdown(
-        '<div class="fc-title-row">'
-        '  <div style="display:flex;align-items:baseline;">'
-        '    <span class="fc-title">Dự Báo Hiệu Suất Sản Phẩm</span>'
-        '    <span class="fc-sub">Advanced ML Predictive Model</span>'
+        '<div class="fb">'
+        '  <div style="display:flex; flex-direction:column; align-items:flex-start; justify-content:center;">'
+        '    <div style="font-size:16px; font-weight:800; color:var(--dk);">DỰ BÁO HIỆU SUẤT SẢN PHẨM</div>'
+        '    <div style="font-size:11px; color:var(--t2); font-weight:500;">Sử dụng Machine Learning để tối ưu doanh số</div>'
         '  </div>'
-        '  <span class="fc-badge">🤖 AI Forecast Engine</span>'
         '</div>',
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
+    
+    st.markdown('<div style="margin-bottom:20px;"></div>', unsafe_allow_html=True)
 
-    # ── Model selector (right-aligned, above result column) ───────────────
-    _, modcol = st.columns([5, 7])
-    with modcol:
-        mcol_left, mcol_right = st.columns([2, 5])
-        with mcol_right:
-            selected_model_name = st.selectbox(
-                "Mô hình AI",
-                options=model_options,
-                index=default_index,
-                key="model_selector",
-                format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title(),
-            )
+    col_form, col_res = st.columns([5, 7], gap="large")
 
-    # ── Load artifacts ─────────────────────────────────────────────────────
+    with col_form:
+        st.markdown('<div class="sec first" style="margin-bottom:12px;">CẤU HÌNH MÔ HÌNH AI</div>', unsafe_allow_html=True)
+        selected_model_name = st.selectbox(
+            "Mô hình dự báo",
+            options=model_options,
+            index=default_index,
+            key="model_selector",
+            format_func=lambda s: s.replace("_", " ").replace(".pkl", "").title(),
+            label_visibility="collapsed"
+        )
+        st.markdown('<div style="margin-top:24px;"></div>', unsafe_allow_html=True)
+
     try:
         for _m in ("main", "__main__"):
             mod = sys.modules.get(_m)
@@ -199,7 +175,6 @@ def render(df):
         processor = joblib.load(PIPELINE_PATH)
         model     = joblib.load(MODELS_DIR / selected_model_name)
 
-        # category options from OHE
         try:
             cat_transformer = processor.named_steps["preprocessor"].named_transformers_["cat_path"]
             ohe = cat_transformer.named_steps["onehot"]
@@ -207,7 +182,6 @@ def render(df):
         except Exception:
             cat_options = ["electronics", "home", "fashion"]
 
-        # feature names for importance chart
         try:
             raw_feat_names = list(processor.named_steps["preprocessor"].get_feature_names_out())
             display_feat   = [c.split("__")[-1] for c in raw_feat_names]
@@ -218,50 +192,47 @@ def render(df):
         st.error(f"Lỗi load model: {e}")
         return
 
-    # ══════════════════════════════════════════════════════════════════════
-    # Layout: form (left 5) | result (right 7)
-    # ══════════════════════════════════════════════════════════════════════
-    col_form, col_res = st.columns([5, 7], gap="large")
-
-    # ── LEFT: form ─────────────────────────────────────────────────────────
     with col_form:
         with st.form("predict_form", clear_on_submit=False):
 
-            st.markdown('<div class="sec first">① Giá &amp; Cạnh Tranh</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec first">CHIẾN LƯỢC GIÁ & CẠNH TRANH</div>', unsafe_allow_html=True)
             ca, cb = st.columns(2)
             with ca:
                 f_price      = st.number_input("Giá hiện tại ($)",        value=25.0,  format="%.2f", step=0.5)
             with cb:
                 f_orig_price = st.number_input("Giá gốc ($)",             value=30.0,  format="%.2f", step=0.5)
+            
             cc, cd = st.columns(2)
             with cc:
-                f_lowest     = st.number_input("Giá chào thấp nhất ($)",  value=20.0,  format="%.2f", step=0.5)
+                f_lowest     = st.number_input("Giá thấp nhất ($)",  value=20.0,  format="%.2f", step=0.5)
             with cd:
-                f_ship       = st.number_input("Phí vận chuyển ($)",      value=0.0,   format="%.2f", step=0.5)
-            f_offers = st.number_input("Số nhà bán cạnh tranh", value=1, min_value=0, step=1)
+                f_offers     = st.number_input("Số đối thủ",         value=1, min_value=0, step=1)
+            
+            f_ship       = st.number_input("Phí vận chuyển ($)",      value=0.0,   format="%.2f", step=0.5)
 
-            st.markdown('<div class="sec">② Đánh Giá</div>', unsafe_allow_html=True)
-            f_rating  = st.slider("Điểm đánh giá (0–5)", 0.0, 5.0, 4.2, step=0.1)
-            f_reviews = st.number_input("Số lượt đánh giá",     value=100, min_value=0, step=1)
+            st.markdown('<div class="sec">ĐÁNH GIÁ & UY TÍN</div>', unsafe_allow_html=True)
+            f_rating  = st.slider("Điểm đánh giá (Rating)", 0.0, 5.0, 4.2, step=0.1)
+            f_reviews = st.number_input("Số lượt đánh giá (Reviews)", value=100, min_value=0, step=1)
 
-            st.markdown('<div class="sec">③ Danh Mục &amp; Đặc Tính</div>', unsafe_allow_html=True)
+            st.markdown('<div class="sec">PHÂN LOẠI & ĐẶC TÍNH</div>', unsafe_allow_html=True)
             f_cat = st.selectbox("Danh mục sản phẩm", cat_options,
                                  format_func=lambda s: s.replace("_", " ").title())
-            ce, cf = st.columns(2)
-            with ce:
-                f_prime  = st.checkbox("Prime",             value=True)
+            
+            chk_col1, chk_col2 = st.columns(2)
+            with chk_col1:
+                f_prime  = st.checkbox("Hỗ trợ Prime",      value=True)
                 f_choice = st.checkbox("Amazon's Choice",   value=False)
-            with cf:
+            with chk_col2:
                 f_climate = st.checkbox("Climate Friendly", value=False)
                 f_vars    = st.checkbox("Có biến thể",      value=True)
 
-            submitted = st.form_submit_button("🔮  Dự Đoán Doanh Số", use_container_width=True)
+            st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
+            submitted = st.form_submit_button("THỰC HIỆN DỰ BÁO")
 
-    # ── RIGHT: result ──────────────────────────────────────────────────────
     with col_res:
         if not submitted:
             st.markdown(
-                '<div class="ph"><div class="ico">🎯</div>'
+                '<div class="ph">'
                 'Nhập thông số sản phẩm ở cột bên trái<br>'
                 'rồi nhấn <b>Dự Đoán Doanh Số</b> để xem kết quả.</div>',
                 unsafe_allow_html=True,
@@ -294,13 +265,12 @@ def render(df):
                 final_val = int(max(0, round(np.expm1(raw_pred))))
 
                 if final_val > 200:
-                    badge_txt, badge_cls = "🚀 Tiềm năng cao", "b-hi"
+                    badge_txt, badge_cls = "Tiềm năng cao", "b-hi"
                 elif final_val > 50:
-                    badge_txt, badge_cls = "⚖️ Ổn định",       "b-md"
+                    badge_txt, badge_cls = "Ổn định",       "b-md"
                 else:
-                    badge_txt, badge_cls = "⚠️ Cần tối ưu",    "b-lo"
+                    badge_txt, badge_cls = "Cần tối ưu",    "b-lo"
 
-                # Metric card
                 st.markdown(
                     f'<div class="mc">'
                     f'  <div class="mc-lbl">Dự đoán doanh số / tháng</div>'
@@ -310,13 +280,12 @@ def render(df):
                     unsafe_allow_html=True,
                 )
 
-                # KPI strip
                 st.markdown(
                     f'<div class="kpi-row">'
                     f'<div class="kpi"><div class="kpi-l">Discount</div>'
                     f'<div class="kpi-v">{f_discount_rate*100:.1f}%</div></div>'
                     f'<div class="kpi"><div class="kpi-l">Rating</div>'
-                    f'<div class="kpi-v">⭐ {f_rating:.1f}</div></div>'
+                    f'<div class="kpi-v">{f_rating:.1f}</div></div>'
                     f'<div class="kpi"><div class="kpi-l">Reviews</div>'
                     f'<div class="kpi-v">{f_reviews:,}</div></div>'
                     f'<div class="kpi"><div class="kpi-l">Đối thủ</div>'
@@ -325,26 +294,24 @@ def render(df):
                     unsafe_allow_html=True,
                 )
 
-                # Chips
                 model_lbl = selected_model_name.replace("_"," ").replace(".pkl","").title()
                 cat_lbl   = f_cat.replace("_"," ").title()
                 extras    = "".join(
                     f'<span class="chip">{t}</span>'
-                    for t in (["🏆 Choice"] if f_choice else [])
-                           + (["🌿 Climate"] if f_climate else [])
-                           + (["🎨 Biến thể"] if f_vars else [])
+                    for t in (["Choice"] if f_choice else [])
+                           + (["Climate Friendly"] if f_climate else [])
+                           + (["Có biến thể"] if f_vars else [])
                 )
                 st.markdown(
                     f'<div class="chips">'
-                    f'<span class="chip">📦 <b>{cat_lbl}</b></span>'
-                    f'<span class="chip">{"✅" if f_prime else "❌"} Prime</span>'
-                    f'<span class="chip">🤖 <b>{model_lbl}</b></span>'
+                    f'<span class="chip"><b>{cat_lbl}</b></span>'
+                    f'<span class="chip">{"Hỗ trợ" if f_prime else "Không"} Prime</span>'
+                    f'<span class="chip">Model: <b>{model_lbl}</b></span>'
                     f'{extras}'
                     f'</div>',
                     unsafe_allow_html=True,
                 )
 
-                # Feature importance chart
                 if hasattr(model, "feature_importances_"):
                     names = display_feat if display_feat else [f"F{i}" for i in range(len(model.feature_importances_))]
                     feat_df = (
@@ -378,13 +345,3 @@ def render(df):
 
             except Exception as e:
                 st.error(f"Lỗi dự báo: {e}")
-
-    # ── Technical expander ─────────────────────────────────────────────────
-    with st.expander("⚙️ Thông tin kỹ thuật"):
-        c1, c2 = st.columns(2)
-        with c1:
-            st.write("**Loại mô hình:**", type(model).__name__)
-            st.write("**Pipeline:**", PIPELINE_PATH.name)
-        with c2:
-            st.write("**Số features:**", len(raw_feat_names) if raw_feat_names else "N/A")
-            st.write("**Cat options:**", ", ".join(cat_options))
