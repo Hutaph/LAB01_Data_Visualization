@@ -35,7 +35,8 @@ def render(df_raw):
         'asin', 'link', 'slug', 'parent_asin', 'landing_asin', 'date', 
         'image_url', 'brand_url', 'brand_urls', 'crawl_category', 'Danh Mục Sản Phẩm',
         'discount', 'discount_rate',
-        'frequently_bought_together', 'currency', 'min_order_quantity'
+        'frequently_bought_together', 'currency', 'min_order_quantity',
+        'is_amazon_choice', 'is_prime', 'is_bestseller', 'is_best_seller'
     ]
     eval_cols = [c for c in df.columns if c not in exclude_cols]
     
@@ -462,7 +463,7 @@ def render(df_raw):
         let freqMap = new Map();
         data.forEach(d => {{
             let m = d.missing_count;
-            let key = (m >= 37) ? 999 : m;
+            let key = (m >= 34) ? 999 : m;
             if (!freqMap.has(key)) freqMap.set(key, {{ count: 0, products: [], vals: [] }});
             let entry = freqMap.get(key);
             entry.count++;
@@ -476,7 +477,7 @@ def render(df_raw):
         let curBin = {{ vals: [], products: [], count: 0 }};
         
         // Critical split points requested by user
-        const FORCED = [6, 18, 28, 999];
+        const FORCED = [15, 18, 28, 999];
 
         sortedKeys.forEach((v, idx) => {{
             let entry = freqMap.get(v);
@@ -500,7 +501,7 @@ def render(df_raw):
             b.vals.sort((a,b) => a - b);
             let minM = b.vals[0];
             let maxM = b.vals[b.vals.length - 1];
-            let label = (minM >= 37) ? '37+' : (minM === maxM ? `${{minM}}` : `${{minM}}-${{maxM}}`);
+            let label = (minM >= 34) ? '34+' : (minM === maxM ? `${{minM}}` : `${{minM}}-${{maxM}}`);
             return {{
                 label: label,
                 salesArr: b.products.map(p => p.sales_volume_num),
